@@ -23,6 +23,7 @@ Environment entries:
 - secrets: `NPM_TOKEN`, `PUTIO_RELEASE_BOT_PRIVATE_KEY`
 - variables: `PUTIO_RELEASE_BOT_CLIENT_ID`
 - approval: none
+- branch policy: `main`
 - deployment records: disabled with `deployment: false`
 
 Keep `NPM_TOKEN` in the `release` Environment so pull requests stay

@@ -1,7 +1,7 @@
 {
   "name": "taizn",
   "version": "0.0.0",
-  "description": "Small Samsung Tizen widget packaging and sideloading CLI.",
+  "description": "A tiny CLI companion for interacting with Tizen ecosystem.",
   "keywords": [
     "cli",
     "samsung",
@@ -19,7 +19,7 @@
     "url": "https://github.com/putdotio/taizn.git"
   },
   "bin": {
-    "taizn": "./dist/tizen-cli.mjs"
+    "taizn": "./dist/taizn.mjs"
   },
   "files": [
     "dist",
@@ -31,19 +31,32 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vp pack src/tizen-cli.mts",
+    "build": "vp pack src/taizn.ts",
     "check": "vp check .",
     "clean": "rm -rf .turbo coverage dist",
-    "dev": "vp pack src/tizen-cli.mts --watch",
-    "prepack": "vp pack src/tizen-cli.mts",
+    "dev": "vp pack src/taizn.ts --watch",
+    "live:test": "vp pack src/taizn.ts && node live-test/run-live-test.ts",
+    "live:test:install": "vp pack src/taizn.ts && node live-test/run-live-test.ts --install",
+    "live:test:profile": "vp pack src/taizn.ts && node live-test/run-live-test.ts --profile",
+    "prepack": "vp pack src/taizn.ts",
+    "smoke": "vp pack src/taizn.ts && node dist/taizn.mjs --version && node dist/taizn.mjs --help >/dev/null",
     "test": "vp test --passWithNoTests",
     "typecheck": "tsc --noEmit",
-    "verify": "vp check . && vp pack src/tizen-cli.mts && vp test --passWithNoTests && npm pack --dry-run"
+    "verify": "vp check . && tsc --noEmit && vp pack src/taizn.ts && vp test --passWithNoTests && npm pack --dry-run"
+  },
+  "dependencies": {
+    "@effect/cli": "^0.75.1",
+    "@effect/platform": "^0.96.1",
+    "@effect/platform-node": "^0.106.0",
+    "@effect/printer": "^0.49.0",
+    "@effect/printer-ansi": "^0.49.0",
+    "effect": "^3.21.2"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",
     "typescript": "^6.0.2",
-    "vite-plus": "^0.1.20"
+    "vite-plus": "^0.1.20",
+    "vitest": "^4.1.5"
   },
   "engines": {
     "node": ">=24.14.0 <25"

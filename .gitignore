@@ -6,6 +6,8 @@
 .turbo
 coverage
 dist
+live-test/app/tizen/icon.png
+live-test/app/taizn.json
 node_modules
 *.log
 *.tsbuildinfo

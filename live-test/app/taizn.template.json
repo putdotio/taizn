@@ -1,0 +1,33 @@
+{
+  "build": {
+    "command": ["node", "build.ts"],
+    "output": "dist",
+    "requiredFiles": ["index.html"]
+  },
+  "signing": {
+    "certificateDir": ".taizn/certificates",
+    "profile": "__TAIZN_PROFILE__"
+  },
+  "widget": {
+    "configXml": "tizen/config.xml",
+    "indexHtml": "dist/index.html",
+    "injectWebapis": true,
+    "rewriteAssetUrls": false,
+    "variants": {
+      "development": {
+        "applicationId": "TaiznLiveD.taizn",
+        "bundleName": "taizn-live-test-dev",
+        "icon": "tizen/icon.png",
+        "name": "Taizn Live Test Dev",
+        "packageId": "TaiznLiveD"
+      },
+      "production": {
+        "applicationId": "TaiznLive.taizn",
+        "bundleName": "taizn-live-test",
+        "icon": "tizen/icon.png",
+        "name": "Taizn Live Test",
+        "packageId": "TaiznLive"
+      }
+    }
+  }
+}

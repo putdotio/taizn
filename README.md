@@ -1,6 +1,18 @@
-# taizn
+<div align="center">
+  <p>
+    <img src="https://static.put.io/images/putio-boncuk.png" width="72">
+  </p>
 
-Small CLI for packaging and sideloading Samsung Tizen web widgets.
+  <h1>taizn</h1>
+
+  <p>A tiny CLI companion for interacting with Tizen ecosystem.</p>
+
+  <p>
+    <a href="https://github.com/putdotio/taizn/actions/workflows/ci.yml?query=branch%3Amain" style="text-decoration:none;"><img src="https://img.shields.io/github/actions/workflow/status/putdotio/taizn/ci.yml?branch=main&style=flat&label=ci&colorA=000000&colorB=000000" alt="CI"></a>
+    <a href="https://www.npmjs.com/package/taizn" style="text-decoration:none;"><img src="https://img.shields.io/npm/v/taizn?style=flat&label=npm&logo=npm&colorA=000000&colorB=000000" alt="npm version"></a>
+    <a href="https://github.com/putdotio/taizn/blob/main/LICENSE" style="text-decoration:none;"><img src="https://img.shields.io/github/license/putdotio/taizn?style=flat&label=license&colorA=000000&colorB=000000" alt="License"></a>
+  </p>
+</div>
 
 ## Install
 
@@ -8,16 +20,24 @@ Small CLI for packaging and sideloading Samsung Tizen web widgets.
 pnpm add -D taizn
 ```
 
-Install Samsung's Tizen Studio and make sure `tizen` and `sdb` work locally.
+Install the Tizen command-line tools and make sure `tizen` and `sdb` work
+locally.
 
-## Project Files
+## Usage
+
+Create `taizn.json` in the app directory, keep `.taizn/` ignored, then run:
+
+```bash
+pnpm exec taizn package
+pnpm exec taizn install
+```
+
+Project files:
 
 - `taizn.json`: app build, widget, signing, and variant config
 - `.taizn/.env`: optional local secrets read by Node
 - `.taizn/certificates/`: optional local author/distributor certs for `taizn profile`
 - `.taizn/build/`: generated package staging and output
-
-Keep `.taizn/` ignored.
 
 ## Commands
 
@@ -25,6 +45,7 @@ Keep `.taizn/` ignored.
 taizn profile
 taizn package
 taizn install
+taizn --version
 ```
 
 `profile` imports `.taizn/certificates/author.p12` and
@@ -37,7 +58,7 @@ taizn install
 TAIZN_CERT_PASSWORD=...
 TAIZN_DIST_PASSWORD=...
 TAIZN_VARIANT=development
-TAIZN_TARGET=192.168.1.99:26101
+TAIZN_TARGET=<tv-ip>:26101
 TAIZN_TIZEN_CLI=~/tizen-studio/tools/ide/bin/tizen
 TAIZN_SDB=~/tizen-studio/tools/sdb
 ```
@@ -79,3 +100,21 @@ TAIZN_SDB=~/tizen-studio/tools/sdb
   }
 }
 ```
+
+## Docs
+
+- [Contributing](./CONTRIBUTING.md)
+- [Distribution](./docs/DISTRIBUTION.md)
+- [Security](./SECURITY.md)
+
+## Repo Internals
+
+- [Agent guide](./AGENTS.md)
+
+## Contributing
+
+See [Contributing](./CONTRIBUTING.md) for setup, checks, and pull request flow.
+
+## License
+
+[MIT](./LICENSE)

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns:tizen="http://tizen.org/ns/widgets" xmlns="http://www.w3.org/ns/widgets" id="https://github.com/putdotio/taizn/live-test" version="1.0.0" height="1080" width="1920" viewmodes="maximized">
+  <access origin="*" subdomains="true"></access>
+  <tizen:application id="TaiznLiveD.taizn" package="TaiznLiveD" required_version="2.3"/>
+  <author href="https://github.com/putdotio/taizn" email="devs@put.io">taizn</author>
+  <content src="index.html"/>
+  <description>Live test app for taizn packaging and install checks.</description>
+  <feature name="http://tizen.org/feature/network.wifi"/>
+  <feature name="http://tizen.org/feature/screen.size.all"/>
+  <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>
+  <feature name="http://tizen.org/feature/tv.audio"/>
+  <feature name="http://tizen.org/feature/tv.display"/>
+  <feature name="http://tizen.org/feature/tv.inputdevice"/>
+  <icon src="icon.png"/>
+  <name>Taizn Live Test Dev</name>
+  <tizen:privilege name="http://developer.samsung.com/privilege/network.public"/>
+  <tizen:privilege name="http://tizen.org/privilege/download"/>
+  <tizen:privilege name="http://tizen.org/privilege/fullscreen"/>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.audio"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.display"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:profile name="tv-samsung"/>
+  <tizen:setting screen-orientation="landscape" context-menu="enable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="disable"/>
+</widget>
