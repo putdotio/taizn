@@ -9,7 +9,7 @@
 
   <p>
     <a href="https://github.com/putdotio/taizn/actions/workflows/ci.yml?query=branch%3Amain" style="text-decoration:none;"><img src="https://img.shields.io/github/actions/workflow/status/putdotio/taizn/ci.yml?branch=main&style=flat&label=ci&colorA=000000&colorB=000000" alt="CI"></a>
-    <a href="https://www.npmjs.com/package/taizn" style="text-decoration:none;"><img src="https://img.shields.io/npm/v/taizn?style=flat&label=npm&logo=npm&colorA=000000&colorB=000000" alt="npm version"></a>
+    <a href="https://www.npmjs.com/package/@putdotio/taizn" style="text-decoration:none;"><img src="https://img.shields.io/npm/v/%40putdotio%2Ftaizn?style=flat&label=npm&logo=npm&colorA=000000&colorB=000000" alt="npm version"></a>
     <a href="https://github.com/putdotio/taizn/blob/main/LICENSE" style="text-decoration:none;"><img src="https://img.shields.io/github/license/putdotio/taizn?style=flat&label=license&colorA=000000&colorB=000000" alt="License"></a>
   </p>
 </div>
@@ -17,7 +17,7 @@
 ## Install
 
 ```bash
-pnpm add -D taizn
+pnpm add -D @putdotio/taizn
 ```
 
 Install the Tizen command-line tools and make sure `tizen` and `sdb` work

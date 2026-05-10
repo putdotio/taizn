@@ -10,7 +10,7 @@ CI runs:
 2. `vp run verify`
 3. `semantic-release` on `main`
 
-The release workflow publishes the unscoped `taizn` package to npm, creates a
+The release workflow publishes the scoped `@putdotio/taizn` package to npm, creates a
 GitHub release, and commits the released `package.json` version back to `main`
 with `[skip ci]`.
 

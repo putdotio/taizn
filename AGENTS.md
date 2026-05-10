@@ -23,7 +23,7 @@ Keep this repo boring: one CLI package, one verify command, one release lane.
 - `.taizn/` is consumer-local generated and secret material; keep it ignored.
 - `live-test/` is the manual fixture for local Tizen packaging and install checks.
 - CI runs `vp run verify`.
-- Releases publish the unscoped `taizn` npm package from `main`.
+- Releases publish the scoped `@putdotio/taizn` npm package from `main`.
 - `CLAUDE.md` is a symlink to this file.
 
 ## Working Rules
