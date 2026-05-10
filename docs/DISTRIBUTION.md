@@ -14,6 +14,9 @@ The release workflow publishes the scoped `@putdotio/taizn` package to npm, crea
 GitHub release, and commits the released `package.json` version back to `main`
 with `[skip ci]`.
 
+Verify jobs can cancel stale runs; release jobs queue so package publishing is
+not interrupted.
+
 ## Release Environment
 
 The release job uses the GitHub Environment named `release`.
