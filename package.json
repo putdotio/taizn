@@ -16,10 +16,10 @@
   "author": "put.io <devs@put.io>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/putdotio/taizn.git"
+    "url": "git+https://github.com/putdotio/taizn.git"
   },
   "bin": {
-    "taizn": "./dist/taizn.mjs"
+    "taizn": "dist/taizn.mjs"
   },
   "files": [
     "dist",
