@@ -1,0 +1,11 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.taizn/
+.turbo
+coverage
+dist
+node_modules
+*.log
+*.tsbuildinfo
