@@ -1,55 +1,52 @@
 # Agent Guide
 
-Keep this repo boring: one CLI package, one verify command, one release lane.
+`taizn` is a small Node CLI that wraps Tizen CLI packaging/install work for a
+consumer app. Keep it a typed shell-out tool, not an app framework.
 
-## Start Here
+## Patterns
 
-- [Overview](./README.md)
-- [Contributing](./CONTRIBUTING.md)
-- [Distribution](./docs/DISTRIBUTION.md)
-- [Security](./SECURITY.md)
+- Keep CLI wiring thin: parse/dispatch commands, then call named implementation functions.
+- Parse `taizn.json` and `TAIZN_*` with Effect Schema before implementation code sees them.
+- Treat `process.cwd()` as the consumer app root.
+- Keep `.taizn/` consumer-local; it can hold env, certs, generated widgets, and device state.
+- Keep file/process side effects explicit: copy, stage, clean, run Tizen, fail clearly.
+- Prefer small helpers over new framework layers or compatibility modes.
 
-## Repo Shape
+## Sharp Edges
 
-- `src/taizn.ts` is the CLI entrypoint and dispatch.
-- `src/cli.ts` owns Effect CLI command wiring.
-- `src/context.ts` loads typed config and environment for commands.
-- `src/config.ts` owns `taizn.json` parsing with Effect Schema.
-- `src/env.ts` owns `TAIZN_*` environment parsing with Effect Schema.
-- `src/runtime.ts` owns process, path, env, and command helpers.
-- `src/tizen.ts` owns profile, package, and install behavior.
-- `src/xml.ts` owns small XML rewrite helpers.
-- `taizn.json` is the consumer project config file.
-- `.taizn/` is consumer-local generated and secret material; keep it ignored.
-- `live-test/` is the manual fixture for local Tizen packaging and install checks.
-- CI runs `vp run verify`.
-- Releases publish the scoped `@putdotio/taizn` npm package from `main`.
-- `CLAUDE.md` is a symlink to this file.
+- Plain `taizn` should behave like `taizn package`.
+- Do not leak `TAIZN_*`, `TIZEN_*`, or `SDB` into the consumer build command.
+- Redact password args when reporting failed Tizen commands.
+- Missing config/env/files and child-command failures should not print stack traces.
+- `install` should only auto-pick a target when exactly one `sdb devices` target is connected.
+- Unit tests prove CLI behavior; only `vp run live:test:*` proves real Tizen behavior.
 
-## Working Rules
+## When Contracts Change
 
-- Keep behavior project-agnostic; no put.io app assumptions in the CLI.
-- Keep docs concise and current-state.
-- Prefer one obvious flow over compatibility modes.
-- Parse external project config at the boundary before passing values inward.
-- Keep command parsing in `src/cli.ts`; keep Tizen side effects in `src/tizen.ts`.
+- Config/env/command/output changes: update `README.md` and CLI tests.
+- CI/release/publishing changes: update `docs/DISTRIBUTION.md`.
+- Keep `CLAUDE.md` as a symlink to this file.
 
-## Verification
+## Checks
 
 ```bash
 vp install
 vp run verify
 ```
 
-Fast CLI smoke:
+Fast loops:
 
 ```bash
+vp run check
+vp run typecheck
 vp run smoke
+vp run test
 ```
 
-Manual Tizen live check:
+Live Tizen checks when the local toolchain/certs/device exist:
 
 ```bash
+vp run live:test:profile
 vp run live:test
 vp run live:test:install
 ```
