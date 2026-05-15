@@ -1,16 +1,28 @@
 import { Command } from "@effect/cli";
 import { Effect } from "effect";
 import { loadContext } from "./context.js";
-import { createProfile, installWidget, packageWidget } from "./tizen.js";
+import { loadEnv } from "./env.js";
+import { checkTizen, createProfile, installWidget, packageWidget } from "./tizen.js";
 
 const runSync = (operation: (context: ReturnType<typeof loadContext>) => void) =>
   Effect.sync(() => {
     operation(loadContext());
   });
 
+const runEnvSync = (operation: (env: ReturnType<typeof loadEnv>) => void) =>
+  Effect.sync(() => {
+    operation(loadEnv());
+  });
+
 const taizn = Command.make("taizn", {}, () =>
   runSync((context) => {
     packageWidget(context);
+  }),
+);
+
+const check = Command.make("check", {}, () =>
+  runEnvSync((env) => {
+    checkTizen(env);
   }),
 );
 
@@ -32,4 +44,4 @@ const install = Command.make("install", {}, () =>
   }),
 );
 
-export const command = taizn.pipe(Command.withSubcommands([profile, pack, install]));
+export const command = taizn.pipe(Command.withSubcommands([check, profile, pack, install]));

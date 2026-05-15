@@ -18,6 +18,7 @@ describe("taizn cli", () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("COMMANDS");
+    expect(result.stdout).toContain("check");
     expect(result.stdout).toContain("package");
     expect(result.stderr).toBe("");
   });
@@ -37,6 +38,25 @@ describe("taizn cli", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("Config file not found:");
     expect(result.stderr).not.toContain("Error:");
+  });
+
+  it("checks tooling without requiring a project config", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-check-"));
+    const result = spawnSync(process.execPath, [cliPath, "check"], {
+      cwd: dir,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        TAIZN_SDB: "/bin/echo",
+        TAIZN_TIZEN_CLI: "/bin/echo",
+      },
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Tizen CLI: /bin/echo");
+    expect(result.stdout).toContain("sdb: /bin/echo");
+    expect(result.stdout).toContain("connected targets: none");
+    expect(result.stderr).toBe("");
   });
 
   it("reports schema errors with config paths", () => {

@@ -28,6 +28,7 @@ locally.
 Create `taizn.json` in the app directory, keep `.taizn/` ignored, then run:
 
 ```bash
+pnpm exec taizn check
 pnpm exec taizn package
 pnpm exec taizn install
 ```
@@ -42,17 +43,23 @@ Project files:
 ## Commands
 
 ```bash
+taizn check
 taizn profile
 taizn package
 taizn install
 taizn --version
 ```
 
-`profile` imports `.taizn/certificates/author.p12` and
+`check` verifies the configured Tizen CLI and `sdb`, then prints connected
+targets without requiring `taizn.json`. `profile` imports
+`.taizn/certificates/author.p12` and
 `.taizn/certificates/distributor.p12` into a Tizen security profile.
 `package` builds and signs a `.wgt`. `install` packages and sideloads it.
 
 ## Environment
+
+Copy [.env.example](./.env.example) into `.taizn/.env` or export values in the
+shell:
 
 ```bash
 TAIZN_CERT_PASSWORD=...

@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { TaiznContext } from "./context.js";
 import type { TizenConfig, TizenVariant } from "./config.js";
+import type { TaiznEnv } from "./env.js";
 import {
   appBuildEnv,
   appDir,
@@ -29,6 +30,26 @@ type SdbDevice = {
   id: string;
   label: string;
   state: string;
+};
+
+export const checkTizen = (env: TaiznEnv) => {
+  const tizenPath = tizenCli(env.tizenCli);
+  const sdbPath = sdb(env.sdb);
+  const devices = listSdbDevices(sdbPath);
+
+  console.log(`Tizen CLI: ${tizenPath}`);
+  console.log(`sdb: ${sdbPath}`);
+
+  if (devices.length === 0) {
+    console.log("connected targets: none");
+    return;
+  }
+
+  console.log("connected targets:");
+
+  for (const device of devices) {
+    console.log(`- ${device.id}${device.label ? ` (${device.label})` : ""}`);
+  }
 };
 
 export const createProfile = async ({ config, env }: TaiznContext) => {
