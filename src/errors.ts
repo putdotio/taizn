@@ -67,6 +67,29 @@ export class CommandFailed extends Schema.TaggedErrorClass<CommandFailed>()("Com
   }
 }
 
+export class ApplicationNotFound extends Schema.TaggedErrorClass<ApplicationNotFound>()(
+  "ApplicationNotFound",
+  {
+    query: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `No installed Tizen application matched "${this.query}".`;
+  }
+}
+
+export class MultipleApplicationsMatched extends Schema.TaggedErrorClass<MultipleApplicationsMatched>()(
+  "MultipleApplicationsMatched",
+  {
+    matches: Schema.Array(Schema.String),
+    query: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `Multiple installed Tizen applications matched "${this.query}": ${this.matches.join(", ")}. Use the application ID.`;
+  }
+}
+
 export class PackageNotProduced extends Schema.TaggedErrorClass<PackageNotProduced>()(
   "PackageNotProduced",
   {
@@ -177,6 +200,7 @@ export class TvRemoteUnauthorized extends Schema.TaggedErrorClass<TvRemoteUnauth
 }
 
 export type TaiznError =
+  | ApplicationNotFound
   | CommandFailed
   | ConfigNotFound
   | FileSystemFailure
@@ -188,6 +212,7 @@ export type TaiznError =
   | MissingTizenTarget
   | MissingTvRemoteHost
   | MissingTvRemoteToken
+  | MultipleApplicationsMatched
   | MultipleTargetsConnected
   | PackageNotProduced
   | SecretReadInterrupted

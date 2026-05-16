@@ -56,6 +56,7 @@ describe("taizn cli", () => {
     assert.include(result.stdout, "COMMANDS");
     assert.include(result.stdout, "apps");
     assert.include(result.stdout, "check");
+    assert.include(result.stdout, "launch");
     assert.include(result.stdout, "package");
     assert.include(result.stdout, "run");
     assert.include(result.stdout, "tv");
@@ -109,6 +110,32 @@ describe("taizn cli", () => {
     assert.include(result.stdout, 'Installed Tizen applications matching "put"');
     assert.include(result.stdout, "- put.io (Example.app)");
     assert.notInclude(result.stdout, "Other App");
+  });
+
+  it("launches an installed Tizen application without requiring a project config", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["launch", "Example.app"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.include(result.stdout, "fake-tizen run -p Example.app -s 127.0.0.1:26101");
+    assert.include(result.stdout, "Launched put.io (Example.app) on 127.0.0.1:26101");
+  });
+
+  it("rejects ambiguous installed application launch queries", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["launch", "app"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+
+    assert.strictEqual(result.status, 1);
+    assert.include(result.stderr, 'Multiple installed Tizen applications matched "app"');
+    assert.notInclude(result.stderr, "Error:");
   });
 
   it("reports schema errors with config paths", () => {
@@ -488,6 +515,7 @@ const createPackageFixture = () => {
 const createToolingFixture = () => {
   const dir = mkdtempSync(join(tmpdir(), "taizn-tooling-config-"));
   writeFakeSdb(dir);
+  writeFakeTizen(dir);
   return dir;
 };
 
@@ -513,6 +541,17 @@ const writeFakeSdb = (dir: string) => {
     `,
   );
   chmodSync(join(dir, "fake-sdb.mjs"), 0o755);
+};
+
+const writeFakeTizen = (dir: string) => {
+  writeFileSync(
+    join(dir, "fake-tizen.mjs"),
+    `#!/usr/bin/env node
+      console.log(["fake-tizen", ...process.argv.slice(2)].join(" "));
+      process.exit(0);
+    `,
+  );
+  chmodSync(join(dir, "fake-tizen.mjs"), 0o755);
 };
 
 const waitForServer = (server: WebSocketServer) =>

@@ -19,10 +19,12 @@ import {
   withTizenPath,
 } from "./runtime.js";
 import {
+  ApplicationNotFound,
   CommandFailed,
   FileSystemFailure,
   MissingPassword,
   MissingTizenTarget,
+  MultipleApplicationsMatched,
   MultipleTargetsConnected,
   PackageNotProduced,
 } from "./errors.js";
@@ -202,17 +204,10 @@ export const listInstalledApplications = Effect.fn("listInstalledApplications")(
   env: TaiznEnv,
   query?: string,
 ) {
-  const sdbPath = yield* resolveSdb(env);
-
-  if (env.target) {
-    yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv() });
-  }
-
-  const target = yield* resolveRequiredSdbTarget(env, sdbPath);
-  const output = yield* capture(sdbPath, ["-s", target, "shell", "0", "applist"]);
+  const { applications: installedApplications, target } = yield* loadInstalledApplications(env);
   const queryLabel = query?.trim();
   const normalizedQuery = normalizeQuery(queryLabel);
-  const applications = parseInstalledApplications(output).filter((application) =>
+  const applications = installedApplications.filter((application) =>
     matchesApplicationQuery(application, normalizedQuery),
   );
   const suffix = queryLabel ? ` matching "${queryLabel}"` : "";
@@ -227,6 +222,20 @@ export const listInstalledApplications = Effect.fn("listInstalledApplications")(
   for (const application of applications) {
     yield* Console.log(`- ${application.name} (${application.applicationId})`);
   }
+});
+
+export const launchInstalledApplication = Effect.fn("launchInstalledApplication")(function* (
+  env: TaiznEnv,
+  query: string,
+) {
+  const tizenPath = yield* resolveTizenCli(env);
+  const { applications, target } = yield* loadInstalledApplications(env);
+  const application = yield* resolveInstalledApplication(query, applications);
+
+  yield* run(tizenPath, ["run", "-p", application.applicationId, "-s", target], {
+    env: yield* baseChildEnv(),
+  });
+  yield* Console.log(`Launched ${application.name} (${application.applicationId}) on ${target}`);
 });
 
 const resolveTizenCli = Effect.fn("resolveTizenCli")(function* (env: TaiznEnv) {
@@ -541,6 +550,19 @@ const resolveRequiredSdbTarget = Effect.fn("resolveRequiredSdbTarget")(function*
   return yield* MissingTizenTarget.make({});
 });
 
+const loadInstalledApplications = Effect.fn("loadInstalledApplications")(function* (env: TaiznEnv) {
+  const sdbPath = yield* resolveSdb(env);
+
+  if (env.target) {
+    yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv() });
+  }
+
+  const target = yield* resolveRequiredSdbTarget(env, sdbPath);
+  const output = yield* capture(sdbPath, ["-s", target, "shell", "0", "applist"]);
+
+  return { applications: parseInstalledApplications(output), target };
+});
+
 const parseInstalledApplications = (output: string): readonly TizenApplication[] =>
   output.split("\n").flatMap((line) => {
     const match = line.match(/^\s*'([^']*)'\s+'([^']*)'\s*$/);
@@ -559,6 +581,66 @@ const matchesApplicationQuery = (
   !normalizedQuery ||
   application.name.toLowerCase().includes(normalizedQuery) ||
   application.applicationId.toLowerCase().includes(normalizedQuery);
+
+const resolveInstalledApplication = Effect.fn("resolveInstalledApplication")(function* (
+  query: string,
+  applications: readonly TizenApplication[],
+) {
+  const queryLabel = query.trim();
+  const normalizedQuery = normalizeQuery(queryLabel);
+
+  if (!normalizedQuery) {
+    return yield* ApplicationNotFound.make({ query });
+  }
+
+  const exactMatch = applications.find(
+    (application) => application.applicationId.toLowerCase() === normalizedQuery,
+  );
+
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  const exactNameMatches = applications.filter(
+    (application) => application.name.toLowerCase() === normalizedQuery,
+  );
+
+  if (exactNameMatches.length === 1) {
+    const [match] = exactNameMatches;
+    if (match) {
+      return match;
+    }
+  }
+
+  if (exactNameMatches.length > 1) {
+    return yield* MultipleApplicationsMatched.make({
+      matches: exactNameMatches.map(
+        (application) => `${application.name} (${application.applicationId})`,
+      ),
+      query: queryLabel,
+    });
+  }
+
+  const matches = applications.filter((application) =>
+    matchesApplicationQuery(application, normalizedQuery),
+  );
+
+  if (matches.length === 1) {
+    const [match] = matches;
+    if (match) {
+      return match;
+    }
+  }
+
+  if (matches.length > 1) {
+    return yield* MultipleApplicationsMatched.make({
+      matches: matches.map((application) => `${application.name} (${application.applicationId})`),
+      query: queryLabel,
+    });
+  }
+
+  return yield* ApplicationNotFound.make({ query: queryLabel });
+});
 
 const run = Effect.fn("run")(function* (
   command: string,

@@ -7,6 +7,7 @@ import {
   checkTizen,
   createProfile,
   installWidget,
+  launchInstalledApplication,
   listInstalledApplications,
   packageWidget,
   runWidget,
@@ -37,6 +38,13 @@ const apps = Command.make(
       const env = yield* loadEnv();
       yield* listInstalledApplications(env, Option.getOrUndefined(query));
     }),
+);
+
+const launch = Command.make("launch", { query: Argument.string("query") }, ({ query }) =>
+  Effect.gen(function* () {
+    const env = yield* loadEnv();
+    yield* launchInstalledApplication(env, query);
+  }),
 );
 
 const profile = Command.make("profile", {}, () => withContext((context) => createProfile(context)));
@@ -79,5 +87,5 @@ const tvInfo = Command.make("info", {}, () =>
 const tv = Command.make("tv", {}).pipe(Command.withSubcommands([tvPair, tvPress, tvInfo]));
 
 export const command = taizn.pipe(
-  Command.withSubcommands([apps, check, profile, pack, install, run, tv]),
+  Command.withSubcommands([apps, check, launch, profile, pack, install, run, tv]),
 );
