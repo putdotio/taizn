@@ -74,10 +74,35 @@ type ListInstalledApplicationsOptions = {
   readonly json?: boolean;
 };
 
-export const checkTizen = Effect.fn("checkTizen")(function* (env: TaiznEnv) {
+type CheckOptions = {
+  readonly json?: boolean;
+};
+
+export const checkTizen = Effect.fn("checkTizen")(function* (
+  env: TaiznEnv,
+  options: CheckOptions = {},
+) {
   const tizenPath = yield* resolveTizenCli(env);
   const sdbPath = yield* resolveSdb(env);
   const devices = yield* listSdbDevices(sdbPath);
+
+  if (options.json) {
+    yield* Console.log(
+      JSON.stringify({
+        configuredTarget: env.target,
+        targets: devices.map((device) => ({
+          id: device.id,
+          label: device.label,
+          state: device.state,
+        })),
+        tools: {
+          sdb: sdbPath,
+          tizenCli: tizenPath,
+        },
+      }),
+    );
+    return;
+  }
 
   yield* Console.log(`Tizen CLI: ${tizenPath}`);
   yield* Console.log(`sdb: ${sdbPath}`);

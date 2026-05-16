@@ -100,6 +100,27 @@ describe("taizn cli", () => {
     assert.strictEqual(result.stderr, "");
   });
 
+  it("checks tooling and connected targets as JSON", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["check", "--json"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const check = parseCheckJson(result.stdout);
+    assert.deepStrictEqual(check, {
+      configuredTarget: "127.0.0.1:26101",
+      targets: [{ id: "127.0.0.1:26101", label: "ExampleTV", state: "device" }],
+      tools: {
+        sdb: join(dir, "fake-sdb.mjs"),
+        tizenCli: join(dir, "fake-tizen.mjs"),
+      },
+    });
+  });
+
   it("lists installed Tizen applications without requiring a project config", () => {
     const dir = createToolingFixture();
     const result = runTaizn(["apps", "put"], dir, {
@@ -619,6 +640,23 @@ const ApplicationsJsonSchema = Schema.Struct({
 
 type ApplicationsJson = typeof ApplicationsJsonSchema.Type;
 
+const CheckJsonSchema = Schema.Struct({
+  configuredTarget: Schema.optional(Schema.String),
+  targets: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      label: Schema.String,
+      state: Schema.String,
+    }),
+  ),
+  tools: Schema.Struct({
+    sdb: Schema.String,
+    tizenCli: Schema.String,
+  }),
+});
+
+type CheckJson = typeof CheckJsonSchema.Type;
+
 const parseProofJson = (text: string): ProofJson => {
   const proof: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(ProofJsonSchema)(proof);
@@ -627,6 +665,11 @@ const parseProofJson = (text: string): ProofJson => {
 const parseApplicationsJson = (text: string): ApplicationsJson => {
   const inventory: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(ApplicationsJsonSchema)(inventory);
+};
+
+const parseCheckJson = (text: string): CheckJson => {
+  const check: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(CheckJsonSchema)(check);
 };
 
 const createToolingFixture = () => {

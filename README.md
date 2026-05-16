@@ -46,6 +46,7 @@ Project files:
 
 ```bash
 taizn check
+taizn check --json
 taizn apps
 taizn apps put
 taizn apps --json put
@@ -64,9 +65,10 @@ taizn --version
 ```
 
 `check` verifies the configured Tizen CLI and `sdb`, then prints connected
-targets without requiring `taizn.json`. `apps` lists installed applications on
-the target, with an optional query filter. Add `--json` to emit a structured
-inventory for agents and scripts. `launch` starts an already-installed
+targets without requiring `taizn.json`. Add `--json` to emit the configured
+tool paths and connected targets for agents and scripts. `apps` lists installed
+applications on the target, with an optional query filter. Add `--json` to emit
+a structured inventory for agents and scripts. `launch` starts an already-installed
 application by exact application ID, exact name, or a unique query. `prove`
 checks the installed app inventory, launches the matched app, and prints a
 compact proof transcript. Add `--json` when an agent or script needs structured

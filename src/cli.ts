@@ -24,10 +24,10 @@ const taizn = Command.make("taizn", {}, () =>
   withContext((context) => packageWidget(context).pipe(Effect.asVoid)),
 );
 
-const check = Command.make("check", {}, () =>
+const check = Command.make("check", { json: Flag.boolean("json") }, ({ json }) =>
   Effect.gen(function* () {
     const env = yield* loadEnv();
-    yield* checkTizen(env);
+    yield* checkTizen(env, { json });
   }),
 );
 
