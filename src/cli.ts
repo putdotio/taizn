@@ -1,9 +1,16 @@
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { loadContext, type TaiznContext } from "./context.js";
 import { loadEnv } from "./env.js";
 import { pairSamsungTvRemote, sendSamsungTvKeys, showSamsungTvInfo } from "./remote.js";
-import { checkTizen, createProfile, installWidget, packageWidget, runWidget } from "./tizen.js";
+import {
+  checkTizen,
+  createProfile,
+  installWidget,
+  listInstalledApplications,
+  packageWidget,
+  runWidget,
+} from "./tizen.js";
 
 const withContext = <E, R>(operation: (context: TaiznContext) => Effect.Effect<void, E, R>) =>
   Effect.gen(function* () {
@@ -20,6 +27,16 @@ const check = Command.make("check", {}, () =>
     const env = yield* loadEnv();
     yield* checkTizen(env);
   }),
+);
+
+const apps = Command.make(
+  "apps",
+  { query: Argument.string("query").pipe(Argument.optional) },
+  ({ query }) =>
+    Effect.gen(function* () {
+      const env = yield* loadEnv();
+      yield* listInstalledApplications(env, Option.getOrUndefined(query));
+    }),
 );
 
 const profile = Command.make("profile", {}, () => withContext((context) => createProfile(context)));
@@ -62,5 +79,5 @@ const tvInfo = Command.make("info", {}, () =>
 const tv = Command.make("tv", {}).pipe(Command.withSubcommands([tvPair, tvPress, tvInfo]));
 
 export const command = taizn.pipe(
-  Command.withSubcommands([check, profile, pack, install, run, tv]),
+  Command.withSubcommands([apps, check, profile, pack, install, run, tv]),
 );

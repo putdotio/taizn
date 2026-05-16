@@ -18,6 +18,8 @@ consumer app. Keep it a typed shell-out tool, not an app framework.
 - Plain `taizn` should behave like `taizn package`.
 - `check` should verify Tizen tooling and connected targets without requiring a
   consumer `taizn.json`.
+- `apps` should list installed target apps without requiring a consumer
+  `taizn.json`.
 - Do not leak `TAIZN_*`, `TIZEN_*`, or `SDB` into the consumer build command.
 - Redact password args when reporting failed Tizen commands.
 - Missing config/env/files and child-command failures should not print stack traces.

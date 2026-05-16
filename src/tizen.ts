@@ -22,6 +22,7 @@ import {
   CommandFailed,
   FileSystemFailure,
   MissingPassword,
+  MissingTizenTarget,
   MultipleTargetsConnected,
   PackageNotProduced,
 } from "./errors.js";
@@ -36,6 +37,11 @@ type SdbDevice = {
   readonly id: string;
   readonly label: string;
   readonly state: string;
+};
+
+type TizenApplication = {
+  readonly applicationId: string;
+  readonly name: string;
 };
 
 type WidgetIndexOptions = {
@@ -190,6 +196,37 @@ export const runWidget = Effect.fn("runWidget")(function* ({ config, env }: Taiz
 
   yield* run(tizenPath, runArgs, { env: yield* baseChildEnv() });
   yield* Console.log(`Launched ${variant.applicationId}`);
+});
+
+export const listInstalledApplications = Effect.fn("listInstalledApplications")(function* (
+  env: TaiznEnv,
+  query?: string,
+) {
+  const sdbPath = yield* resolveSdb(env);
+
+  if (env.target) {
+    yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv() });
+  }
+
+  const target = yield* resolveRequiredSdbTarget(env, sdbPath);
+  const output = yield* capture(sdbPath, ["-s", target, "shell", "0", "applist"]);
+  const queryLabel = query?.trim();
+  const normalizedQuery = normalizeQuery(queryLabel);
+  const applications = parseInstalledApplications(output).filter((application) =>
+    matchesApplicationQuery(application, normalizedQuery),
+  );
+  const suffix = queryLabel ? ` matching "${queryLabel}"` : "";
+
+  yield* Console.log(`Installed Tizen applications${suffix} on ${target}:`);
+
+  if (applications.length === 0) {
+    yield* Console.log("none");
+    return;
+  }
+
+  for (const application of applications) {
+    yield* Console.log(`- ${application.name} (${application.applicationId})`);
+  }
 });
 
 const resolveTizenCli = Effect.fn("resolveTizenCli")(function* (env: TaiznEnv) {
@@ -473,6 +510,55 @@ const resolveRunTarget = Effect.fn("resolveRunTarget")(function* (env: TaiznEnv,
 
   return undefined;
 });
+
+const resolveRequiredSdbTarget = Effect.fn("resolveRequiredSdbTarget")(function* (
+  env: TaiznEnv,
+  sdbPath: string,
+) {
+  if (env.target) {
+    return env.target;
+  }
+
+  const devices = yield* listSdbDevices(sdbPath);
+
+  if (devices.length === 1) {
+    const device = devices[0];
+    if (device) {
+      yield* Console.log(
+        `Using connected Tizen target: ${device.id}${device.label ? ` (${device.label})` : ""}`,
+      );
+
+      return device.id;
+    }
+  }
+
+  if (devices.length > 1) {
+    return yield* MultipleTargetsConnected.make({
+      targets: devices.map((device) => device.id),
+    });
+  }
+
+  return yield* MissingTizenTarget.make({});
+});
+
+const parseInstalledApplications = (output: string): readonly TizenApplication[] =>
+  output.split("\n").flatMap((line) => {
+    const match = line.match(/^\s*'([^']*)'\s+'([^']*)'\s*$/);
+    const name = match?.[1]?.trim();
+    const applicationId = match?.[2]?.trim();
+
+    return name && applicationId ? [{ applicationId, name }] : [];
+  });
+
+const normalizeQuery = (query: string | undefined) => query?.trim().toLowerCase();
+
+const matchesApplicationQuery = (
+  application: TizenApplication,
+  normalizedQuery: string | undefined,
+) =>
+  !normalizedQuery ||
+  application.name.toLowerCase().includes(normalizedQuery) ||
+  application.applicationId.toLowerCase().includes(normalizedQuery);
 
 const run = Effect.fn("run")(function* (
   command: string,

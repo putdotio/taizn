@@ -107,6 +107,15 @@ export class MultipleTargetsConnected extends Schema.TaggedErrorClass<MultipleTa
   }
 }
 
+export class MissingTizenTarget extends Schema.TaggedErrorClass<MissingTizenTarget>()(
+  "MissingTizenTarget",
+  {},
+) {
+  override get message(): string {
+    return "No Tizen target is connected. Set TAIZN_TARGET or connect exactly one device.";
+  }
+}
+
 export class MissingTvRemoteHost extends Schema.TaggedErrorClass<MissingTvRemoteHost>()(
   "MissingTvRemoteHost",
   {},
@@ -176,6 +185,7 @@ export type TaiznError =
   | InvalidJson
   | MissingFile
   | MissingPassword
+  | MissingTizenTarget
   | MissingTvRemoteHost
   | MissingTvRemoteToken
   | MultipleTargetsConnected

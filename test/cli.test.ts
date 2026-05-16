@@ -54,6 +54,7 @@ describe("taizn cli", () => {
 
     assert.strictEqual(result.status, 0);
     assert.include(result.stdout, "COMMANDS");
+    assert.include(result.stdout, "apps");
     assert.include(result.stdout, "check");
     assert.include(result.stdout, "package");
     assert.include(result.stdout, "run");
@@ -95,6 +96,19 @@ describe("taizn cli", () => {
     assert.include(result.stdout, "sdb: /bin/echo");
     assert.include(result.stdout, "connected targets: none");
     assert.strictEqual(result.stderr, "");
+  });
+
+  it("lists installed Tizen applications without requiring a project config", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["apps", "put"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.include(result.stdout, 'Installed Tizen applications matching "put"');
+    assert.include(result.stdout, "- put.io (Example.app)");
+    assert.notInclude(result.stdout, "Other App");
   });
 
   it("reports schema errors with config paths", () => {
@@ -410,17 +424,7 @@ const createPackageFixture = () => {
     `,
   );
   chmodSync(join(dir, "fake-tizen.mjs"), 0o755);
-  writeFileSync(
-    join(dir, "fake-sdb.mjs"),
-    `#!/usr/bin/env node
-      if (process.argv[2] === "devices") {
-        console.log("List of devices attached");
-        console.log("127.0.0.1:26101\\tdevice\\tExampleTV");
-      }
-      process.exit(0);
-    `,
-  );
-  chmodSync(join(dir, "fake-sdb.mjs"), 0o755);
+  writeFakeSdb(dir);
 
   writeFileSync(
     join(dir, "platforms/tizen/config.xml"),
@@ -479,6 +483,36 @@ const createPackageFixture = () => {
   );
 
   return dir;
+};
+
+const createToolingFixture = () => {
+  const dir = mkdtempSync(join(tmpdir(), "taizn-tooling-config-"));
+  writeFakeSdb(dir);
+  return dir;
+};
+
+const writeFakeSdb = (dir: string) => {
+  writeFileSync(
+    join(dir, "fake-sdb.mjs"),
+    `#!/usr/bin/env node
+      const args = process.argv.slice(2);
+      if (args[0] === "devices") {
+        console.log("List of devices attached");
+        console.log("127.0.0.1:26101\\tdevice\\tExampleTV");
+        process.exit(0);
+      }
+      if (args[0] === "-s" && args[2] === "shell" && args[3] === "0" && args[4] === "applist") {
+        console.log("\\tApplication List for user 5001");
+        console.log("\\t Name \\t AppID ");
+        console.log("\\t=================================================");
+        console.log("\\t'put.io'\\t 'Example.app'");
+        console.log("\\t'Other App'\\t 'Other.app'");
+        process.exit(0);
+      }
+      process.exit(0);
+    `,
+  );
+  chmodSync(join(dir, "fake-sdb.mjs"), 0o755);
 };
 
 const waitForServer = (server: WebSocketServer) =>

@@ -46,6 +46,8 @@ Project files:
 
 ```bash
 taizn check
+taizn apps
+taizn apps put
 taizn profile
 taizn package
 taizn install
@@ -58,7 +60,8 @@ taizn --version
 ```
 
 `check` verifies the configured Tizen CLI and `sdb`, then prints connected
-targets without requiring `taizn.json`. `profile` imports
+targets without requiring `taizn.json`. `apps` lists installed applications on
+the target, with an optional query filter. `profile` imports
 `.taizn/certificates/author.p12` and
 `.taizn/certificates/distributor.p12` into a Tizen security profile.
 `package` builds and signs a `.wgt`. `install` packages and sideloads it.
