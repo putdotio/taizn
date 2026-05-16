@@ -98,6 +98,106 @@ type TvInfoOptions = {
   readonly json?: boolean;
 };
 
+type TvDoctorOptions = {
+  readonly connect?: boolean;
+  readonly json?: boolean;
+};
+
+type DiagnosticValueSource = "default" | "env" | "none" | "state" | "target";
+
+type DiagnosticError = {
+  readonly details?: string;
+  readonly file?: string;
+  readonly message: string;
+  readonly target?: string;
+  readonly type: string;
+};
+
+type RemoteStateDiagnostic =
+  | {
+      readonly path: string;
+      readonly status: "missing";
+      readonly tokenConfigured: false;
+    }
+  | {
+      readonly host: string;
+      readonly name: string;
+      readonly path: string;
+      readonly port: number;
+      readonly protocol: "ws" | "wss";
+      readonly status: "valid";
+      readonly tokenConfigured: true;
+    }
+  | {
+      readonly error: DiagnosticError;
+      readonly path: string;
+      readonly status: "error";
+      readonly tokenConfigured: false;
+    };
+
+type RemoteStateRead = {
+  readonly diagnostic: RemoteStateDiagnostic;
+  readonly state?: TvRemoteState;
+};
+
+type TvInfoDiagnostic =
+  | {
+      readonly developer: {
+        readonly enabled?: boolean;
+        readonly ip?: string;
+        readonly mode?: string;
+      };
+      readonly ip: string;
+      readonly model?: string;
+      readonly name: string;
+      readonly ok: true;
+      readonly port: number;
+      readonly remote?: string;
+      readonly remoteAvailable?: boolean;
+      readonly tokenAuth?: boolean;
+      readonly type?: string;
+      readonly uri?: string;
+    }
+  | {
+      readonly error: DiagnosticError;
+      readonly ok: false;
+      readonly port: number;
+    };
+
+type TvRemoteConnectionDiagnostic =
+  | {
+      readonly reason: string;
+      readonly tested: false;
+    }
+  | {
+      readonly ok: true;
+      readonly tested: true;
+      readonly tokenReturned: boolean;
+    }
+  | {
+      readonly error: DiagnosticError;
+      readonly ok: false;
+      readonly tested: true;
+    };
+
+type TvDoctorResult = {
+  readonly host?: string;
+  readonly hostSource: DiagnosticValueSource;
+  readonly info: TvInfoDiagnostic;
+  readonly remote: {
+    readonly connection: TvRemoteConnectionDiagnostic;
+    readonly name: string;
+    readonly port: number;
+    readonly protocol: "ws" | "wss";
+    readonly target?: string;
+    readonly timeoutMs: number;
+    readonly tokenConfigured: boolean;
+    readonly tokenSource: DiagnosticValueSource;
+  };
+  readonly state: RemoteStateDiagnostic;
+  readonly target?: string;
+};
+
 type TvRemoteError =
   | MissingTvRemoteHost
   | MissingTvRemoteToken
@@ -165,6 +265,70 @@ export const sendSamsungTvKeys = Effect.fn("sendSamsungTvKeys")(function* (
       ? `Sent Samsung TV remote key: ${keys[0]}`
       : `Sent Samsung TV remote keys: ${keys.join(", ")}`,
   );
+});
+
+export const diagnoseSamsungTvRemote = Effect.fn("diagnoseSamsungTvRemote")(function* (
+  env: TaiznEnv,
+  doctorOptions: TvDoctorOptions = {},
+) {
+  const stateRead = yield* readRemoteStateDiagnostic();
+  const state = stateRead.state;
+  const targetHost = hostFromTarget(env.target);
+  const host = env.tvHost ?? state?.host ?? targetHost;
+  const hostSource = valueSource(env.tvHost, state?.host, targetHost);
+  const token = env.tvToken ?? state?.token;
+  const tokenSource = valueSource(env.tvToken, state?.token, undefined);
+  const remoteOptions = host
+    ? {
+        host,
+        name: env.tvName ?? state?.name ?? DEFAULT_REMOTE_NAME,
+        port: env.tvPort ?? state?.port ?? DEFAULT_REMOTE_PORT,
+        protocol: env.tvProtocol ?? state?.protocol ?? DEFAULT_REMOTE_PROTOCOL,
+        timeoutMs: env.tvTimeoutMs ?? DEFAULT_TIMEOUT_MS,
+        token,
+      }
+    : undefined;
+  const infoPort = env.tvInfoPort ?? TV_INFO_PORT;
+  const info = yield* readInfoDiagnostic(host, infoPort, remoteOptions?.timeoutMs);
+  const connection = yield* readRemoteConnectionDiagnostic(remoteOptions, doctorOptions);
+  const result: TvDoctorResult = {
+    host,
+    hostSource,
+    info,
+    remote: {
+      connection,
+      name: remoteOptions?.name ?? env.tvName ?? DEFAULT_REMOTE_NAME,
+      port: remoteOptions?.port ?? env.tvPort ?? state?.port ?? DEFAULT_REMOTE_PORT,
+      protocol:
+        remoteOptions?.protocol ?? env.tvProtocol ?? state?.protocol ?? DEFAULT_REMOTE_PROTOCOL,
+      target: remoteOptions ? remoteTarget(remoteOptions) : undefined,
+      timeoutMs: remoteOptions?.timeoutMs ?? env.tvTimeoutMs ?? DEFAULT_TIMEOUT_MS,
+      tokenConfigured: Boolean(token),
+      tokenSource,
+    },
+    state: stateRead.diagnostic,
+    target: env.target,
+  };
+
+  if (doctorOptions.json) {
+    yield* Console.log(JSON.stringify(result));
+    return;
+  }
+
+  yield* Console.log(`Samsung TV doctor: ${host ?? "missing host"}`);
+  yield* Console.log(`host_source: ${hostSource}`);
+  yield* Console.log(`info: ${info.ok ? `ok ${info.name}` : `failed ${info.error.type}`}`);
+  yield* Console.log(`remote: ${result.remote.target ?? "missing"}`);
+  yield* Console.log(`token_configured: ${result.remote.tokenConfigured ? "yes" : "no"}`);
+  yield* Console.log(`remote_state: ${result.state.status}`);
+
+  if (connection.tested) {
+    yield* Console.log(
+      `remote_connect: ${connection.ok ? "ok" : `failed ${connection.error.type}`}`,
+    );
+  } else {
+    yield* Console.log(`remote_connect: skipped (${connection.reason})`);
+  }
 });
 
 export const showSamsungTvInfo = Effect.fn("showSamsungTvInfo")(function* (
@@ -302,6 +466,44 @@ const saveRemoteState = Effect.fn("saveRemoteState")(function* (options: SavedRe
         FileSystemFailure.make({ cause, operation: "write", path: paths.remoteStatePath }),
       ),
     );
+});
+
+const readRemoteStateDiagnostic = Effect.fn("readRemoteStateDiagnostic")(function* () {
+  const paths = yield* getPaths();
+
+  return yield* readRemoteState().pipe(
+    Effect.match({
+      onFailure: (error): RemoteStateRead => ({
+        diagnostic: {
+          error: diagnosticError(error),
+          path: paths.remoteStatePath,
+          status: "error",
+          tokenConfigured: false,
+        },
+      }),
+      onSuccess: (state): RemoteStateRead =>
+        state
+          ? {
+              diagnostic: {
+                host: state.host,
+                name: state.name,
+                path: paths.remoteStatePath,
+                port: state.port,
+                protocol: state.protocol,
+                status: "valid",
+                tokenConfigured: true,
+              },
+              state,
+            }
+          : {
+              diagnostic: {
+                path: paths.remoteStatePath,
+                status: "missing",
+                tokenConfigured: false,
+              },
+            },
+    }),
+  );
 });
 
 const connectRemote = Effect.fn("connectRemote")(function* (
@@ -457,6 +659,86 @@ export const fetchSamsungTvInfo = Effect.fn("fetchSamsungTvInfo")(function* (
   );
 });
 
+const readInfoDiagnostic = Effect.fn("readInfoDiagnostic")(function* (
+  host: string | undefined,
+  port: number,
+  timeoutMs: number | undefined,
+) {
+  if (!host) {
+    return {
+      error: diagnosticError(MissingTvRemoteHost.make({})),
+      ok: false,
+      port,
+    } satisfies TvInfoDiagnostic;
+  }
+
+  return yield* fetchSamsungTvInfo(host, { port, timeoutMs }).pipe(
+    Effect.match({
+      onFailure: (error): TvInfoDiagnostic => ({
+        error: diagnosticError(error),
+        ok: false,
+        port,
+      }),
+      onSuccess: (info): TvInfoDiagnostic => {
+        const support = info.isSupport ? parseSupport(info.isSupport) : undefined;
+
+        return {
+          developer: {
+            enabled: stringFlag(info.device.developerMode),
+            ip: info.device.developerIP,
+            mode: info.device.developerMode,
+          },
+          ip: info.device.ip ?? host,
+          model: info.device.modelName,
+          name: decodeHtml(info.name),
+          ok: true,
+          port,
+          remote: info.remote,
+          remoteAvailable: stringFlag(support?.remote_available),
+          tokenAuth: stringFlag(info.device.TokenAuthSupport),
+          type: info.type,
+          uri: info.uri,
+        };
+      },
+    }),
+  );
+});
+
+const readRemoteConnectionDiagnostic = Effect.fn("readRemoteConnectionDiagnostic")(function* (
+  options: RemoteOptions | undefined,
+  doctorOptions: TvDoctorOptions,
+) {
+  if (!doctorOptions.connect) {
+    return {
+      reason: "pass --connect to test the websocket endpoint",
+      tested: false,
+    } satisfies TvRemoteConnectionDiagnostic;
+  }
+
+  if (!options) {
+    return {
+      error: diagnosticError(MissingTvRemoteHost.make({})),
+      ok: false,
+      tested: true,
+    } satisfies TvRemoteConnectionDiagnostic;
+  }
+
+  return yield* connectRemote(options).pipe(
+    Effect.match({
+      onFailure: (error): TvRemoteConnectionDiagnostic => ({
+        error: diagnosticError(error),
+        ok: false,
+        tested: true,
+      }),
+      onSuccess: (returnedToken): TvRemoteConnectionDiagnostic => ({
+        ok: true,
+        tested: true,
+        tokenReturned: returnedToken.length > 0,
+      }),
+    }),
+  );
+});
+
 const isAbortError = (cause: unknown) =>
   cause instanceof Error && (cause.name === "AbortError" || cause.name === "TimeoutError");
 
@@ -536,6 +818,99 @@ const normalizeRemoteError = (cause: unknown, options: RemoteOptions): TvRemoteE
   }
 
   return TvRemoteConnectionFailed.make({ cause, target: remoteTarget(options) });
+};
+
+const diagnosticError = (
+  error:
+    | FileSystemFailure
+    | InvalidJson
+    | MissingTvRemoteHost
+    | MissingTvRemoteToken
+    | TvRemoteConnectionFailed
+    | TvRemoteProtocolError
+    | TvRemoteTimeout
+    | TvRemoteUnauthorized,
+): DiagnosticError => {
+  if (error instanceof FileSystemFailure) {
+    return {
+      message: error.message,
+      target: error.path,
+      type: "FileSystemFailure",
+    };
+  }
+
+  if (error instanceof InvalidJson) {
+    return {
+      details: error.details,
+      file: error.file,
+      message: error.message,
+      type: "InvalidJson",
+    };
+  }
+
+  if (error instanceof MissingTvRemoteHost) {
+    return {
+      message: error.message,
+      type: "MissingTvRemoteHost",
+    };
+  }
+
+  if (error instanceof MissingTvRemoteToken) {
+    return {
+      message: error.message,
+      type: "MissingTvRemoteToken",
+    };
+  }
+
+  if (error instanceof TvRemoteConnectionFailed) {
+    return {
+      message: error.message,
+      target: error.target,
+      type: "TvRemoteConnectionFailed",
+    };
+  }
+
+  if (error instanceof TvRemoteProtocolError) {
+    return {
+      details: error.details,
+      message: error.message,
+      type: "TvRemoteProtocolError",
+    };
+  }
+
+  if (error instanceof TvRemoteTimeout) {
+    return {
+      message: error.message,
+      target: error.target,
+      type: "TvRemoteTimeout",
+    };
+  }
+
+  return {
+    message: error.message,
+    target: error.target,
+    type: "TvRemoteUnauthorized",
+  };
+};
+
+const valueSource = (
+  envValue: string | undefined,
+  stateValue: string | undefined,
+  targetValue: string | undefined,
+): DiagnosticValueSource => {
+  if (envValue) {
+    return "env";
+  }
+
+  if (stateValue) {
+    return "state";
+  }
+
+  if (targetValue) {
+    return "target";
+  }
+
+  return "none";
 };
 
 const hostFromTarget = (target: string | undefined) => {

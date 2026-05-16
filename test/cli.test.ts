@@ -1,4 +1,11 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -415,6 +422,136 @@ describe("taizn cli", () => {
     }
   });
 
+  it("diagnoses Samsung TV remote state as JSON", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-doctor-json-"));
+    const infoServer = createServer((_request, response) => {
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          device: {
+            TokenAuthSupport: "true",
+            developerIP: "127.0.0.1",
+            developerMode: "1",
+            ip: "127.0.0.1",
+            modelName: "Fixture TV",
+          },
+          isSupport: JSON.stringify({ remote_available: "true" }),
+          name: "Fixture &amp; TV",
+          remote: "1.0",
+          type: "Samsung SmartTV",
+          uri: "http://127.0.0.1/api/v2/",
+        }),
+      );
+    });
+    const requestUrls: string[] = [];
+
+    await waitForHttpServer(infoServer);
+    const remoteServer = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+    await waitForServer(remoteServer);
+
+    const infoAddress = infoServer.address();
+    const remoteAddress = remoteServer.address();
+
+    if (!infoAddress || typeof infoAddress === "string") {
+      infoServer.close();
+      remoteServer.close();
+      throw new Error("Expected TCP HTTP test server address.");
+    }
+
+    if (!remoteAddress || typeof remoteAddress === "string") {
+      infoServer.close();
+      remoteServer.close();
+      throw new Error("Expected TCP websocket test server address.");
+    }
+
+    remoteServer.on("connection", (socket, request) => {
+      requestUrls.push(request.url ?? "");
+      socket.send(
+        JSON.stringify({
+          data: {
+            id: "test-client",
+          },
+          event: "ms.channel.connect",
+        }),
+      );
+    });
+
+    try {
+      mkdirSync(join(dir, ".taizn"), { recursive: true });
+      writeFileSync(
+        join(dir, ".taizn/remote.json"),
+        `${JSON.stringify(
+          {
+            host: "127.0.0.1",
+            name: "fixture",
+            port: remoteAddress.port,
+            protocol: "ws",
+            token: "fixture-token",
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const result = await runTaiznAsync(["tv", "doctor", "--connect", "--json"], dir, {
+        TAIZN_TV_HOST: "127.0.0.1",
+        TAIZN_TV_INFO_PORT: String(infoAddress.port),
+      });
+
+      assert.strictEqual(result.status, 0);
+      assert.strictEqual(result.stderr, "");
+      assert.notInclude(result.stdout, "fixture-token");
+      assert.include(requestUrls[0] ?? "", "token=fixture-token");
+      assert.deepStrictEqual(parseTvDoctorJson(result.stdout), {
+        host: "127.0.0.1",
+        hostSource: "env",
+        info: {
+          developer: {
+            enabled: true,
+            ip: "127.0.0.1",
+            mode: "1",
+          },
+          ip: "127.0.0.1",
+          model: "Fixture TV",
+          name: "Fixture & TV",
+          ok: true,
+          port: infoAddress.port,
+          remote: "1.0",
+          remoteAvailable: true,
+          tokenAuth: true,
+          type: "Samsung SmartTV",
+          uri: "http://127.0.0.1/api/v2/",
+        },
+        remote: {
+          connection: {
+            ok: true,
+            tested: true,
+            tokenReturned: true,
+          },
+          name: "fixture",
+          port: remoteAddress.port,
+          protocol: "ws",
+          target: `ws://127.0.0.1:${remoteAddress.port}`,
+          timeoutMs: 30000,
+          tokenConfigured: true,
+          tokenSource: "state",
+        },
+        state: {
+          host: "127.0.0.1",
+          name: "fixture",
+          path: join(realpathSync(dir), ".taizn/remote.json"),
+          port: remoteAddress.port,
+          protocol: "ws",
+          status: "valid",
+          tokenConfigured: true,
+        },
+      });
+    } finally {
+      infoServer.close();
+      remoteServer.close();
+    }
+  });
+
   it("times out stalled Samsung TV info requests", async () => {
     const server = createServer((_request, _response) => {
       // Keep the request open to exercise the AbortSignal timeout path.
@@ -769,6 +906,68 @@ const TvPressJsonSchema = Schema.Struct({
 
 type TvPressJson = typeof TvPressJsonSchema.Type;
 
+const DiagnosticErrorJsonSchema = Schema.Struct({
+  details: Schema.optional(Schema.String),
+  file: Schema.optional(Schema.String),
+  message: Schema.String,
+  target: Schema.optional(Schema.String),
+  type: Schema.String,
+});
+
+const TvDoctorJsonSchema = Schema.Struct({
+  host: Schema.optional(Schema.String),
+  hostSource: Schema.String,
+  info: Schema.Struct({
+    developer: Schema.optional(
+      Schema.Struct({
+        enabled: Schema.optional(Schema.Boolean),
+        ip: Schema.optional(Schema.String),
+        mode: Schema.optional(Schema.String),
+      }),
+    ),
+    error: Schema.optional(DiagnosticErrorJsonSchema),
+    ip: Schema.optional(Schema.String),
+    model: Schema.optional(Schema.String),
+    name: Schema.optional(Schema.String),
+    ok: Schema.Boolean,
+    port: Schema.Number,
+    remote: Schema.optional(Schema.String),
+    remoteAvailable: Schema.optional(Schema.Boolean),
+    tokenAuth: Schema.optional(Schema.Boolean),
+    type: Schema.optional(Schema.String),
+    uri: Schema.optional(Schema.String),
+  }),
+  remote: Schema.Struct({
+    connection: Schema.Struct({
+      error: Schema.optional(DiagnosticErrorJsonSchema),
+      ok: Schema.optional(Schema.Boolean),
+      reason: Schema.optional(Schema.String),
+      tested: Schema.Boolean,
+      tokenReturned: Schema.optional(Schema.Boolean),
+    }),
+    name: Schema.String,
+    port: Schema.Number,
+    protocol: Schema.Literals(["ws", "wss"]),
+    target: Schema.optional(Schema.String),
+    timeoutMs: Schema.Number,
+    tokenConfigured: Schema.Boolean,
+    tokenSource: Schema.String,
+  }),
+  state: Schema.Struct({
+    error: Schema.optional(DiagnosticErrorJsonSchema),
+    host: Schema.optional(Schema.String),
+    name: Schema.optional(Schema.String),
+    path: Schema.String,
+    port: Schema.optional(Schema.Number),
+    protocol: Schema.optional(Schema.Literals(["ws", "wss"])),
+    status: Schema.String,
+    tokenConfigured: Schema.Boolean,
+  }),
+  target: Schema.optional(Schema.String),
+});
+
+type TvDoctorJson = typeof TvDoctorJsonSchema.Type;
+
 const parseProofJson = (text: string): ProofJson => {
   const proof: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(ProofJsonSchema)(proof);
@@ -792,6 +991,11 @@ const parseTvInfoJson = (text: string): TvInfoJson => {
 const parseTvPressJson = (text: string): TvPressJson => {
   const press: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(TvPressJsonSchema)(press);
+};
+
+const parseTvDoctorJson = (text: string): TvDoctorJson => {
+  const doctor: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(TvDoctorJsonSchema)(doctor);
 };
 
 const createToolingFixture = () => {

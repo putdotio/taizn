@@ -2,7 +2,12 @@ import { Argument, Command, Flag } from "effect/unstable/cli";
 import { Effect, Option } from "effect";
 import { loadContext, type TaiznContext } from "./context.js";
 import { loadEnv } from "./env.js";
-import { pairSamsungTvRemote, sendSamsungTvKeys, showSamsungTvInfo } from "./remote.js";
+import {
+  diagnoseSamsungTvRemote,
+  pairSamsungTvRemote,
+  sendSamsungTvKeys,
+  showSamsungTvInfo,
+} from "./remote.js";
 import {
   checkTizen,
   createProfile,
@@ -75,6 +80,16 @@ const tvPair = Command.make("pair", {}, () =>
   }),
 );
 
+const tvDoctor = Command.make(
+  "doctor",
+  { connect: Flag.boolean("connect"), json: Flag.boolean("json") },
+  ({ connect, json }) =>
+    Effect.gen(function* () {
+      const env = yield* loadEnv();
+      yield* diagnoseSamsungTvRemote(env, { connect, json });
+    }),
+);
+
 const tvPress = Command.make(
   "press",
   {
@@ -96,7 +111,9 @@ const tvInfo = Command.make("info", { json: Flag.boolean("json") }, ({ json }) =
   }),
 );
 
-const tv = Command.make("tv", {}).pipe(Command.withSubcommands([tvPair, tvPress, tvInfo]));
+const tv = Command.make("tv", {}).pipe(
+  Command.withSubcommands([tvDoctor, tvPair, tvPress, tvInfo]),
+);
 
 export const command = taizn.pipe(
   Command.withSubcommands([apps, check, launch, prove, profile, pack, install, run, tv]),

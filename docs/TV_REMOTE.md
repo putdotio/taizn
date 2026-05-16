@@ -6,6 +6,9 @@ and smoke checks against a physical TV or monitor.
 ## Commands
 
 ```bash
+taizn tv doctor
+taizn tv doctor --json
+taizn tv doctor --connect --json
 taizn tv info
 taizn tv info --json
 taizn tv pair
@@ -14,6 +17,10 @@ taizn tv press --json KEY_ENTER
 taizn tv press --delay-ms 250 KEY_HOME KEY_DOWN KEY_ENTER
 ```
 
+- `doctor` reports the resolved host, local `.taizn/remote.json` state, token
+  presence, HTTP metadata status, and websocket endpoint. Add `--json` for a
+  structured diagnostic. Add `--connect` only when you want to test the
+  websocket; without a token this can trigger the TV's allow/deny prompt.
 - `info` reads the TV's local `/api/v2/` metadata and reports remote-control
   support. Add `--json` to emit a structured TV capability snapshot for agents
   and scripts.
@@ -68,7 +75,8 @@ The `.taizn/` directory is local state and must stay ignored.
 
 ## Scope
 
-Remote commands send key presses only. They do not install widgets, launch
-applications, or capture screenshots. Use the regular `taizn install` and Tizen
-CLI commands for app lifecycle work. Use logs, app-level probes, Samsung Web
-Inspector, Remote Test Lab, or external capture when visual proof is needed.
+Remote commands only inspect metadata, diagnose remote readiness, pair, and send
+key presses. They do not install widgets, launch applications, or capture
+screenshots. Use the regular `taizn install` and Tizen CLI commands for app
+lifecycle work. Use logs, app-level probes, Samsung Web Inspector, Remote Test
+Lab, or external capture when visual proof is needed.

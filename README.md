@@ -57,6 +57,9 @@ taizn profile
 taizn package
 taizn install
 taizn run
+taizn tv doctor
+taizn tv doctor --json
+taizn tv doctor --connect --json
 taizn tv info
 taizn tv info --json
 taizn tv pair
@@ -80,9 +83,10 @@ proof output. `profile` imports
 `package` builds and signs a `.wgt`. `install` packages and sideloads it.
 `run` launches the configured variant application on the target. `tv` commands use
 Samsung's websocket remote-control API to inspect a TV,
-pair for a remote token, and send remote-control key presses. Add `--json` to
-`tv info` for a structured TV capability snapshot, or to `tv press` for a
-structured key-sequence receipt. See
+diagnose remote-control readiness, pair for a remote token, and send remote-control
+key presses. Add `--json` to `tv doctor` for structured host/token/connection
+diagnostics, to `tv info` for a structured TV capability snapshot, or to
+`tv press` for a structured key-sequence receipt. See
 [Samsung TV Remote](./docs/TV_REMOTE.md) for pairing, environment, and limits.
 `tv press` accepts one key or a sequence of keys.
 
