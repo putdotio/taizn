@@ -11,5 +11,5 @@
     "target": "esnext",
     "types": ["node"]
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "live-test/**/*.ts"]
 }

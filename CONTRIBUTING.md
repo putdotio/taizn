@@ -51,12 +51,17 @@ vp run test
 Live checks for a local Tizen toolchain and device:
 
 ```bash
+vp run live:test:doctor
 vp run live:test
 vp run live:test:install
 vp run live:test:prove
+vp run live:test:smoke
+vp run live:test:roundtrip
+vp run live:test:tv-assets:production
 ```
 
-See [Live Test](./live-test/README.md) for signing profile setup.
+See [Live Test](./live-test/README.md) for signing profile setup, beacon
+configuration, remote diagnostics, and hosted asset checks.
 
 ## Development Notes
 

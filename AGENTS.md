@@ -61,6 +61,23 @@ Live Tizen checks when the local toolchain/certs/device exist:
 ```bash
 vp run live:test:profile
 vp run live:test
+vp run live:test:doctor
+vp run live:test:doctor:connect
 vp run live:test:install
 vp run live:test:prove
+vp run live:test:remote
+vp run live:test:roundtrip
+vp run live:test:smoke
+vp run live:test:tv-assets
+vp run live:test:tv-assets:production
 ```
+
+Use `LIVE_TEST_FETCH_URLS` with `live:test:roundtrip` when the TV WebView needs
+to prove it can fetch specific remote assets.
+Use `live:test:tv-assets` or `live:test:tv-assets:production` to run that same
+roundtrip against `https://tv.put.io/js/main.js` and
+`https://tv.put.io/css/main.css`.
+Use `LIVE_TEST_REQUIRE_REMOTE=1` with `live:test:remote` when websocket remote
+control is a required gate instead of a diagnostic artifact.
+Use `LIVE_TEST_REMOTE_KEYS` only after `taizn tv pair` has configured a
+Samsung remote token.

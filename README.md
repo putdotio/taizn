@@ -166,8 +166,8 @@ bundle local app assets but production packages should load hosted asset URLs.
 
 ## Docs
 
-- [Contributing](./CONTRIBUTING.md)
 - [Distribution](./docs/DISTRIBUTION.md)
+- [Live Test](./live-test/README.md)
 - [Samsung TV Remote](./docs/TV_REMOTE.md)
 - [Security](./SECURITY.md)
 

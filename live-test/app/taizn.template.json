@@ -22,11 +22,11 @@
         "packageId": "TaiznLiveD"
       },
       "production": {
-        "applicationId": "TaiznLive.taizn",
+        "applicationId": "TaiznLiveP.taizn",
         "bundleName": "taizn-live-test",
         "icon": "tizen/icon.png",
         "name": "Taizn Live Test",
-        "packageId": "TaiznLive"
+        "packageId": "TaiznLiveP"
       }
     }
   }

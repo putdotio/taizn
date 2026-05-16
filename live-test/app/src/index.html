@@ -41,5 +41,128 @@
       <h1>Hello from taizn</h1>
       <p>If you can read this on the TV, packaging and install worked.</p>
     </main>
+    <script>
+      const beaconUrl = "__TAIZN_LIVE_BEACON_URL__";
+      const assetUrls = __TAIZN_LIVE_FETCH_URLS__;
+
+      if (beaconUrl) {
+        const assetKind = (sourceUrl) => {
+          if (sourceUrl.endsWith(".css")) {
+            return "stylesheet";
+          }
+
+          if (sourceUrl.endsWith(".js")) {
+            return "script";
+          }
+
+          return "fetch";
+        };
+
+        const withTimeout = (sourceUrl, startedAt, run) =>
+          new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+              resolve({
+                error: "Timed out waiting for asset load",
+                kind: assetKind(sourceUrl),
+                ok: false,
+                startedAt,
+                url: sourceUrl,
+              });
+            }, 10000);
+            const settle = (result) => {
+              clearTimeout(timeout);
+              resolve(result);
+            };
+
+            run(settle);
+          });
+
+        const probeStylesheet = (sourceUrl, startedAt) =>
+          withTimeout(sourceUrl, startedAt, (settle) => {
+            const link = document.createElement("link");
+            link.href = sourceUrl;
+            link.rel = "stylesheet";
+            link.onload = () => {
+              settle({ kind: "stylesheet", ok: true, startedAt, url: sourceUrl });
+            };
+            link.onerror = () => {
+              settle({
+                error: "Stylesheet failed to load",
+                kind: "stylesheet",
+                ok: false,
+                startedAt,
+                url: sourceUrl,
+              });
+            };
+            document.head.appendChild(link);
+          });
+
+        const probeScript = (sourceUrl, startedAt) =>
+          withTimeout(sourceUrl, startedAt, (settle) => {
+            const script = document.createElement("script");
+            script.async = false;
+            script.src = sourceUrl;
+            script.onload = () => {
+              settle({ kind: "script", ok: true, startedAt, url: sourceUrl });
+            };
+            script.onerror = () => {
+              settle({
+                error: "Script failed to load",
+                kind: "script",
+                ok: false,
+                startedAt,
+                url: sourceUrl,
+              });
+            };
+            document.body.appendChild(script);
+          });
+
+        const probeFetch = (sourceUrl, startedAt) =>
+          fetch(sourceUrl, { cache: "no-store", mode: "no-cors" }).then(
+            (response) => ({
+              kind: "fetch",
+              ok: true,
+              responseType: response.type,
+              startedAt,
+              url: sourceUrl,
+            }),
+            (error) => ({
+              error: error instanceof Error ? error.message : String(error),
+              kind: "fetch",
+              ok: false,
+              startedAt,
+              url: sourceUrl,
+            }),
+          );
+
+        const probeAsset = (sourceUrl) => {
+          const startedAt = new Date().toISOString();
+
+          if (assetKind(sourceUrl) === "stylesheet") {
+            return probeStylesheet(sourceUrl, startedAt);
+          }
+
+          if (assetKind(sourceUrl) === "script") {
+            return probeScript(sourceUrl, startedAt);
+          }
+
+          return probeFetch(sourceUrl, startedAt);
+        };
+
+        Promise.all(assetUrls.map(probeAsset))
+          .then((assets) => {
+            const url = new URL(beaconUrl);
+            url.searchParams.set("href", window.location.href);
+            url.searchParams.set("readyAt", new Date().toISOString());
+
+            if (assets.length > 0) {
+              url.searchParams.set("fetches", JSON.stringify(assets));
+            }
+
+            return fetch(url.href, { cache: "no-store", mode: "no-cors" });
+          })
+          .catch(() => {});
+      }
+    </script>
   </body>
 </html>
