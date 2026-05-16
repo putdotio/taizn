@@ -31,7 +31,7 @@ Environment entries:
 
 The npm package uses Trusted Publishing from GitHub Actions. On npm, configure owner `putdotio`, repository `taizn`, workflow `ci.yml`, and Environment named `release` for the package.
 
-The workflow grants `id-token: write` so npm can mint short-lived publish credentials and provenance; do not add a long-lived `NPM_TOKEN` secret.
+The workflow grants `id-token: write` so npm mints short-lived publish credentials and provenance for the release job.
 
 Release GitHub writes use `putio-release-bot`, and the release-bot remote is configured only after dependencies are installed.
 
