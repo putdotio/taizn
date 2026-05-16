@@ -1,8 +1,8 @@
-import { Argument, Command } from "effect/unstable/cli";
+import { Argument, Command, Flag } from "effect/unstable/cli";
 import { Effect } from "effect";
 import { loadContext, type TaiznContext } from "./context.js";
 import { loadEnv } from "./env.js";
-import { pairSamsungTvRemote, sendSamsungTvKey, showSamsungTvInfo } from "./remote.js";
+import { pairSamsungTvRemote, sendSamsungTvKeys, showSamsungTvInfo } from "./remote.js";
 import { checkTizen, createProfile, installWidget, packageWidget, runWidget } from "./tizen.js";
 
 const withContext = <E, R>(operation: (context: TaiznContext) => Effect.Effect<void, E, R>) =>
@@ -39,11 +39,17 @@ const tvPair = Command.make("pair", {}, () =>
   }),
 );
 
-const tvPress = Command.make("press", { key: Argument.string("key") }, ({ key }) =>
-  Effect.gen(function* () {
-    const env = yield* loadEnv();
-    yield* sendSamsungTvKey(env, key);
-  }),
+const tvPress = Command.make(
+  "press",
+  {
+    delayMs: Flag.integer("delay-ms").pipe(Flag.withDefault(250)),
+    keys: Argument.string("key").pipe(Argument.variadic({ min: 1 })),
+  },
+  ({ delayMs, keys }) =>
+    Effect.gen(function* () {
+      const env = yield* loadEnv();
+      yield* sendSamsungTvKeys(env, keys, { delayMs });
+    }),
 );
 
 const tvInfo = Command.make("info", {}, () =>

@@ -311,12 +311,16 @@ describe("taizn cli", () => {
       assert.notInclude(requestUrls[0] ?? "", "token=stale-token");
       assert.include(readFileSync(join(dir, ".taizn/remote.json"), "utf8"), "test-token");
 
-      const press = await runTaiznAsync(["tv", "press", "KEY_ENTER"], dir);
+      const press = await runTaiznAsync(
+        ["tv", "press", "--delay-ms", "1", "KEY_UP", "KEY_ENTER"],
+        dir,
+      );
 
       assert.strictEqual(press.status, 0);
-      assert.include(press.stdout, "Sent Samsung TV remote key: KEY_ENTER");
-      assert.lengthOf(receivedKeys, 1);
-      assert.include(receivedKeys[0] ?? "", '"DataOfCmd":"KEY_ENTER"');
+      assert.include(press.stdout, "Sent Samsung TV remote keys: KEY_UP, KEY_ENTER");
+      assert.lengthOf(receivedKeys, 2);
+      assert.include(receivedKeys[0] ?? "", '"DataOfCmd":"KEY_UP"');
+      assert.include(receivedKeys[1] ?? "", '"DataOfCmd":"KEY_ENTER"');
     } finally {
       server.close();
     }

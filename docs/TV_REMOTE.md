@@ -9,6 +9,7 @@ and smoke checks against a physical TV or monitor.
 taizn tv info
 taizn tv pair
 taizn tv press KEY_ENTER
+taizn tv press --delay-ms 250 KEY_HOME KEY_DOWN KEY_ENTER
 ```
 
 - `info` reads the TV's local `/api/v2/` metadata and reports remote-control
@@ -17,7 +18,8 @@ taizn tv press KEY_ENTER
   client. When pairing succeeds, it stores the token in `.taizn/remote.json`.
 - `press` reconnects with the paired token and sends a Samsung remote key such
   as `KEY_HOME`, `KEY_BACK`, `KEY_UP`, `KEY_DOWN`, `KEY_LEFT`, `KEY_RIGHT`, or
-  `KEY_ENTER`.
+  `KEY_ENTER`. Pass multiple keys to send a navigation sequence on one
+  websocket connection. `--delay-ms` controls the delay between sequence keys.
 
 ## Environment
 

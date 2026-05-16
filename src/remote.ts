@@ -84,6 +84,11 @@ type SavedRemoteOptions = RemoteOptions & {
   readonly token: string;
 };
 
+type RemoteKeySequence = {
+  readonly delayMs: number;
+  readonly keys: readonly string[];
+};
+
 type TvRemoteError =
   | MissingTvRemoteHost
   | MissingTvRemoteToken
@@ -108,15 +113,31 @@ export const sendSamsungTvKey = Effect.fn("sendSamsungTvKey")(function* (
   env: TaiznEnv,
   key: string,
 ) {
-  const options = yield* resolveRemoteOptions(env, { requireToken: true });
-  const token = options.token;
+  yield* sendSamsungTvKeys(env, [key]);
+});
+
+export const sendSamsungTvKeys = Effect.fn("sendSamsungTvKeys")(function* (
+  env: TaiznEnv,
+  keys: readonly string[],
+  pressOptions?: { readonly delayMs?: number },
+) {
+  const remoteOptions = yield* resolveRemoteOptions(env, { requireToken: true });
+  const token = remoteOptions.token;
 
   if (!token) {
     return yield* MissingTvRemoteToken.make({});
   }
 
-  yield* connectRemote(options, key);
-  yield* Console.log(`Sent Samsung TV remote key: ${key}`);
+  yield* connectRemote(remoteOptions, {
+    delayMs: Math.max(0, pressOptions?.delayMs ?? 250),
+    keys,
+  });
+
+  yield* Console.log(
+    keys.length === 1
+      ? `Sent Samsung TV remote key: ${keys[0]}`
+      : `Sent Samsung TV remote keys: ${keys.join(", ")}`,
+  );
 });
 
 export const showSamsungTvInfo = Effect.fn("showSamsungTvInfo")(function* (env: TaiznEnv) {
@@ -230,14 +251,17 @@ const saveRemoteState = Effect.fn("saveRemoteState")(function* (options: SavedRe
     );
 });
 
-const connectRemote = Effect.fn("connectRemote")(function* (options: RemoteOptions, key?: string) {
+const connectRemote = Effect.fn("connectRemote")(function* (
+  options: RemoteOptions,
+  sequence?: RemoteKeySequence,
+) {
   return yield* Effect.tryPromise({
-    try: () => connectRemotePromise(options, key),
+    try: () => connectRemotePromise(options, sequence),
     catch: (cause) => normalizeRemoteError(cause, options),
   });
 });
 
-const connectRemotePromise = (options: RemoteOptions, key?: string) =>
+const connectRemotePromise = (options: RemoteOptions, sequence?: RemoteKeySequence) =>
   new Promise<string>((resolve, reject) => {
     const url = remoteUrl(options);
     const ws = new WebSocket(url, {
@@ -272,6 +296,37 @@ const connectRemotePromise = (options: RemoteOptions, key?: string) =>
       ws.close();
     };
 
+    const sendSequence = (token: string) => {
+      const keys = sequence?.keys ?? [];
+
+      if (keys.length === 0) {
+        succeed(token);
+        return;
+      }
+
+      let index = 0;
+      const sendNext = () => {
+        const key = keys[index];
+
+        if (!key) {
+          succeed(token);
+          return;
+        }
+
+        ws.send(JSON.stringify(remoteKeyPayload(key)));
+        index += 1;
+
+        if (index >= keys.length) {
+          setTimeout(() => succeed(token), 500);
+          return;
+        }
+
+        setTimeout(sendNext, sequence?.delayMs ?? 250);
+      };
+
+      sendNext();
+    };
+
     ws.on("message", (data) => {
       let event: RemoteEvent;
 
@@ -302,11 +357,7 @@ const connectRemotePromise = (options: RemoteOptions, key?: string) =>
         return;
       }
 
-      if (key) {
-        ws.send(JSON.stringify(remoteKeyPayload(key)));
-      }
-
-      setTimeout(() => succeed(token), key ? 500 : 0);
+      sendSequence(token);
     });
 
     ws.on("error", (cause) => {

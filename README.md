@@ -53,6 +53,7 @@ taizn run
 taizn tv info
 taizn tv pair
 taizn tv press KEY_ENTER
+taizn tv press --delay-ms 250 KEY_HOME KEY_DOWN KEY_ENTER
 taizn --version
 ```
 
@@ -65,6 +66,7 @@ targets without requiring `taizn.json`. `profile` imports
 Samsung's websocket remote-control API to inspect a TV,
 pair for a remote token, and send remote-control key presses. See
 [Samsung TV Remote](./docs/TV_REMOTE.md) for pairing, environment, and limits.
+`tv press` accepts one key or a sequence of keys.
 
 ## Environment
 
