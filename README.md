@@ -61,6 +61,7 @@ taizn tv info
 taizn tv info --json
 taizn tv pair
 taizn tv press KEY_ENTER
+taizn tv press --json KEY_ENTER
 taizn tv press --delay-ms 250 KEY_HOME KEY_DOWN KEY_ENTER
 taizn --version
 ```
@@ -80,7 +81,8 @@ proof output. `profile` imports
 `run` launches the configured variant application on the target. `tv` commands use
 Samsung's websocket remote-control API to inspect a TV,
 pair for a remote token, and send remote-control key presses. Add `--json` to
-`tv info` for a structured TV capability snapshot. See
+`tv info` for a structured TV capability snapshot, or to `tv press` for a
+structured key-sequence receipt. See
 [Samsung TV Remote](./docs/TV_REMOTE.md) for pairing, environment, and limits.
 `tv press` accepts one key or a sequence of keys.
 

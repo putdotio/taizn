@@ -10,6 +10,7 @@ taizn tv info
 taizn tv info --json
 taizn tv pair
 taizn tv press KEY_ENTER
+taizn tv press --json KEY_ENTER
 taizn tv press --delay-ms 250 KEY_HOME KEY_DOWN KEY_ENTER
 ```
 
@@ -22,6 +23,7 @@ taizn tv press --delay-ms 250 KEY_HOME KEY_DOWN KEY_ENTER
   as `KEY_HOME`, `KEY_BACK`, `KEY_UP`, `KEY_DOWN`, `KEY_LEFT`, `KEY_RIGHT`, or
   `KEY_ENTER`. Pass multiple keys to send a navigation sequence on one
   websocket connection. `--delay-ms` controls the delay between sequence keys.
+  Add `--json` to emit a redacted receipt with the target, delay, and keys sent.
 
 ## Environment
 

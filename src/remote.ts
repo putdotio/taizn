@@ -89,6 +89,11 @@ type RemoteKeySequence = {
   readonly keys: readonly string[];
 };
 
+type PressOptions = {
+  readonly delayMs?: number;
+  readonly json?: boolean;
+};
+
 type TvInfoOptions = {
   readonly json?: boolean;
 };
@@ -123,19 +128,37 @@ export const sendSamsungTvKey = Effect.fn("sendSamsungTvKey")(function* (
 export const sendSamsungTvKeys = Effect.fn("sendSamsungTvKeys")(function* (
   env: TaiznEnv,
   keys: readonly string[],
-  pressOptions?: { readonly delayMs?: number },
+  pressOptions?: PressOptions,
 ) {
   const remoteOptions = yield* resolveRemoteOptions(env, { requireToken: true });
   const token = remoteOptions.token;
+  const delayMs = Math.max(0, pressOptions?.delayMs ?? 250);
 
   if (!token) {
     return yield* MissingTvRemoteToken.make({});
   }
 
   yield* connectRemote(remoteOptions, {
-    delayMs: Math.max(0, pressOptions?.delayMs ?? 250),
+    delayMs,
     keys,
   });
+
+  if (pressOptions?.json) {
+    yield* Console.log(
+      JSON.stringify({
+        delayMs,
+        keys,
+        keyCount: keys.length,
+        target: {
+          host: remoteOptions.host,
+          port: remoteOptions.port,
+          protocol: remoteOptions.protocol,
+          url: remoteTarget(remoteOptions),
+        },
+      }),
+    );
+    return;
+  }
 
   yield* Console.log(
     keys.length === 1

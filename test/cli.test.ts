@@ -523,6 +523,24 @@ describe("taizn cli", () => {
       assert.lengthOf(receivedKeys, 2);
       assert.include(receivedKeys[0] ?? "", '"DataOfCmd":"KEY_UP"');
       assert.include(receivedKeys[1] ?? "", '"DataOfCmd":"KEY_ENTER"');
+
+      const jsonPress = await runTaiznAsync(["tv", "press", "--json", "KEY_LEFT"], dir);
+
+      assert.strictEqual(jsonPress.status, 0);
+      assert.strictEqual(jsonPress.stderr, "");
+      assert.deepStrictEqual(parseTvPressJson(jsonPress.stdout), {
+        delayMs: 250,
+        keyCount: 1,
+        keys: ["KEY_LEFT"],
+        target: {
+          host: "127.0.0.1",
+          port: address.port,
+          protocol: "ws",
+          url: `ws://127.0.0.1:${address.port}`,
+        },
+      });
+      assert.lengthOf(receivedKeys, 3);
+      assert.include(receivedKeys[2] ?? "", '"DataOfCmd":"KEY_LEFT"');
     } finally {
       server.close();
     }
@@ -737,6 +755,20 @@ const TvInfoJsonSchema = Schema.Struct({
 
 type TvInfoJson = typeof TvInfoJsonSchema.Type;
 
+const TvPressJsonSchema = Schema.Struct({
+  delayMs: Schema.Number,
+  keyCount: Schema.Number,
+  keys: Schema.Array(Schema.String),
+  target: Schema.Struct({
+    host: Schema.String,
+    port: Schema.Number,
+    protocol: Schema.Literals(["ws", "wss"]),
+    url: Schema.String,
+  }),
+});
+
+type TvPressJson = typeof TvPressJsonSchema.Type;
+
 const parseProofJson = (text: string): ProofJson => {
   const proof: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(ProofJsonSchema)(proof);
@@ -755,6 +787,11 @@ const parseCheckJson = (text: string): CheckJson => {
 const parseTvInfoJson = (text: string): TvInfoJson => {
   const info: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(TvInfoJsonSchema)(info);
+};
+
+const parseTvPressJson = (text: string): TvPressJson => {
+  const press: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(TvPressJsonSchema)(press);
 };
 
 const createToolingFixture = () => {

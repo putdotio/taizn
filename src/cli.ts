@@ -79,12 +79,13 @@ const tvPress = Command.make(
   "press",
   {
     delayMs: Flag.integer("delay-ms").pipe(Flag.withDefault(250)),
+    json: Flag.boolean("json"),
     keys: Argument.string("key").pipe(Argument.variadic({ min: 1 })),
   },
-  ({ delayMs, keys }) =>
+  ({ delayMs, json, keys }) =>
     Effect.gen(function* () {
       const env = yield* loadEnv();
-      yield* sendSamsungTvKeys(env, keys, { delayMs });
+      yield* sendSamsungTvKeys(env, keys, { delayMs, json });
     }),
 );
 
