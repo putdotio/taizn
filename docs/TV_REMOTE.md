@@ -7,13 +7,15 @@ and smoke checks against a physical TV or monitor.
 
 ```bash
 taizn tv info
+taizn tv info --json
 taizn tv pair
 taizn tv press KEY_ENTER
 taizn tv press --delay-ms 250 KEY_HOME KEY_DOWN KEY_ENTER
 ```
 
 - `info` reads the TV's local `/api/v2/` metadata and reports remote-control
-  support.
+  support. Add `--json` to emit a structured TV capability snapshot for agents
+  and scripts.
 - `pair` opens a Samsung remote websocket and waits for the TV to approve the
   client. When pairing succeeds, it stores the token in `.taizn/remote.json`.
 - `press` reconnects with the paired token and sends a Samsung remote key such

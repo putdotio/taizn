@@ -355,6 +355,66 @@ describe("taizn cli", () => {
     }
   });
 
+  it("reads Samsung TV info as JSON", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-info-json-"));
+    const server = createServer((_request, response) => {
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          device: {
+            TokenAuthSupport: "true",
+            developerIP: "127.0.0.1",
+            developerMode: "1",
+            ip: "127.0.0.1",
+            modelName: "Fixture TV",
+          },
+          isSupport: JSON.stringify({ remote_available: "true" }),
+          name: "Fixture &amp; TV",
+          remote: "1.0",
+          type: "Samsung SmartTV",
+          uri: "http://127.0.0.1/api/v2/",
+        }),
+      );
+    });
+
+    try {
+      await waitForHttpServer(server);
+      const address = server.address();
+
+      if (!address || typeof address === "string") {
+        throw new Error("Expected TCP HTTP test server address.");
+      }
+
+      const result = await runTaiznAsync(["tv", "info", "--json"], dir, {
+        TAIZN_TV_HOST: "127.0.0.1",
+        TAIZN_TV_INFO_PORT: String(address.port),
+      });
+
+      assert.strictEqual(result.status, 0);
+      assert.strictEqual(result.stderr, "");
+      const info = parseTvInfoJson(result.stdout);
+      assert.deepStrictEqual(info, {
+        developer: {
+          enabled: true,
+          ip: "127.0.0.1",
+          mode: "1",
+        },
+        host: "127.0.0.1",
+        infoPort: address.port,
+        ip: "127.0.0.1",
+        model: "Fixture TV",
+        name: "Fixture & TV",
+        remote: "1.0",
+        remoteAvailable: true,
+        tokenAuth: true,
+        type: "Samsung SmartTV",
+        uri: "http://127.0.0.1/api/v2/",
+      });
+    } finally {
+      server.close();
+    }
+  });
+
   it("times out stalled Samsung TV info requests", async () => {
     const server = createServer((_request, _response) => {
       // Keep the request open to exercise the AbortSignal timeout path.
@@ -657,6 +717,26 @@ const CheckJsonSchema = Schema.Struct({
 
 type CheckJson = typeof CheckJsonSchema.Type;
 
+const TvInfoJsonSchema = Schema.Struct({
+  developer: Schema.Struct({
+    enabled: Schema.optional(Schema.Boolean),
+    ip: Schema.optional(Schema.String),
+    mode: Schema.optional(Schema.String),
+  }),
+  host: Schema.String,
+  infoPort: Schema.Number,
+  ip: Schema.String,
+  model: Schema.optional(Schema.String),
+  name: Schema.String,
+  remote: Schema.optional(Schema.String),
+  remoteAvailable: Schema.optional(Schema.Boolean),
+  tokenAuth: Schema.optional(Schema.Boolean),
+  type: Schema.optional(Schema.String),
+  uri: Schema.optional(Schema.String),
+});
+
+type TvInfoJson = typeof TvInfoJsonSchema.Type;
+
 const parseProofJson = (text: string): ProofJson => {
   const proof: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(ProofJsonSchema)(proof);
@@ -670,6 +750,11 @@ const parseApplicationsJson = (text: string): ApplicationsJson => {
 const parseCheckJson = (text: string): CheckJson => {
   const check: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(CheckJsonSchema)(check);
+};
+
+const parseTvInfoJson = (text: string): TvInfoJson => {
+  const info: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(TvInfoJsonSchema)(info);
 };
 
 const createToolingFixture = () => {

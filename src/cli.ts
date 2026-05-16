@@ -88,10 +88,10 @@ const tvPress = Command.make(
     }),
 );
 
-const tvInfo = Command.make("info", {}, () =>
+const tvInfo = Command.make("info", { json: Flag.boolean("json") }, ({ json }) =>
   Effect.gen(function* () {
     const env = yield* loadEnv();
-    yield* showSamsungTvInfo(env);
+    yield* showSamsungTvInfo(env, { json });
   }),
 );
 

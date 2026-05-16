@@ -89,6 +89,10 @@ type RemoteKeySequence = {
   readonly keys: readonly string[];
 };
 
+type TvInfoOptions = {
+  readonly json?: boolean;
+};
+
 type TvRemoteError =
   | MissingTvRemoteHost
   | MissingTvRemoteToken
@@ -140,13 +144,39 @@ export const sendSamsungTvKeys = Effect.fn("sendSamsungTvKeys")(function* (
   );
 });
 
-export const showSamsungTvInfo = Effect.fn("showSamsungTvInfo")(function* (env: TaiznEnv) {
+export const showSamsungTvInfo = Effect.fn("showSamsungTvInfo")(function* (
+  env: TaiznEnv,
+  infoOptions: TvInfoOptions = {},
+) {
   const options = yield* resolveRemoteOptions(env);
   const info = yield* fetchSamsungTvInfo(options.host, {
     port: env.tvInfoPort,
     timeoutMs: options.timeoutMs,
   });
   const support = info.isSupport ? parseSupport(info.isSupport) : undefined;
+
+  if (infoOptions.json) {
+    yield* Console.log(
+      JSON.stringify({
+        developer: {
+          enabled: stringFlag(info.device.developerMode),
+          ip: info.device.developerIP,
+          mode: info.device.developerMode,
+        },
+        host: options.host,
+        infoPort: env.tvInfoPort ?? TV_INFO_PORT,
+        ip: info.device.ip ?? options.host,
+        model: info.device.modelName,
+        name: decodeHtml(info.name),
+        remote: info.remote,
+        remoteAvailable: stringFlag(support?.remote_available),
+        tokenAuth: stringFlag(info.device.TokenAuthSupport),
+        type: info.type,
+        uri: info.uri,
+      }),
+    );
+    return;
+  }
 
   yield* Console.log(`Samsung TV: ${decodeHtml(info.name)}`);
   yield* Console.log(`model: ${info.device.modelName ?? "unknown"}`);
@@ -496,3 +526,17 @@ const hostFromTarget = (target: string | undefined) => {
 const causeToMessage = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
 
 const decodeHtml = (value: string) => value.replaceAll("&quot;", '"').replaceAll("&amp;", "&");
+
+const stringFlag = (value: string | undefined) => {
+  const normalized = value?.trim().toLowerCase();
+
+  if (normalized === "true" || normalized === "1") {
+    return true;
+  }
+
+  if (normalized === "false" || normalized === "0") {
+    return false;
+  }
+
+  return undefined;
+};
