@@ -9,6 +9,7 @@ export type TaiznPaths = {
   readonly configPath: string;
   readonly envPath: string;
   readonly outputDir: string;
+  readonly remoteStatePath: string;
   readonly stageDir: string;
   readonly taiznDir: string;
 };
@@ -51,6 +52,7 @@ export const makePaths = (appDir: string): TaiznPaths => {
     configPath: join(appDir, "taizn.json"),
     envPath: join(taiznDir, ".env"),
     outputDir: join(taiznDir, "build", "output"),
+    remoteStatePath: join(taiznDir, "remote.json"),
     stageDir: join(taiznDir, "build", "stage"),
     taiznDir,
   };

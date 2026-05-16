@@ -9,7 +9,7 @@ consumer app. Keep it a typed shell-out tool, not an app framework.
 - Keep reusable operations as `Effect.fn` programs with typed errors; provide Node services at the executable edge.
 - Parse `taizn.json` and `TAIZN_*` with Effect Schema before implementation code sees them.
 - Treat `process.cwd()` as the consumer app root.
-- Keep `.taizn/` consumer-local; it can hold env, certs, generated widgets, and device state.
+- Keep `.taizn/` consumer-local; it can hold env, certs, generated widgets, paired TV remote tokens, and device state.
 - Keep file/process side effects explicit: copy, stage, clean, run Tizen, fail clearly.
 - Prefer small helpers over new framework layers or compatibility modes.
 
@@ -22,6 +22,8 @@ consumer app. Keep it a typed shell-out tool, not an app framework.
 - Redact password args when reporting failed Tizen commands.
 - Missing config/env/files and child-command failures should not print stack traces.
 - `install` should only auto-pick a target when exactly one `sdb devices` target is connected.
+- `tv` commands should not require a consumer `taizn.json`; they use `TAIZN_TV_HOST`, `.taizn/remote.json`, or the host part of `TAIZN_TARGET`.
+- `tv` commands send Samsung remote keys only; do not imply screenshot, app launch, or widget install support there.
 - Unit tests use `@effect/vitest` through `vp run test`; only `vp run live:test:*` proves real Tizen behavior.
 
 ## When Contracts Change

@@ -31,6 +31,7 @@ Create `taizn.json` in the app directory, keep `.taizn/` ignored, then run:
 pnpm exec taizn check
 pnpm exec taizn package
 pnpm exec taizn install
+pnpm exec taizn run
 ```
 
 Project files:
@@ -38,6 +39,7 @@ Project files:
 - `taizn.json`: app build, widget, signing, and variant config
 - `.taizn/.env`: optional local secrets read by Node
 - `.taizn/certificates/`: optional local author/distributor certs for `taizn profile`
+- `.taizn/remote.json`: optional paired Samsung TV remote token
 - `.taizn/build/`: generated package staging and output
 
 ## Commands
@@ -47,6 +49,10 @@ taizn check
 taizn profile
 taizn package
 taizn install
+taizn run
+taizn tv info
+taizn tv pair
+taizn tv press KEY_ENTER
 taizn --version
 ```
 
@@ -55,6 +61,10 @@ targets without requiring `taizn.json`. `profile` imports
 `.taizn/certificates/author.p12` and
 `.taizn/certificates/distributor.p12` into a Tizen security profile.
 `package` builds and signs a `.wgt`. `install` packages and sideloads it.
+`run` launches the configured variant application on the target. `tv` commands use
+Samsung's websocket remote-control API to inspect a TV,
+pair for a remote token, and send remote-control key presses. See
+[Samsung TV Remote](./docs/TV_REMOTE.md) for pairing, environment, and limits.
 
 ## Environment
 
@@ -68,7 +78,19 @@ TAIZN_VARIANT=development
 TAIZN_TARGET=<tv-ip>:26101
 TAIZN_TIZEN_CLI=~/tizen-studio/tools/ide/bin/tizen
 TAIZN_SDB=~/tizen-studio/tools/sdb
+TAIZN_TV_HOST=<tv-ip>
+TAIZN_TV_INFO_PORT=8001
+TAIZN_TV_NAME=taizn
+TAIZN_TV_PORT=8002
+TAIZN_TV_PROTOCOL=wss
+TAIZN_TV_TIMEOUT_MS=30000
+TAIZN_TV_TOKEN=<paired-remote-token>
 ```
+
+`taizn tv` uses `TAIZN_TV_HOST`, or the host part of `TAIZN_TARGET` when no TV
+host is set. `TAIZN_TV_INFO_PORT` controls the HTTP metadata endpoint; the
+remote-control websocket still uses `TAIZN_TV_PORT`. `taizn tv pair` writes the
+paired remote token to `.taizn/remote.json`; keep `.taizn/` ignored.
 
 ## Config
 
@@ -122,6 +144,7 @@ bundle local app assets but production packages should load hosted asset URLs.
 
 - [Contributing](./CONTRIBUTING.md)
 - [Distribution](./docs/DISTRIBUTION.md)
+- [Samsung TV Remote](./docs/TV_REMOTE.md)
 - [Security](./SECURITY.md)
 
 ## Repo Internals

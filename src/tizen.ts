@@ -53,6 +53,11 @@ type RunOptions = {
   readonly env?: ChildEnv;
 };
 
+type RunTarget = {
+  readonly flag: "-s" | "-t";
+  readonly value: string;
+};
+
 export const checkTizen = Effect.fn("checkTizen")(function* (env: TaiznEnv) {
   const tizenPath = yield* resolveTizenCli(env);
   const sdbPath = yield* resolveSdb(env);
@@ -166,6 +171,25 @@ export const installWidget = Effect.fn("installWidget")(function* (context: Taiz
   const installArgs = target ? ["install", "-n", built, "-s", target] : ["install", "-n", built];
 
   yield* run(tizenPath, installArgs, { env: yield* baseChildEnv() });
+});
+
+export const runWidget = Effect.fn("runWidget")(function* ({ config, env }: TaiznContext) {
+  const variant = getVariant(config, env.variant);
+  const sdbPath = yield* resolveSdb(env);
+  const tizenPath = yield* resolveTizenCli(env);
+
+  if (env.target) {
+    yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv() });
+  }
+
+  const target = yield* resolveRunTarget(env, sdbPath);
+  // Real Samsung TVs launch web widgets here by application id; package id fails.
+  const runArgs = target
+    ? ["run", "-p", variant.applicationId, target.flag, target.value]
+    : ["run", "-p", variant.applicationId];
+
+  yield* run(tizenPath, runArgs, { env: yield* baseChildEnv() });
+  yield* Console.log(`Launched ${variant.applicationId}`);
 });
 
 const resolveTizenCli = Effect.fn("resolveTizenCli")(function* (env: TaiznEnv) {
@@ -411,6 +435,33 @@ const resolveInstallTarget = Effect.fn("resolveInstallTarget")(function* (env: T
       );
 
       return device.id;
+    }
+  }
+
+  if (devices.length > 1) {
+    return yield* MultipleTargetsConnected.make({
+      targets: devices.map((device) => device.id),
+    });
+  }
+
+  return undefined;
+});
+
+const resolveRunTarget = Effect.fn("resolveRunTarget")(function* (env: TaiznEnv, sdbPath: string) {
+  if (env.target) {
+    return { flag: "-s", value: env.target } satisfies RunTarget;
+  }
+
+  const devices = yield* listSdbDevices(sdbPath);
+
+  if (devices.length === 1) {
+    const device = devices[0];
+    if (device) {
+      yield* Console.log(
+        `Using connected Tizen target: ${device.id}${device.label ? ` (${device.label})` : ""}`,
+      );
+
+      return { flag: "-s", value: device.id } satisfies RunTarget;
     }
   }
 

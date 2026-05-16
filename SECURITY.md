@@ -20,6 +20,7 @@ Useful reports usually include issues involving:
 - unsafe package contents or release artifacts
 - unsafe command execution through project config
 - Tizen signing material committed or exposed through generated files
+- paired Samsung TV remote tokens committed or exposed through generated files
 - GitHub Actions release or publish risk
 
 ## Guidelines

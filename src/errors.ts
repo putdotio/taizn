@@ -107,6 +107,66 @@ export class MultipleTargetsConnected extends Schema.TaggedErrorClass<MultipleTa
   }
 }
 
+export class MissingTvRemoteHost extends Schema.TaggedErrorClass<MissingTvRemoteHost>()(
+  "MissingTvRemoteHost",
+  {},
+) {
+  override get message(): string {
+    return "Samsung TV host is required. Set TAIZN_TV_HOST or TAIZN_TARGET.";
+  }
+}
+
+export class MissingTvRemoteToken extends Schema.TaggedErrorClass<MissingTvRemoteToken>()(
+  "MissingTvRemoteToken",
+  {},
+) {
+  override get message(): string {
+    return "Samsung TV remote token is required. Run `taizn tv pair` or set TAIZN_TV_TOKEN.";
+  }
+}
+
+export class TvRemoteConnectionFailed extends Schema.TaggedErrorClass<TvRemoteConnectionFailed>()(
+  "TvRemoteConnectionFailed",
+  {
+    cause: Schema.Defect,
+    target: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `Samsung TV remote connection failed: ${this.target}`;
+  }
+}
+
+export class TvRemoteProtocolError extends Schema.TaggedErrorClass<TvRemoteProtocolError>()(
+  "TvRemoteProtocolError",
+  {
+    details: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `Samsung TV remote protocol error: ${this.details}`;
+  }
+}
+
+export class TvRemoteTimeout extends Schema.TaggedErrorClass<TvRemoteTimeout>()("TvRemoteTimeout", {
+  target: Schema.String,
+}) {
+  override get message(): string {
+    return `Timed out waiting for Samsung TV remote response: ${this.target}`;
+  }
+}
+
+export class TvRemoteUnauthorized extends Schema.TaggedErrorClass<TvRemoteUnauthorized>()(
+  "TvRemoteUnauthorized",
+  {
+    target: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `Samsung TV denied remote control access: ${this.target}`;
+  }
+}
+
 export type TaiznError =
   | CommandFailed
   | ConfigNotFound
@@ -116,8 +176,14 @@ export type TaiznError =
   | InvalidJson
   | MissingFile
   | MissingPassword
+  | MissingTvRemoteHost
+  | MissingTvRemoteToken
   | MultipleTargetsConnected
   | PackageNotProduced
-  | SecretReadInterrupted;
+  | SecretReadInterrupted
+  | TvRemoteConnectionFailed
+  | TvRemoteProtocolError
+  | TvRemoteTimeout
+  | TvRemoteUnauthorized;
 
 export const renderError = (error: TaiznError) => error.message;

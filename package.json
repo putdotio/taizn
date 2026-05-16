@@ -23,6 +23,7 @@
   },
   "files": [
     "dist",
+    "docs",
     "README.md"
   ],
   "type": "module",
@@ -47,11 +48,13 @@
   },
   "dependencies": {
     "@effect/platform-node": "4.0.0-beta.66",
-    "effect": "4.0.0-beta.66"
+    "effect": "4.0.0-beta.66",
+    "ws": "^8.20.1"
   },
   "devDependencies": {
     "@effect/vitest": "4.0.0-beta.66",
     "@types/node": "^25.7.0",
+    "@types/ws": "^8.18.1",
     "typescript": "^6.0.2",
     "vite-plus": "^0.1.20",
     "vitest": "^4.1.6"

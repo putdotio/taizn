@@ -1,9 +1,12 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { assert, describe, it } from "@effect/vitest";
 import { Effect } from "effect";
+import { WebSocketServer } from "ws";
+import { fetchSamsungTvInfo } from "../src/remote.js";
 import { appBuildEnv, redactCommandArgs, TaiznSystem } from "../src/runtime.js";
 
 const cliPath = resolve("dist/taizn.mjs");
@@ -18,6 +21,33 @@ const runTaizn = (args: string[], cwd = process.cwd(), env: NodeJS.ProcessEnv = 
     },
   });
 
+const runTaiznAsync = (args: string[], cwd = process.cwd(), env: NodeJS.ProcessEnv = {}) =>
+  new Promise<{ readonly status: number | null; readonly stderr: string; readonly stdout: string }>(
+    (resolve) => {
+      const child = spawn(process.execPath, [cliPath, ...args], {
+        cwd,
+        env: {
+          ...process.env,
+          ...env,
+        },
+      });
+      let stdout = "";
+      let stderr = "";
+
+      child.stdout.setEncoding("utf8");
+      child.stderr.setEncoding("utf8");
+      child.stdout.on("data", (chunk: string) => {
+        stdout += chunk;
+      });
+      child.stderr.on("data", (chunk: string) => {
+        stderr += chunk;
+      });
+      child.on("close", (status) => {
+        resolve({ status, stderr, stdout });
+      });
+    },
+  );
+
 describe("taizn cli", () => {
   it("prints help without a project config", () => {
     const result = runTaizn(["--help"]);
@@ -26,6 +56,8 @@ describe("taizn cli", () => {
     assert.include(result.stdout, "COMMANDS");
     assert.include(result.stdout, "check");
     assert.include(result.stdout, "package");
+    assert.include(result.stdout, "run");
+    assert.include(result.stdout, "tv");
     assert.strictEqual(result.stderr, "");
   });
 
@@ -112,6 +144,200 @@ describe("taizn cli", () => {
     ]);
   });
 
+  it("rejects partial Samsung TV remote ports", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-port-"));
+    const result = runTaizn(["tv", "info"], dir, {
+      TAIZN_TV_HOST: "127.0.0.1",
+      TAIZN_TV_PORT: "8002abc",
+    });
+
+    assert.strictEqual(result.status, 1);
+    assert.include(result.stderr, "Invalid TAIZN environment:");
+    assert.include(result.stderr, "TAIZN_TV_PORT must be an integer between 1 and 65535");
+  });
+
+  it("lets Samsung TV env overrides bypass malformed remote state", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-remote-invalid-"));
+    mkdirSync(join(dir, ".taizn"), { recursive: true });
+    writeFileSync(join(dir, ".taizn/remote.json"), "{bad\n");
+
+    const result = runTaizn(["tv", "pair"], dir, {
+      TAIZN_TV_HOST: "127.0.0.1",
+      TAIZN_TV_PORT: "9",
+      TAIZN_TV_PROTOCOL: "ws",
+    });
+
+    assert.strictEqual(result.status, 1);
+    assert.include(result.stderr, "Samsung TV remote connection failed");
+    assert.notInclude(result.stderr, "Invalid");
+  });
+
+  it("reads Samsung TV info from a configured info port", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-info-port-"));
+    const server = createServer((_request, response) => {
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          device: {
+            TokenAuthSupport: "true",
+            developerIP: "127.0.0.1",
+            developerMode: "1",
+            ip: "127.0.0.1",
+            modelName: "Fixture TV",
+          },
+          isSupport: JSON.stringify({ remote_available: "true" }),
+          name: "Fixture",
+          remote: "1.0",
+        }),
+      );
+    });
+
+    try {
+      await waitForHttpServer(server);
+      const address = server.address();
+
+      if (!address || typeof address === "string") {
+        throw new Error("Expected TCP HTTP test server address.");
+      }
+
+      const result = await runTaiznAsync(["tv", "info"], dir, {
+        TAIZN_TV_HOST: "127.0.0.1",
+        TAIZN_TV_INFO_PORT: String(address.port),
+      });
+
+      assert.strictEqual(result.status, 0);
+      assert.include(result.stdout, "Samsung TV: Fixture");
+      assert.include(result.stdout, "model: Fixture TV");
+    } finally {
+      server.close();
+    }
+  });
+
+  it("times out stalled Samsung TV info requests", async () => {
+    const server = createServer((_request, _response) => {
+      // Keep the request open to exercise the AbortSignal timeout path.
+    });
+
+    try {
+      await waitForHttpServer(server);
+      const address = server.address();
+
+      if (!address || typeof address === "string") {
+        throw new Error("Expected TCP HTTP test server address.");
+      }
+
+      let error: unknown;
+
+      try {
+        await Effect.runPromise(
+          fetchSamsungTvInfo("127.0.0.1", {
+            port: address.port,
+            timeoutMs: 10,
+          }),
+        );
+      } catch (cause) {
+        error = cause;
+      }
+
+      assert.include(String(error), "Timed out waiting for Samsung TV remote response");
+    } finally {
+      server.close();
+    }
+  });
+
+  it("pairs and sends Samsung TV remote keys", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-remote-"));
+    const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+    const receivedKeys: string[] = [];
+    const requestUrls: string[] = [];
+
+    await waitForServer(server);
+
+    const address = server.address();
+
+    if (!address || typeof address === "string") {
+      server.close();
+      throw new Error("Expected TCP websocket test server address.");
+    }
+
+    server.on("connection", (socket, request) => {
+      requestUrls.push(request.url ?? "");
+      socket.send(
+        JSON.stringify({
+          data: {
+            clients: [
+              {
+                attributes: { token: "other-token" },
+                id: "other-client",
+                isHost: false,
+              },
+              {
+                attributes: { token: "test-token" },
+                id: "test-client",
+                isHost: false,
+              },
+            ],
+            id: "test-client",
+          },
+          event: "ms.channel.connect",
+        }),
+      );
+      socket.on("message", (data) => {
+        receivedKeys.push(data.toString());
+      });
+    });
+
+    try {
+      mkdirSync(join(dir, ".taizn"), { recursive: true });
+      writeFileSync(
+        join(dir, ".taizn/remote.json"),
+        `${JSON.stringify(
+          {
+            host: "127.0.0.1",
+            name: "stale-name",
+            port: address.port,
+            protocol: "ws",
+            token: "stale-token",
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const pair = await runTaiznAsync(["tv", "pair"], dir);
+
+      assert.strictEqual(pair.status, 0);
+      assert.include(pair.stdout, "TAIZN_TV_TOKEN=test-token");
+      assert.notInclude(requestUrls[0] ?? "", "token=stale-token");
+      assert.include(readFileSync(join(dir, ".taizn/remote.json"), "utf8"), "test-token");
+
+      const press = await runTaiznAsync(["tv", "press", "KEY_ENTER"], dir);
+
+      assert.strictEqual(press.status, 0);
+      assert.include(press.stdout, "Sent Samsung TV remote key: KEY_ENTER");
+      assert.lengthOf(receivedKeys, 1);
+      assert.include(receivedKeys[0] ?? "", '"DataOfCmd":"KEY_ENTER"');
+    } finally {
+      server.close();
+    }
+  });
+
+  it("runs the configured widget variant on the target", () => {
+    const dir = createPackageFixture();
+    const result = runTaizn(["run"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+      TAIZN_VARIANT: "production",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.include(result.stdout, "Launched Example.app");
+    assert.include(readFileSync(join(dir, "run-args.json"), "utf8"), '"Example.app"');
+    assert.include(readFileSync(join(dir, "run-args.json"), "utf8"), '"-s"');
+    assert.include(readFileSync(join(dir, "run-args.json"), "utf8"), '"127.0.0.1:26101"');
+  });
+
   it("uses variant widget overrides when staging the package", () => {
     const dir = createPackageFixture();
 
@@ -170,12 +396,27 @@ const createPackageFixture = () => {
     `#!/usr/bin/env node
       import { mkdirSync, writeFileSync } from "node:fs";
       import { join } from "node:path";
+      if (process.argv[2] === "run") {
+        writeFileSync("run-args.json", JSON.stringify(process.argv.slice(2)));
+        process.exit(0);
+      }
       const output = process.argv[process.argv.indexOf("-o") + 1];
       mkdirSync(output, { recursive: true });
       writeFileSync(join(output, "signed.wgt"), "signed");
     `,
   );
   chmodSync(join(dir, "fake-tizen.mjs"), 0o755);
+  writeFileSync(
+    join(dir, "fake-sdb.mjs"),
+    `#!/usr/bin/env node
+      if (process.argv[2] === "devices") {
+        console.log("List of devices attached");
+        console.log("127.0.0.1:26101\\tdevice\\tExampleTV");
+      }
+      process.exit(0);
+    `,
+  );
+  chmodSync(join(dir, "fake-sdb.mjs"), 0o755);
 
   writeFileSync(
     join(dir, "platforms/tizen/config.xml"),
@@ -235,3 +476,16 @@ const createPackageFixture = () => {
 
   return dir;
 };
+
+const waitForServer = (server: WebSocketServer) =>
+  new Promise<void>((resolve, reject) => {
+    server.once("listening", () => resolve());
+    server.once("error", reject);
+  });
+
+const waitForHttpServer = (server: ReturnType<typeof createServer>) =>
+  new Promise<void>((resolve, reject) => {
+    server.listen(0, "127.0.0.1");
+    server.once("listening", () => resolve());
+    server.once("error", reject);
+  });
