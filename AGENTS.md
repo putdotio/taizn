@@ -22,6 +22,8 @@ consumer app. Keep it a typed shell-out tool, not an app framework.
   `taizn.json`.
 - `launch` should start an already-installed target app without requiring a
   consumer `taizn.json`.
+- `prove` should produce a compact installed-and-launched proof transcript
+  without requiring a consumer `taizn.json`.
 - Do not leak `TAIZN_*`, `TIZEN_*`, or `SDB` into the consumer build command.
 - Redact password args when reporting failed Tizen commands.
 - Missing config/env/files and child-command failures should not print stack traces.

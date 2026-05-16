@@ -10,6 +10,7 @@ import {
   launchInstalledApplication,
   listInstalledApplications,
   packageWidget,
+  proveInstalledApplication,
   runWidget,
 } from "./tizen.js";
 
@@ -44,6 +45,13 @@ const launch = Command.make("launch", { query: Argument.string("query") }, ({ qu
   Effect.gen(function* () {
     const env = yield* loadEnv();
     yield* launchInstalledApplication(env, query);
+  }),
+);
+
+const prove = Command.make("prove", { query: Argument.string("query") }, ({ query }) =>
+  Effect.gen(function* () {
+    const env = yield* loadEnv();
+    yield* proveInstalledApplication(env, query);
   }),
 );
 
@@ -87,5 +95,5 @@ const tvInfo = Command.make("info", {}, () =>
 const tv = Command.make("tv", {}).pipe(Command.withSubcommands([tvPair, tvPress, tvInfo]));
 
 export const command = taizn.pipe(
-  Command.withSubcommands([apps, check, launch, profile, pack, install, run, tv]),
+  Command.withSubcommands([apps, check, launch, prove, profile, pack, install, run, tv]),
 );

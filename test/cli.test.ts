@@ -58,6 +58,7 @@ describe("taizn cli", () => {
     assert.include(result.stdout, "check");
     assert.include(result.stdout, "launch");
     assert.include(result.stdout, "package");
+    assert.include(result.stdout, "prove");
     assert.include(result.stdout, "run");
     assert.include(result.stdout, "tv");
     assert.strictEqual(result.stderr, "");
@@ -136,6 +137,21 @@ describe("taizn cli", () => {
     assert.strictEqual(result.status, 1);
     assert.include(result.stderr, 'Multiple installed Tizen applications matched "app"');
     assert.notInclude(result.stderr, "Error:");
+  });
+
+  it("proves an installed Tizen application without requiring a project config", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["prove", "Example.app"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.include(result.stdout, "Tizen target: 127.0.0.1:26101");
+    assert.include(result.stdout, "Installed application: put.io (Example.app)");
+    assert.include(result.stdout, "fake-tizen run -p Example.app -s 127.0.0.1:26101");
+    assert.include(result.stdout, "Launch proof: Example.app started on 127.0.0.1:26101");
   });
 
   it("reports schema errors with config paths", () => {

@@ -49,6 +49,7 @@ taizn check
 taizn apps
 taizn apps put
 taizn launch GinifYRGmZ.putio
+taizn prove GinifYRGmZ.putio
 taizn profile
 taizn package
 taizn install
@@ -63,7 +64,9 @@ taizn --version
 `check` verifies the configured Tizen CLI and `sdb`, then prints connected
 targets without requiring `taizn.json`. `apps` lists installed applications on
 the target, with an optional query filter. `launch` starts an already-installed
-application by exact application ID, exact name, or a unique query. `profile` imports
+application by exact application ID, exact name, or a unique query. `prove`
+checks the installed app inventory, launches the matched app, and prints a
+compact proof transcript. `profile` imports
 `.taizn/certificates/author.p12` and
 `.taizn/certificates/distributor.p12` into a Tizen security profile.
 `package` builds and signs a `.wgt`. `install` packages and sideloads it.

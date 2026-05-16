@@ -232,10 +232,22 @@ export const launchInstalledApplication = Effect.fn("launchInstalledApplication"
   const { applications, target } = yield* loadInstalledApplications(env);
   const application = yield* resolveInstalledApplication(query, applications);
 
-  yield* run(tizenPath, ["run", "-p", application.applicationId, "-s", target], {
-    env: yield* baseChildEnv(),
-  });
+  yield* launchApplication(tizenPath, target, application);
   yield* Console.log(`Launched ${application.name} (${application.applicationId}) on ${target}`);
+});
+
+export const proveInstalledApplication = Effect.fn("proveInstalledApplication")(function* (
+  env: TaiznEnv,
+  query: string,
+) {
+  const tizenPath = yield* resolveTizenCli(env);
+  const { applications, target } = yield* loadInstalledApplications(env);
+  const application = yield* resolveInstalledApplication(query, applications);
+
+  yield* Console.log(`Tizen target: ${target}`);
+  yield* Console.log(`Installed application: ${application.name} (${application.applicationId})`);
+  yield* launchApplication(tizenPath, target, application);
+  yield* Console.log(`Launch proof: ${application.applicationId} started on ${target}`);
 });
 
 const resolveTizenCli = Effect.fn("resolveTizenCli")(function* (env: TaiznEnv) {
@@ -640,6 +652,16 @@ const resolveInstalledApplication = Effect.fn("resolveInstalledApplication")(fun
   }
 
   return yield* ApplicationNotFound.make({ query: queryLabel });
+});
+
+const launchApplication = Effect.fn("launchApplication")(function* (
+  tizenPath: string,
+  target: string,
+  application: TizenApplication,
+) {
+  yield* run(tizenPath, ["run", "-p", application.applicationId, "-s", target], {
+    env: yield* baseChildEnv(),
+  });
 });
 
 const run = Effect.fn("run")(function* (
