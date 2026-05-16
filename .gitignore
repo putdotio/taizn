@@ -2,7 +2,9 @@
 .env
 .env.*
 !.env.example
+.codex-review.out
 .taizn/
+.repos/effect
 .turbo
 coverage
 dist

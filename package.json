@@ -39,20 +39,18 @@
     "live:test:install": "vp pack src/taizn.ts && node live-test/run-live-test.ts --install",
     "live:test:profile": "vp pack src/taizn.ts && node live-test/run-live-test.ts --profile",
     "prepack": "vp pack src/taizn.ts",
+    "prepare": "./scripts/prepare-effect.sh",
     "smoke": "vp pack src/taizn.ts && node dist/taizn.mjs --version && node dist/taizn.mjs --help >/dev/null",
-    "test": "vp test --passWithNoTests",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
-    "verify": "vp check . && tsc --noEmit && vp pack src/taizn.ts && vp test --passWithNoTests && npm pack --dry-run"
+    "verify": "vp check . && tsc --noEmit && vp pack src/taizn.ts && vp run test && npm pack --dry-run"
   },
   "dependencies": {
-    "@effect/cli": "^0.75.1",
-    "@effect/platform": "^0.96.1",
-    "@effect/platform-node": "^0.106.0",
-    "@effect/printer": "^0.49.0",
-    "@effect/printer-ansi": "^0.49.0",
-    "effect": "^3.21.2"
+    "@effect/platform-node": "4.0.0-beta.66",
+    "effect": "4.0.0-beta.66"
   },
   "devDependencies": {
+    "@effect/vitest": "4.0.0-beta.66",
     "@types/node": "^25.7.0",
     "typescript": "^6.0.2",
     "vite-plus": "^0.1.20",

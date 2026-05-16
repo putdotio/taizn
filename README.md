@@ -127,6 +127,7 @@ bundle local app assets but production packages should load hosted asset URLs.
 ## Repo Internals
 
 - [Agent guide](./AGENTS.md)
+- Effect source for local API research lives in ignored `.repos/effect`; dependency installs bootstrap it outside CI.
 
 ## Contributing
 

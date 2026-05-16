@@ -1,37 +1,58 @@
 #!/usr/bin/env node
 
-import { Command } from "@effect/cli";
-import { NodeContext, NodeRuntime } from "@effect/platform-node";
-import { Effect } from "effect";
-import { readFileSync } from "node:fs";
-import * as ParseResult from "effect/ParseResult";
-import * as Schema from "effect/Schema";
+import { NodeRuntime, NodeServices } from "@effect/platform-node";
+import { CliError, Command } from "effect/unstable/cli";
+import { Console, Effect, FileSystem, Layer, Schema } from "effect";
+import { fileURLToPath } from "node:url";
 import { command } from "./cli.js";
-import { loadLocalEnv } from "./runtime.js";
+import { type TaiznError, renderError } from "./errors.js";
+import { loadLocalEnv, TaiznSystem } from "./runtime.js";
 
-const PackageJsonSchema = Schema.Struct({
+class PackageJson extends Schema.Class<PackageJson>("PackageJson")({
   version: Schema.String,
-});
+}) {}
 
-loadLocalEnv();
+const appLayer = Layer.mergeAll(NodeServices.layer, TaiznSystem.Live);
 
-const cli = Command.run(command, {
-  name: "taizn",
-  version: getPackageVersion(),
-});
+const getPackageVersion = Effect.fn("getPackageVersion")(
+  function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const source = yield* fs.readFileString(
+      fileURLToPath(new URL("../package.json", import.meta.url)),
+    );
+    const json = yield* Effect.try({
+      try: () => JSON.parse(source),
+      catch: () => undefined,
+    });
+    const parsed = yield* Schema.decodeUnknownEffect(PackageJson)(json).pipe(
+      Effect.catch(() => Effect.succeed(PackageJson.make({ version: "0.0.0" }))),
+    );
 
-cli(process.argv).pipe(Effect.provide(NodeContext.layer), NodeRuntime.runMain);
+    return parsed.version;
+  },
+  Effect.catch(() => Effect.succeed("0.0.0")),
+);
 
-function getPackageVersion() {
-  try {
-    return Schema.decodeUnknownSync(Schema.parseJson(PackageJsonSchema))(
-      readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-    ).version;
-  } catch (error) {
-    if (ParseResult.isParseError(error)) {
-      return "0.0.0";
+const program = Effect.gen(function* () {
+  yield* loadLocalEnv();
+  const version = yield* getPackageVersion();
+  yield* Command.run(command, { version });
+}).pipe(Effect.catch(handleMainError), Effect.provide(appLayer));
+
+NodeRuntime.runMain(program);
+
+function handleMainError(error: TaiznError | CliError.CliError) {
+  if (CliError.isCliError(error)) {
+    if (error._tag === "ShowHelp" && error.errors.length === 0) {
+      return Effect.void;
     }
 
-    return "0.0.0";
+    return markFailed;
   }
+
+  return Console.error(renderError(error)).pipe(Effect.andThen(markFailed));
 }
+
+const markFailed = Effect.sync(() => {
+  process.exitCode = 1;
+});

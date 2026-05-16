@@ -1,49 +1,42 @@
-import * as ParseResult from "effect/ParseResult";
-import * as Schema from "effect/Schema";
-import { fail } from "./runtime.js";
+import { Effect, Schema } from "effect";
+import { InvalidEnvironment } from "./errors.js";
+import { TaiznSystem } from "./runtime.js";
 
-const TaiznEnvSchema = Schema.Struct({
+const RawTaiznEnv = Schema.Struct({
   certPassword: Schema.optional(Schema.String),
   distPassword: Schema.optional(Schema.String),
   sdb: Schema.optional(Schema.String),
   target: Schema.optional(Schema.String),
   tizenCli: Schema.optional(Schema.String),
-  variant: Schema.optional(Schema.Literal("development", "production")),
+  variant: Schema.optional(Schema.Literals(["development", "production"])),
 });
 
-export type TaiznEnv = Schema.Schema.Type<typeof TaiznEnvSchema> & {
-  readonly variant: "development" | "production";
-};
+export class TaiznEnv extends Schema.Class<TaiznEnv>("TaiznEnv")({
+  certPassword: Schema.optional(Schema.String),
+  distPassword: Schema.optional(Schema.String),
+  sdb: Schema.optional(Schema.String),
+  target: Schema.optional(Schema.String),
+  tizenCli: Schema.optional(Schema.String),
+  variant: Schema.Literals(["development", "production"]),
+}) {}
 
-export const loadEnv = (): TaiznEnv => {
-  try {
-    const env = Schema.decodeUnknownSync(TaiznEnvSchema)({
-      certPassword: process.env.TAIZN_CERT_PASSWORD,
-      distPassword: process.env.TAIZN_DIST_PASSWORD,
-      sdb: process.env.TAIZN_SDB,
-      target: process.env.TAIZN_TARGET,
-      tizenCli: process.env.TAIZN_TIZEN_CLI,
-      variant: process.env.TAIZN_VARIANT,
-    });
+export const loadEnv = Effect.fn("loadEnv")(function* () {
+  const system = yield* TaiznSystem;
+  const env = yield* system.env;
+  const raw = yield* Schema.decodeUnknownEffect(RawTaiznEnv)(
+    {
+      certPassword: env.TAIZN_CERT_PASSWORD,
+      distPassword: env.TAIZN_DIST_PASSWORD,
+      sdb: env.TAIZN_SDB,
+      target: env.TAIZN_TARGET,
+      tizenCli: env.TAIZN_TIZEN_CLI,
+      variant: env.TAIZN_VARIANT,
+    },
+    { errors: "all" },
+  ).pipe(Effect.mapError((error) => InvalidEnvironment.make({ details: error.message })));
 
-    return {
-      ...env,
-      variant: env.variant ?? "development",
-    };
-  } catch (error) {
-    if (ParseResult.isParseError(error)) {
-      return fail(`Invalid TAIZN environment:\n${formatParseIssues(error)}`);
-    }
-
-    const message = error instanceof Error ? error.message : String(error);
-    return fail(`Invalid TAIZN environment: ${message}`);
-  }
-};
-
-const formatParseIssues = (error: ParseResult.ParseError) =>
-  ParseResult.ArrayFormatter.formatErrorSync(error)
-    .map((issue) => {
-      const path = issue.path.length > 0 ? issue.path.join(".") : "TAIZN environment";
-      return `- ${path}: ${issue.message}`;
-    })
-    .join("\n");
+  return TaiznEnv.make({
+    ...raw,
+    variant: raw.variant ?? "development",
+  });
+});

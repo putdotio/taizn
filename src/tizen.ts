@@ -1,35 +1,41 @@
-import { execFileSync } from "node:child_process";
-import { copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { Console, Effect, FileSystem, Stream } from "effect";
+import { ChildProcess } from "effect/unstable/process";
+import { ChildProcessSpawner } from "effect/unstable/process";
 import { join } from "node:path";
 import type { TaiznContext } from "./context.js";
 import type { TizenConfig, TizenVariant } from "./config.js";
 import type { TaiznEnv } from "./env.js";
 import {
   appBuildEnv,
-  appDir,
   appPath,
   baseChildEnv,
-  fail,
-  outputDir,
+  type ChildEnv,
+  defaultSdb,
+  defaultTizenCli,
+  getPaths,
   readPassword,
+  redactCommandArgs,
   requireFile,
-  run,
-  sdb,
-  stageDir,
-  tizenCli,
+  withTizenPath,
 } from "./runtime.js";
+import {
+  CommandFailed,
+  FileSystemFailure,
+  MissingPassword,
+  MultipleTargetsConnected,
+  PackageNotProduced,
+} from "./errors.js";
 import { escapeXml, setXmlAttribute } from "./xml.js";
 
 type Certificates = {
-  author: string;
-  distributor: string;
+  readonly author: string;
+  readonly distributor: string;
 };
 
 type SdbDevice = {
-  id: string;
-  label: string;
-  state: string;
+  readonly id: string;
+  readonly label: string;
+  readonly state: string;
 };
 
 type WidgetIndexOptions = {
@@ -42,101 +48,133 @@ type WidgetStageOptions = WidgetIndexOptions & {
   readonly excludeFiles: readonly string[];
 };
 
-export const checkTizen = (env: TaiznEnv) => {
-  const tizenPath = tizenCli(env.tizenCli);
-  const sdbPath = sdb(env.sdb);
-  const devices = listSdbDevices(sdbPath);
+type RunOptions = {
+  readonly cwd?: string;
+  readonly env?: ChildEnv;
+};
 
-  console.log(`Tizen CLI: ${tizenPath}`);
-  console.log(`sdb: ${sdbPath}`);
+export const checkTizen = Effect.fn("checkTizen")(function* (env: TaiznEnv) {
+  const tizenPath = yield* resolveTizenCli(env);
+  const sdbPath = yield* resolveSdb(env);
+  const devices = yield* listSdbDevices(sdbPath);
+
+  yield* Console.log(`Tizen CLI: ${tizenPath}`);
+  yield* Console.log(`sdb: ${sdbPath}`);
 
   if (devices.length === 0) {
-    console.log("connected targets: none");
+    yield* Console.log("connected targets: none");
     return;
   }
 
-  console.log("connected targets:");
+  yield* Console.log("connected targets:");
 
   for (const device of devices) {
-    console.log(`- ${device.id}${device.label ? ` (${device.label})` : ""}`);
+    yield* Console.log(`- ${device.id}${device.label ? ` (${device.label})` : ""}`);
   }
-};
+});
 
-export const createProfile = async ({ config, env }: TaiznContext) => {
-  const password = await readPassword(env.certPassword, "Tizen certificate password: ");
+export const createProfile = Effect.fn("createProfile")(function* ({ config, env }: TaiznContext) {
+  const password = yield* readPassword(env.certPassword, "Tizen certificate password: ");
 
   if (!password) {
-    fail("TAIZN_CERT_PASSWORD is required to create the signing profile.");
+    return yield* MissingPassword.make({
+      action: "create the signing profile",
+      variable: "TAIZN_CERT_PASSWORD",
+    });
   }
 
-  const certificates = getCertificates(config);
-  const distributorPassword = env.distPassword || password;
+  const certificates = yield* getCertificates(config);
+  const distributorPassword = env.distPassword ?? password;
+  const tizenPath = yield* resolveTizenCli(env);
 
-  run(tizenCli(env.tizenCli), [
-    "security-profiles",
-    "add",
-    "-f",
-    "-A",
-    "-n",
-    config.signing.profile,
-    "-a",
-    certificates.author,
-    "-p",
-    password,
-    "-d",
-    certificates.distributor,
-    "-dp",
-    distributorPassword,
-  ]);
+  yield* run(
+    tizenPath,
+    [
+      "security-profiles",
+      "add",
+      "-f",
+      "-A",
+      "-n",
+      config.signing.profile,
+      "-a",
+      certificates.author,
+      "-p",
+      password,
+      "-d",
+      certificates.distributor,
+      "-dp",
+      distributorPassword,
+    ],
+    { env: yield* baseChildEnv() },
+  );
 
-  console.log(`Configured active Tizen signing profile: ${config.signing.profile}`);
-};
+  yield* Console.log(`Configured active Tizen signing profile: ${config.signing.profile}`);
+});
 
-export const packageWidget = ({ config, env }: TaiznContext): string => {
+export const packageWidget = Effect.fn("packageWidget")(function* ({ config, env }: TaiznContext) {
   const [command, ...args] = config.build.command;
+  const tizenPath = yield* resolveTizenCli(env);
+  const paths = yield* getPaths();
   const variant = getVariant(config, env.variant);
 
-  run(command, args, { env: appBuildEnv() });
-  stageWidget(config, variant);
-  run(tizenCli(env.tizenCli), [
-    "package",
-    "-t",
-    "wgt",
-    "-s",
-    config.signing.profile,
-    "-o",
-    outputDir,
-    "--",
-    stageDir,
-  ]);
+  yield* run(command, args, { env: yield* appBuildEnv() });
+  yield* stageWidget(config, variant);
+  yield* run(
+    tizenPath,
+    [
+      "package",
+      "-t",
+      "wgt",
+      "-s",
+      config.signing.profile,
+      "-o",
+      paths.outputDir,
+      "--",
+      paths.stageDir,
+    ],
+    { env: yield* baseChildEnv() },
+  );
 
-  const built = findBuiltWidget();
-  const installable = join(outputDir, `${variant.bundleName}.wgt`);
+  const built = yield* findBuiltWidget();
+  const installable = join(paths.outputDir, `${variant.bundleName}.wgt`);
 
   if (built !== installable) {
-    copyFileSync(built, installable);
+    const fs = yield* FileSystem.FileSystem;
+    yield* fs
+      .copyFile(built, installable)
+      .pipe(
+        Effect.mapError((cause) =>
+          FileSystemFailure.make({ cause, operation: "copy", path: installable }),
+        ),
+      );
   }
 
-  console.log(`Packaged ${installable}`);
+  yield* Console.log(`Packaged ${installable}`);
   return installable;
-};
+});
 
-export const installWidget = (context: TaiznContext) => {
-  const built = packageWidget(context);
-  const target = resolveInstallTarget(context.env);
+export const installWidget = Effect.fn("installWidget")(function* (context: TaiznContext) {
+  const built = yield* packageWidget(context);
+  const target = yield* resolveInstallTarget(context.env);
+  const sdbPath = yield* resolveSdb(context.env);
+  const tizenPath = yield* resolveTizenCli(context.env);
 
   if (context.env.target) {
-    run(sdb(context.env.sdb), ["connect", context.env.target]);
+    yield* run(sdbPath, ["connect", context.env.target], { env: yield* baseChildEnv() });
   }
 
-  const installArgs = ["install", "-n", built];
+  const installArgs = target ? ["install", "-n", built, "-s", target] : ["install", "-n", built];
 
-  if (target) {
-    installArgs.push("-s", target);
-  }
+  yield* run(tizenPath, installArgs, { env: yield* baseChildEnv() });
+});
 
-  run(tizenCli(context.env.tizenCli), installArgs);
-};
+const resolveTizenCli = Effect.fn("resolveTizenCli")(function* (env: TaiznEnv) {
+  return yield* requireFile(env.tizenCli ?? (yield* defaultTizenCli()), "Tizen CLI");
+});
+
+const resolveSdb = Effect.fn("resolveSdb")(function* (env: TaiznEnv) {
+  return yield* requireFile(env.sdb ?? (yield* defaultSdb()), "sdb");
+});
 
 const getVariant = (config: TizenConfig, variant: "development" | "production") =>
   config.widget.variants[variant];
@@ -148,110 +186,201 @@ const getWidgetStageOptions = (config: TizenConfig, variant: TizenVariant): Widg
   rewriteAssetUrls: variant.rewriteAssetUrls ?? config.widget.rewriteAssetUrls,
 });
 
-const getCertificates = (config: TizenConfig): Certificates => {
-  const certificatesDir = appPath(config.signing.certificateDir);
+const getCertificates = Effect.fn("getCertificates")(function* (config: TizenConfig) {
+  const paths = yield* getPaths();
+  const certificatesDir = appPath(paths.appDir, config.signing.certificateDir);
 
   return {
-    author: requireFile(join(certificatesDir, "author.p12"), "Author certificate"),
-    distributor: requireFile(join(certificatesDir, "distributor.p12"), "Distributor certificate"),
-  };
-};
+    author: yield* requireFile(join(certificatesDir, "author.p12"), "Author certificate"),
+    distributor: yield* requireFile(
+      join(certificatesDir, "distributor.p12"),
+      "Distributor certificate",
+    ),
+  } satisfies Certificates;
+});
 
-const rewriteConfigForWidget = (variant: TizenVariant) => {
-  const targetPath = join(stageDir, "config.xml");
-  let widgetConfig = readFileSync(targetPath, "utf8");
-
-  widgetConfig = widgetConfig.replace(/<tizen:application\b[^>]*\/>/, (tag) =>
+const rewriteConfigForWidget = Effect.fn("rewriteConfigForWidget")(function* (
+  variant: TizenVariant,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const paths = yield* getPaths();
+  const targetPath = join(paths.stageDir, "config.xml");
+  const source = yield* fs
+    .readFileString(targetPath)
+    .pipe(
+      Effect.mapError((cause) =>
+        FileSystemFailure.make({ cause, operation: "read", path: targetPath }),
+      ),
+    );
+  const withApplication = source.replace(/<tizen:application\b[^>]*\/>/, (tag) =>
     setXmlAttribute(
       setXmlAttribute(tag, "id", variant.applicationId),
       "package",
       variant.packageId,
     ),
   );
-  widgetConfig = widgetConfig.replace(
+  const rewritten = withApplication.replace(
     /<name>[^<]*<\/name>/,
     `<name>${escapeXml(variant.name)}</name>`,
   );
 
-  writeFileSync(targetPath, widgetConfig);
-};
+  yield* fs
+    .writeFileString(targetPath, rewritten)
+    .pipe(
+      Effect.mapError((cause) =>
+        FileSystemFailure.make({ cause, operation: "write", path: targetPath }),
+      ),
+    );
+});
 
-const rewriteIndexForWidget = (options: WidgetIndexOptions) => {
-  const targetPath = join(stageDir, "index.html");
+const rewriteIndexForWidget = Effect.fn("rewriteIndexForWidget")(function* (
+  options: WidgetIndexOptions,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const paths = yield* getPaths();
+  const targetPath = join(paths.stageDir, "index.html");
   const webapisScript = '<script src="$WEBAPIS/webapis/webapis.js"></script>';
-  let html = readFileSync(appPath(options.indexHtml), "utf8");
+  const indexPath = appPath(paths.appDir, options.indexHtml);
+  const source = yield* fs
+    .readFileString(indexPath)
+    .pipe(
+      Effect.mapError((cause) =>
+        FileSystemFailure.make({ cause, operation: "read", path: indexPath }),
+      ),
+    );
+  const withAssets = options.rewriteAssetUrls
+    ? source.replaceAll('href="/', 'href="./').replaceAll('src="/', 'src="./')
+    : source;
+  const html =
+    options.injectWebapis !== false && !withAssets.includes("$WEBAPIS/webapis/webapis.js")
+      ? withAssets.replace("</head>", `${webapisScript}</head>`)
+      : withAssets;
 
-  if (options.rewriteAssetUrls) {
-    html = html.replaceAll('href="/', 'href="./').replaceAll('src="/', 'src="./');
-  }
+  yield* fs
+    .writeFileString(targetPath, html)
+    .pipe(
+      Effect.mapError((cause) =>
+        FileSystemFailure.make({ cause, operation: "write", path: targetPath }),
+      ),
+    );
+});
 
-  if (options.injectWebapis !== false && !html.includes("$WEBAPIS/webapis/webapis.js")) {
-    html = html.replace("</head>", `${webapisScript}</head>`);
-  }
+const assertBuildOutput = Effect.fn("assertBuildOutput")(function* (config: TizenConfig) {
+  const paths = yield* getPaths();
+  const sourceDir = appPath(paths.appDir, config.build.output);
 
-  writeFileSync(targetPath, html);
-};
+  yield* requireFile(sourceDir, "Tizen build output");
 
-const assertBuildOutput = (config: TizenConfig) => {
-  const sourceDir = appPath(config.build.output);
-
-  requireFile(sourceDir, "Tizen build output");
-
-  for (const requiredFile of config.build.requiredFiles || []) {
-    requireFile(join(sourceDir, requiredFile), `Tizen build output ${requiredFile}`);
+  for (const requiredFile of config.build.requiredFiles ?? []) {
+    yield* requireFile(join(sourceDir, requiredFile), `Tizen build output ${requiredFile}`);
   }
 
   return sourceDir;
-};
+});
 
-const removeExcludedStageFiles = (excludeFiles: readonly string[]) => {
+const removeExcludedStageFiles = Effect.fn("removeExcludedStageFiles")(function* (
+  excludeFiles: readonly string[],
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const paths = yield* getPaths();
+
   for (const file of excludeFiles) {
-    rmSync(join(stageDir, file), { force: true, recursive: true });
+    const path = join(paths.stageDir, file);
+    yield* fs
+      .remove(path, { force: true, recursive: true })
+      .pipe(
+        Effect.mapError((cause) => FileSystemFailure.make({ cause, operation: "remove", path })),
+      );
   }
-};
+});
 
-const stageWidget = (config: TizenConfig, variant: TizenVariant) => {
-  const sourceDir = assertBuildOutput(config);
+const stageWidget = Effect.fn("stageWidget")(function* (
+  config: TizenConfig,
+  variant: TizenVariant,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const paths = yield* getPaths();
+  const sourceDir = yield* assertBuildOutput(config);
   const options = getWidgetStageOptions(config, variant);
+  const configXml = appPath(paths.appDir, config.widget.configXml);
+  const icon = yield* requireFile(appPath(paths.appDir, variant.icon), "Tizen widget icon");
 
-  rmSync(stageDir, { force: true, recursive: true });
-  rmSync(outputDir, { force: true, recursive: true });
-  mkdirSync(stageDir, { recursive: true });
-  mkdirSync(outputDir, { recursive: true });
+  yield* fs
+    .remove(paths.stageDir, { force: true, recursive: true })
+    .pipe(
+      Effect.mapError((cause) =>
+        FileSystemFailure.make({ cause, operation: "remove", path: paths.stageDir }),
+      ),
+    );
+  yield* fs
+    .remove(paths.outputDir, { force: true, recursive: true })
+    .pipe(
+      Effect.mapError((cause) =>
+        FileSystemFailure.make({ cause, operation: "remove", path: paths.outputDir }),
+      ),
+    );
+  yield* fs
+    .makeDirectory(paths.stageDir, { recursive: true })
+    .pipe(
+      Effect.mapError((cause) =>
+        FileSystemFailure.make({ cause, operation: "mkdir", path: paths.stageDir }),
+      ),
+    );
+  yield* fs
+    .makeDirectory(paths.outputDir, { recursive: true })
+    .pipe(
+      Effect.mapError((cause) =>
+        FileSystemFailure.make({ cause, operation: "mkdir", path: paths.outputDir }),
+      ),
+    );
+  yield* fs
+    .copy(sourceDir, paths.stageDir)
+    .pipe(
+      Effect.mapError((cause) =>
+        FileSystemFailure.make({ cause, operation: "copy", path: paths.stageDir }),
+      ),
+    );
+  yield* fs
+    .copyFile(configXml, join(paths.stageDir, "config.xml"))
+    .pipe(
+      Effect.mapError((cause) =>
+        FileSystemFailure.make({ cause, operation: "copy", path: configXml }),
+      ),
+    );
+  yield* fs
+    .copyFile(icon, join(paths.stageDir, "icon.png"))
+    .pipe(
+      Effect.mapError((cause) => FileSystemFailure.make({ cause, operation: "copy", path: icon })),
+    );
+  yield* removeExcludedStageFiles(options.excludeFiles);
+  yield* rewriteConfigForWidget(variant);
+  yield* rewriteIndexForWidget(options);
+});
 
-  cpSync(sourceDir, stageDir, { recursive: true });
-  copyFileSync(appPath(config.widget.configXml), join(stageDir, "config.xml"));
-  copyFileSync(requireFile(appPath(variant.icon), "Tizen widget icon"), join(stageDir, "icon.png"));
-  removeExcludedStageFiles(options.excludeFiles);
-  rewriteConfigForWidget(variant);
-  rewriteIndexForWidget(options);
-};
-
-const findBuiltWidget = () => {
-  const built = execFileSync("find", [outputDir, "-maxdepth", "1", "-name", "*.wgt", "-print"], {
-    encoding: "utf8",
-  })
-    .trim()
-    .split("\n")
-    .filter(Boolean)
+const findBuiltWidget = Effect.fn("findBuiltWidget")(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const paths = yield* getPaths();
+  const entries = yield* fs
+    .readDirectory(paths.outputDir)
+    .pipe(
+      Effect.mapError((cause) =>
+        FileSystemFailure.make({ cause, operation: "readDirectory", path: paths.outputDir }),
+      ),
+    );
+  const built = entries
+    .filter((entry) => entry.endsWith(".wgt"))
+    .map((entry) => join(paths.outputDir, entry))
     .at(0);
 
-  if (typeof built === "string") {
+  if (built) {
     return built;
   }
 
-  return fail(`No .wgt package was produced in ${outputDir}`);
-};
+  return yield* PackageNotProduced.make({ outputDir: paths.outputDir });
+});
 
-const listSdbDevices = (sdbPath: string | undefined): SdbDevice[] => {
-  const output = execFileSync(sdb(sdbPath), ["devices"], {
-    cwd: appDir,
-    encoding: "utf8",
-    env: {
-      ...baseChildEnv(),
-      PATH: `${join(homedir(), "tizen-studio/tools")}:${process.env.PATH || ""}`,
-    },
-  });
+const listSdbDevices = Effect.fn("listSdbDevices")(function* (sdbPath: string) {
+  const output = yield* capture(sdbPath, ["devices"]);
 
   return output
     .split("\n")
@@ -260,34 +389,93 @@ const listSdbDevices = (sdbPath: string | undefined): SdbDevice[] => {
     .filter(Boolean)
     .map(parseSdbDevice)
     .filter((device) => device.id && device.state === "device");
-};
+});
 
 const parseSdbDevice = (line: string): SdbDevice => {
   const [id = "", state = "", label = ""] = line.split(/\s+/, 3);
   return { id, label, state };
 };
 
-const resolveInstallTarget = (env: TaiznContext["env"]) => {
+const resolveInstallTarget = Effect.fn("resolveInstallTarget")(function* (env: TaiznEnv) {
   if (env.target) {
     return env.target;
   }
 
-  const devices = listSdbDevices(env.sdb);
+  const devices = yield* listSdbDevices(yield* resolveSdb(env));
 
   if (devices.length === 1) {
-    const [device] = devices;
-    console.log(
-      `Using connected Tizen target: ${device.id}${device.label ? ` (${device.label})` : ""}`,
-    );
+    const device = devices[0];
+    if (device) {
+      yield* Console.log(
+        `Using connected Tizen target: ${device.id}${device.label ? ` (${device.label})` : ""}`,
+      );
 
-    return device.id;
+      return device.id;
+    }
   }
 
   if (devices.length > 1) {
-    fail(
-      `Multiple Tizen targets are connected: ${devices.map((device) => device.id).join(", ")}. Set TAIZN_TARGET explicitly.`,
-    );
+    return yield* MultipleTargetsConnected.make({
+      targets: devices.map((device) => device.id),
+    });
   }
 
-  return null;
-};
+  return undefined;
+});
+
+const run = Effect.fn("run")(function* (
+  command: string,
+  args: ReadonlyArray<string>,
+  options: RunOptions,
+) {
+  const paths = yield* getPaths();
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const env = yield* withTizenPath(options.env ?? (yield* baseChildEnv()));
+  const exitCode = yield* spawner
+    .exitCode(
+      ChildProcess.make(command, args, {
+        cwd: options.cwd ?? paths.appDir,
+        env,
+        stderr: "inherit",
+        stdin: "inherit",
+        stdout: "inherit",
+      }),
+    )
+    .pipe(Effect.mapError(() => CommandFailed.make({ args: redactCommandArgs(args), command })));
+
+  if (exitCode !== 0) {
+    return yield* CommandFailed.make({ args: redactCommandArgs(args), command });
+  }
+});
+
+const capture = Effect.fn("capture")(function* (command: string, args: ReadonlyArray<string>) {
+  const output = yield* Effect.scoped(
+    Effect.gen(function* () {
+      const paths = yield* getPaths();
+      const env = yield* withTizenPath(yield* baseChildEnv());
+      const process = yield* ChildProcess.make(command, args, {
+        cwd: paths.appDir,
+        env,
+        stderr: "inherit",
+      }).pipe(
+        Effect.mapError(() => CommandFailed.make({ args: redactCommandArgs(args), command })),
+      );
+      const output = yield* process.stdout
+        .pipe(Stream.decodeText, Stream.mkString)
+        .pipe(
+          Effect.mapError(() => CommandFailed.make({ args: redactCommandArgs(args), command })),
+        );
+      const exitCode = yield* process.exitCode.pipe(
+        Effect.mapError(() => CommandFailed.make({ args: redactCommandArgs(args), command })),
+      );
+
+      return { exitCode, output };
+    }),
+  );
+
+  if (output.exitCode !== 0) {
+    return yield* CommandFailed.make({ args: redactCommandArgs(args), command });
+  }
+
+  return output.output;
+});

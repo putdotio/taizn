@@ -13,6 +13,8 @@ vp install
 ```
 
 Use the Node.js version in [`.node-version`](./.node-version).
+Install runs `scripts/prepare-effect.sh` outside CI to clone the local Effect
+source into ignored `.repos/effect` for API research.
 
 ## Run Locally
 
@@ -57,10 +59,11 @@ See [Live Test](./live-test/README.md) for signing profile setup.
 
 ## Development Notes
 
-- `src/cli.ts` owns command parsing with Effect CLI.
+- `src/cli.ts` owns command parsing with `effect/unstable/cli`.
 - `src/config.ts` and `src/env.ts` parse external inputs with Effect Schema.
-- `src/tizen.ts` owns Tizen side effects.
-- Tests in `test/` exercise the packed CLI from `dist/taizn.mjs`.
+- `src/runtime.ts` owns the Node service layer and runtime boundary helpers.
+- `src/tizen.ts` owns Effectful Tizen side effects.
+- Tests in `test/` use `@effect/vitest` and exercise the packed CLI from `dist/taizn.mjs`.
 - `live-test/` exercises the packed CLI against local Tizen tools.
 - Keep `.taizn/` generated, local, and ignored.
 

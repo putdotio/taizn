@@ -2,7 +2,9 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { describe, expect, it } from "vitest";
+import { assert, describe, it } from "@effect/vitest";
+import { Effect } from "effect";
+import { appBuildEnv, redactCommandArgs, TaiznSystem } from "../src/runtime.js";
 
 const cliPath = resolve("dist/taizn.mjs");
 
@@ -20,28 +22,28 @@ describe("taizn cli", () => {
   it("prints help without a project config", () => {
     const result = runTaizn(["--help"]);
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain("COMMANDS");
-    expect(result.stdout).toContain("check");
-    expect(result.stdout).toContain("package");
-    expect(result.stderr).toBe("");
+    assert.strictEqual(result.status, 0);
+    assert.include(result.stdout, "COMMANDS");
+    assert.include(result.stdout, "check");
+    assert.include(result.stdout, "package");
+    assert.strictEqual(result.stderr, "");
   });
 
   it("prints the package version", () => {
     const result = runTaizn(["--version"]);
 
-    expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
-    expect(result.stderr).toBe("");
+    assert.strictEqual(result.status, 0);
+    assert.match(result.stdout.trim(), /^taizn v\d+\.\d+\.\d+/);
+    assert.strictEqual(result.stderr, "");
   });
 
   it("reports missing config without a stack trace", () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-missing-config-"));
     const result = runTaizn(["package"], dir);
 
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("Config file not found:");
-    expect(result.stderr).not.toContain("Error:");
+    assert.strictEqual(result.status, 1);
+    assert.include(result.stderr, "Config file not found:");
+    assert.notInclude(result.stderr, "Error:");
   });
 
   it("checks tooling without requiring a project config", () => {
@@ -56,11 +58,11 @@ describe("taizn cli", () => {
       },
     });
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Tizen CLI: /bin/echo");
-    expect(result.stdout).toContain("sdb: /bin/echo");
-    expect(result.stdout).toContain("connected targets: none");
-    expect(result.stderr).toBe("");
+    assert.strictEqual(result.status, 0);
+    assert.include(result.stdout, "Tizen CLI: /bin/echo");
+    assert.include(result.stdout, "sdb: /bin/echo");
+    assert.include(result.stdout, "connected targets: none");
+    assert.strictEqual(result.stderr, "");
   });
 
   it("reports schema errors with config paths", () => {
@@ -69,11 +71,45 @@ describe("taizn cli", () => {
 
     const result = runTaizn(["package"], dir);
 
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("Invalid taizn.json:");
-    expect(result.stderr).toContain("build.command.0:");
-    expect(result.stderr).toContain("widget:");
-    expect(result.stderr).not.toContain("ParseError");
+    assert.strictEqual(result.status, 1);
+    assert.include(result.stderr, "Invalid taizn.json:");
+    assert.include(result.stderr, "command");
+    assert.include(result.stderr, "widget");
+    assert.notInclude(result.stderr, "ParseError");
+  });
+
+  it.effect("keeps consumer build env free of taizn and tizen variables", () =>
+    appBuildEnv().pipe(
+      Effect.provideService(TaiznSystem, {
+        cwd: Effect.succeed(process.cwd()),
+        env: Effect.succeed({
+          DYLD_INSERT_LIBRARIES: "bad-preload",
+          PATH: "/bin",
+          SDB: "leaky-sdb",
+          TAIZN_TARGET: "1.2.3.4:26101",
+          TIZEN_PROFILE: "leaky-profile",
+        }),
+        homeDir: Effect.succeed("/Users/tester"),
+        loadEnvFile: () => Effect.void,
+        readSecret: () => Effect.succeed("secret"),
+      }),
+      Effect.map((env) => {
+        assert.strictEqual(env.PATH, "/bin");
+        assert.notProperty(env, "DYLD_INSERT_LIBRARIES");
+        assert.notProperty(env, "SDB");
+        assert.notProperty(env, "TAIZN_TARGET");
+        assert.notProperty(env, "TIZEN_PROFILE");
+      }),
+    ),
+  );
+
+  it("redacts Tizen password command arguments", () => {
+    assert.deepEqual(redactCommandArgs(["-p", "author", "-dp", "dist"]), [
+      "-p",
+      "[redacted]",
+      "-dp",
+      "[redacted]",
+    ]);
   });
 
   it("uses variant widget overrides when staging the package", () => {
@@ -83,11 +119,13 @@ describe("taizn cli", () => {
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
     });
 
-    expect(development.status).toBe(0);
-    expect(readFileSync(join(dir, ".taizn/build/stage/index.html"), "utf8")).toContain(
+    assert.strictEqual(development.status, 0);
+    assert.include(
+      readFileSync(join(dir, ".taizn/build/stage/index.html"), "utf8"),
       'src="./js/main.js"',
     );
-    expect(readFileSync(join(dir, ".taizn/build/stage/index.html"), "utf8")).toContain(
+    assert.include(
+      readFileSync(join(dir, ".taizn/build/stage/index.html"), "utf8"),
       'href="./css/main.css"',
     );
 
@@ -96,15 +134,15 @@ describe("taizn cli", () => {
       TAIZN_VARIANT: "production",
     });
 
-    expect(production.status).toBe(0);
+    assert.strictEqual(production.status, 0);
 
     const stagedHtml = readFileSync(join(dir, ".taizn/build/stage/index.html"), "utf8");
 
-    expect(stagedHtml).toContain('src="https://tv.put.io/js/main.js"');
-    expect(stagedHtml).toContain('href="https://tv.put.io/css/main.css"');
-    expect(stagedHtml).not.toContain('src="./js/main.js"');
-    expect(() => readFileSync(join(dir, ".taizn/build/stage/css/main.css.map"))).toThrow();
-    expect(() => readFileSync(join(dir, ".taizn/build/stage/js/main.js.map"))).toThrow();
+    assert.include(stagedHtml, 'src="https://tv.put.io/js/main.js"');
+    assert.include(stagedHtml, 'href="https://tv.put.io/css/main.css"');
+    assert.notInclude(stagedHtml, 'src="./js/main.js"');
+    assert.throws(() => readFileSync(join(dir, ".taizn/build/stage/css/main.css.map")));
+    assert.throws(() => readFileSync(join(dir, ".taizn/build/stage/js/main.js.map")));
   });
 });
 

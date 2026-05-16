@@ -1,9 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
-import * as ParseResult from "effect/ParseResult";
-import * as Schema from "effect/Schema";
-import { configPath, fail } from "./runtime.js";
+import { Effect, FileSystem, Schema } from "effect";
+import { ConfigNotFound, FileSystemFailure, InvalidConfig, InvalidJson } from "./errors.js";
+import { getPaths } from "./runtime.js";
 
-const TizenVariantSchema = Schema.Struct({
+export class TizenVariant extends Schema.Class<TizenVariant>("TizenVariant")({
   applicationId: Schema.NonEmptyString,
   bundleName: Schema.NonEmptyString,
   excludeFiles: Schema.optional(Schema.Array(Schema.NonEmptyString)),
@@ -13,59 +12,74 @@ const TizenVariantSchema = Schema.Struct({
   name: Schema.NonEmptyString,
   packageId: Schema.NonEmptyString,
   rewriteAssetUrls: Schema.optional(Schema.Boolean),
-});
+}) {}
 
-const TizenConfigSchema = Schema.Struct({
-  build: Schema.Struct({
-    command: Schema.NonEmptyArray(Schema.NonEmptyString),
-    output: Schema.NonEmptyString,
-    requiredFiles: Schema.optional(Schema.Array(Schema.NonEmptyString)),
-  }),
-  signing: Schema.Struct({
-    certificateDir: Schema.NonEmptyString,
-    profile: Schema.NonEmptyString,
-  }),
-  widget: Schema.Struct({
-    configXml: Schema.NonEmptyString,
-    excludeFiles: Schema.optional(Schema.Array(Schema.NonEmptyString)),
-    indexHtml: Schema.NonEmptyString,
-    injectWebapis: Schema.optional(Schema.Boolean),
-    rewriteAssetUrls: Schema.optional(Schema.Boolean),
-    variants: Schema.Struct({
-      development: TizenVariantSchema,
-      production: TizenVariantSchema,
-    }),
-  }),
-});
+class BuildConfig extends Schema.Class<BuildConfig>("BuildConfig")({
+  command: Schema.NonEmptyArray(Schema.NonEmptyString),
+  output: Schema.NonEmptyString,
+  requiredFiles: Schema.optional(Schema.Array(Schema.NonEmptyString)),
+}) {}
 
-export type TizenConfig = Schema.Schema.Type<typeof TizenConfigSchema>;
-export type TizenVariant = Schema.Schema.Type<typeof TizenVariantSchema>;
+class SigningConfig extends Schema.Class<SigningConfig>("SigningConfig")({
+  certificateDir: Schema.NonEmptyString,
+  profile: Schema.NonEmptyString,
+}) {}
 
-export const loadConfig = (): TizenConfig => {
-  if (!existsSync(configPath)) {
-    fail(`Config file not found: ${configPath}`);
+class WidgetVariants extends Schema.Class<WidgetVariants>("WidgetVariants")({
+  development: TizenVariant,
+  production: TizenVariant,
+}) {}
+
+class WidgetConfig extends Schema.Class<WidgetConfig>("WidgetConfig")({
+  configXml: Schema.NonEmptyString,
+  excludeFiles: Schema.optional(Schema.Array(Schema.NonEmptyString)),
+  indexHtml: Schema.NonEmptyString,
+  injectWebapis: Schema.optional(Schema.Boolean),
+  rewriteAssetUrls: Schema.optional(Schema.Boolean),
+  variants: WidgetVariants,
+}) {}
+
+export class TizenConfig extends Schema.Class<TizenConfig>("TizenConfig")({
+  build: BuildConfig,
+  signing: SigningConfig,
+  widget: WidgetConfig,
+}) {}
+
+export const loadConfig = Effect.fn("loadConfig")(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const paths = yield* getPaths();
+  const exists = yield* fs
+    .exists(paths.configPath)
+    .pipe(
+      Effect.mapError((cause) =>
+        FileSystemFailure.make({ cause, operation: "exists", path: paths.configPath }),
+      ),
+    );
+
+  if (!exists) {
+    return yield* ConfigNotFound.make({ path: paths.configPath });
   }
 
-  return decodeConfig(readFileSync(configPath, "utf8"));
-};
+  const source = yield* fs
+    .readFileString(paths.configPath)
+    .pipe(
+      Effect.mapError((cause) =>
+        FileSystemFailure.make({ cause, operation: "read", path: paths.configPath }),
+      ),
+    );
 
-const decodeConfig = (source: string): TizenConfig => {
-  try {
-    return Schema.decodeUnknownSync(Schema.parseJson(TizenConfigSchema), { errors: "all" })(source);
-  } catch (error) {
-    if (ParseResult.isParseError(error)) {
-      return fail(`Invalid taizn.json:\n${formatParseIssues(error)}`);
-    }
+  return yield* decodeConfig(source);
+});
 
-    const message = error instanceof Error ? error.message : String(error);
-    return fail(`Invalid taizn.json: ${message}`);
-  }
-};
+const decodeConfig = Effect.fn("decodeConfig")(function* (source: string) {
+  const json = yield* Effect.try({
+    try: () => JSON.parse(source),
+    catch: (cause) => InvalidJson.make({ details: causeToMessage(cause), file: "taizn.json" }),
+  });
 
-const formatParseIssues = (error: ParseResult.ParseError) =>
-  ParseResult.ArrayFormatter.formatErrorSync(error)
-    .map((issue) => {
-      const path = issue.path.length > 0 ? issue.path.join(".") : "taizn.json";
-      return `- ${path}: ${issue.message}`;
-    })
-    .join("\n");
+  return yield* Schema.decodeUnknownEffect(TizenConfig)(json, { errors: "all" }).pipe(
+    Effect.mapError((error) => InvalidConfig.make({ details: error.message })),
+  );
+});
+
+const causeToMessage = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));

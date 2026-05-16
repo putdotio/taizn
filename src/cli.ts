@@ -1,47 +1,32 @@
-import { Command } from "@effect/cli";
+import { Command } from "effect/unstable/cli";
 import { Effect } from "effect";
-import { loadContext } from "./context.js";
+import { loadContext, type TaiznContext } from "./context.js";
 import { loadEnv } from "./env.js";
 import { checkTizen, createProfile, installWidget, packageWidget } from "./tizen.js";
 
-const runSync = (operation: (context: ReturnType<typeof loadContext>) => void) =>
-  Effect.sync(() => {
-    operation(loadContext());
-  });
-
-const runEnvSync = (operation: (env: ReturnType<typeof loadEnv>) => void) =>
-  Effect.sync(() => {
-    operation(loadEnv());
+const withContext = <E, R>(operation: (context: TaiznContext) => Effect.Effect<void, E, R>) =>
+  Effect.gen(function* () {
+    const context = yield* loadContext();
+    yield* operation(context);
   });
 
 const taizn = Command.make("taizn", {}, () =>
-  runSync((context) => {
-    packageWidget(context);
-  }),
+  withContext((context) => packageWidget(context).pipe(Effect.asVoid)),
 );
 
 const check = Command.make("check", {}, () =>
-  runEnvSync((env) => {
-    checkTizen(env);
+  Effect.gen(function* () {
+    const env = yield* loadEnv();
+    yield* checkTizen(env);
   }),
 );
 
-const profile = Command.make("profile", {}, () =>
-  Effect.promise(async () => {
-    await createProfile(loadContext());
-  }),
-);
+const profile = Command.make("profile", {}, () => withContext((context) => createProfile(context)));
 
 const pack = Command.make("package", {}, () =>
-  runSync((context) => {
-    packageWidget(context);
-  }),
+  withContext((context) => packageWidget(context).pipe(Effect.asVoid)),
 );
 
-const install = Command.make("install", {}, () =>
-  runSync((context) => {
-    installWidget(context);
-  }),
-);
+const install = Command.make("install", {}, () => withContext((context) => installWidget(context)));
 
 export const command = taizn.pipe(Command.withSubcommands([check, profile, pack, install]));
