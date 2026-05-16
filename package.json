@@ -1,6 +1,6 @@
 {
   "name": "@putdotio/taizn",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "A tiny CLI companion for interacting with Tizen ecosystem.",
   "keywords": [
     "cli",
