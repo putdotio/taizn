@@ -23,14 +23,17 @@ The release job uses the GitHub Environment named `release`.
 
 Environment entries:
 
-- secrets: `NPM_TOKEN`, `PUTIO_RELEASE_BOT_PRIVATE_KEY`
+- secrets: `PUTIO_RELEASE_BOT_PRIVATE_KEY`
 - variables: `PUTIO_RELEASE_BOT_CLIENT_ID`
 - approval: none
 - branch policy: `main`
 - deployment records: disabled with `deployment: false`
 
-Keep `NPM_TOKEN` in the `release` Environment so pull requests stay
-publish-secret-free.
+The npm package uses Trusted Publishing from GitHub Actions. On npm, configure owner `putdotio`, repository `taizn`, workflow `ci.yml`, and Environment named `release` for the package.
+
+The workflow grants `id-token: write` so npm can mint short-lived publish credentials and provenance; do not add a long-lived `NPM_TOKEN` secret.
+
+Release GitHub writes use `putio-release-bot`, and the release-bot remote is configured only after dependencies are installed.
 
 ## Local Checks
 
