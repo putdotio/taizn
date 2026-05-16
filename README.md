@@ -85,6 +85,7 @@ TAIZN_SDB=~/tizen-studio/tools/sdb
   },
   "widget": {
     "configXml": "platforms/tizen/config.xml",
+    "excludeFiles": ["js/main.js.map", "css/main.css.map"],
     "indexHtml": "platforms/tizen/index.html",
     "injectWebapis": true,
     "rewriteAssetUrls": false,
@@ -99,14 +100,23 @@ TAIZN_SDB=~/tizen-studio/tools/sdb
       "production": {
         "applicationId": "Example.app",
         "bundleName": "example",
+        "excludeFiles": ["js/main.js.LICENSE.txt"],
         "icon": "platforms/tizen/icon.png",
+        "indexHtml": "platforms/tizen/hosted.html",
+        "injectWebapis": true,
         "name": "Example",
-        "packageId": "Example"
+        "packageId": "Example",
+        "rewriteAssetUrls": false
       }
     }
   }
 }
 ```
+
+Variant `indexHtml`, `injectWebapis`, and `rewriteAssetUrls` values override
+the top-level `widget` values. Variant `excludeFiles` values are added to
+top-level `widget.excludeFiles`. Use them when development packages should
+bundle local app assets but production packages should load hosted asset URLs.
 
 ## Docs
 

@@ -32,6 +32,16 @@ type SdbDevice = {
   state: string;
 };
 
+type WidgetIndexOptions = {
+  readonly indexHtml: string;
+  readonly injectWebapis?: boolean;
+  readonly rewriteAssetUrls?: boolean;
+};
+
+type WidgetStageOptions = WidgetIndexOptions & {
+  readonly excludeFiles: readonly string[];
+};
+
 export const checkTizen = (env: TaiznEnv) => {
   const tizenPath = tizenCli(env.tizenCli);
   const sdbPath = sdb(env.sdb);
@@ -84,9 +94,10 @@ export const createProfile = async ({ config, env }: TaiznContext) => {
 
 export const packageWidget = ({ config, env }: TaiznContext): string => {
   const [command, ...args] = config.build.command;
+  const variant = getVariant(config, env.variant);
 
   run(command, args, { env: appBuildEnv() });
-  stageWidget(config, getVariant(config, env.variant));
+  stageWidget(config, variant);
   run(tizenCli(env.tizenCli), [
     "package",
     "-t",
@@ -100,7 +111,7 @@ export const packageWidget = ({ config, env }: TaiznContext): string => {
   ]);
 
   const built = findBuiltWidget();
-  const installable = join(outputDir, `${getVariant(config, env.variant).bundleName}.wgt`);
+  const installable = join(outputDir, `${variant.bundleName}.wgt`);
 
   if (built !== installable) {
     copyFileSync(built, installable);
@@ -130,6 +141,13 @@ export const installWidget = (context: TaiznContext) => {
 const getVariant = (config: TizenConfig, variant: "development" | "production") =>
   config.widget.variants[variant];
 
+const getWidgetStageOptions = (config: TizenConfig, variant: TizenVariant): WidgetStageOptions => ({
+  excludeFiles: [...(config.widget.excludeFiles ?? []), ...(variant.excludeFiles ?? [])],
+  indexHtml: variant.indexHtml ?? config.widget.indexHtml,
+  injectWebapis: variant.injectWebapis ?? config.widget.injectWebapis,
+  rewriteAssetUrls: variant.rewriteAssetUrls ?? config.widget.rewriteAssetUrls,
+});
+
 const getCertificates = (config: TizenConfig): Certificates => {
   const certificatesDir = appPath(config.signing.certificateDir);
 
@@ -158,16 +176,16 @@ const rewriteConfigForWidget = (variant: TizenVariant) => {
   writeFileSync(targetPath, widgetConfig);
 };
 
-const rewriteIndexForWidget = (config: TizenConfig) => {
+const rewriteIndexForWidget = (options: WidgetIndexOptions) => {
   const targetPath = join(stageDir, "index.html");
   const webapisScript = '<script src="$WEBAPIS/webapis/webapis.js"></script>';
-  let html = readFileSync(appPath(config.widget.indexHtml), "utf8");
+  let html = readFileSync(appPath(options.indexHtml), "utf8");
 
-  if (config.widget.rewriteAssetUrls) {
+  if (options.rewriteAssetUrls) {
     html = html.replaceAll('href="/', 'href="./').replaceAll('src="/', 'src="./');
   }
 
-  if (config.widget.injectWebapis !== false && !html.includes("$WEBAPIS/webapis/webapis.js")) {
+  if (options.injectWebapis !== false && !html.includes("$WEBAPIS/webapis/webapis.js")) {
     html = html.replace("</head>", `${webapisScript}</head>`);
   }
 
@@ -186,8 +204,15 @@ const assertBuildOutput = (config: TizenConfig) => {
   return sourceDir;
 };
 
+const removeExcludedStageFiles = (excludeFiles: readonly string[]) => {
+  for (const file of excludeFiles) {
+    rmSync(join(stageDir, file), { force: true, recursive: true });
+  }
+};
+
 const stageWidget = (config: TizenConfig, variant: TizenVariant) => {
   const sourceDir = assertBuildOutput(config);
+  const options = getWidgetStageOptions(config, variant);
 
   rmSync(stageDir, { force: true, recursive: true });
   rmSync(outputDir, { force: true, recursive: true });
@@ -197,8 +222,9 @@ const stageWidget = (config: TizenConfig, variant: TizenVariant) => {
   cpSync(sourceDir, stageDir, { recursive: true });
   copyFileSync(appPath(config.widget.configXml), join(stageDir, "config.xml"));
   copyFileSync(requireFile(appPath(variant.icon), "Tizen widget icon"), join(stageDir, "icon.png"));
+  removeExcludedStageFiles(options.excludeFiles);
   rewriteConfigForWidget(variant);
-  rewriteIndexForWidget(config);
+  rewriteIndexForWidget(options);
 };
 
 const findBuiltWidget = () => {

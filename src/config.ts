@@ -6,9 +6,13 @@ import { configPath, fail } from "./runtime.js";
 const TizenVariantSchema = Schema.Struct({
   applicationId: Schema.NonEmptyString,
   bundleName: Schema.NonEmptyString,
+  excludeFiles: Schema.optional(Schema.Array(Schema.NonEmptyString)),
   icon: Schema.NonEmptyString,
+  indexHtml: Schema.optional(Schema.NonEmptyString),
+  injectWebapis: Schema.optional(Schema.Boolean),
   name: Schema.NonEmptyString,
   packageId: Schema.NonEmptyString,
+  rewriteAssetUrls: Schema.optional(Schema.Boolean),
 });
 
 const TizenConfigSchema = Schema.Struct({
@@ -23,6 +27,7 @@ const TizenConfigSchema = Schema.Struct({
   }),
   widget: Schema.Struct({
     configXml: Schema.NonEmptyString,
+    excludeFiles: Schema.optional(Schema.Array(Schema.NonEmptyString)),
     indexHtml: Schema.NonEmptyString,
     injectWebapis: Schema.optional(Schema.Boolean),
     rewriteAssetUrls: Schema.optional(Schema.Boolean),

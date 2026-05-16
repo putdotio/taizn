@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -6,10 +6,14 @@ import { describe, expect, it } from "vitest";
 
 const cliPath = resolve("dist/taizn.mjs");
 
-const runTaizn = (args: string[], cwd = process.cwd()) =>
+const runTaizn = (args: string[], cwd = process.cwd(), env: NodeJS.ProcessEnv = {}) =>
   spawnSync(process.execPath, [cliPath, ...args], {
     cwd,
     encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env,
+    },
   });
 
 describe("taizn cli", () => {
@@ -71,4 +75,125 @@ describe("taizn cli", () => {
     expect(result.stderr).toContain("widget:");
     expect(result.stderr).not.toContain("ParseError");
   });
+
+  it("uses variant widget overrides when staging the package", () => {
+    const dir = createPackageFixture();
+
+    const development = runTaizn(["package"], dir, {
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+
+    expect(development.status).toBe(0);
+    expect(readFileSync(join(dir, ".taizn/build/stage/index.html"), "utf8")).toContain(
+      'src="./js/main.js"',
+    );
+    expect(readFileSync(join(dir, ".taizn/build/stage/index.html"), "utf8")).toContain(
+      'href="./css/main.css"',
+    );
+
+    const production = runTaizn(["package"], dir, {
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+      TAIZN_VARIANT: "production",
+    });
+
+    expect(production.status).toBe(0);
+
+    const stagedHtml = readFileSync(join(dir, ".taizn/build/stage/index.html"), "utf8");
+
+    expect(stagedHtml).toContain('src="https://tv.put.io/js/main.js"');
+    expect(stagedHtml).toContain('href="https://tv.put.io/css/main.css"');
+    expect(stagedHtml).not.toContain('src="./js/main.js"');
+    expect(() => readFileSync(join(dir, ".taizn/build/stage/css/main.css.map"))).toThrow();
+    expect(() => readFileSync(join(dir, ".taizn/build/stage/js/main.js.map"))).toThrow();
+  });
 });
+
+const createPackageFixture = () => {
+  const dir = mkdtempSync(join(tmpdir(), "taizn-package-config-"));
+
+  mkdirSync(join(dir, "platforms/tizen/icons"), { recursive: true });
+
+  writeFileSync(
+    join(dir, "build.mjs"),
+    `
+      import { mkdirSync, writeFileSync } from "node:fs";
+      mkdirSync("dist/css", { recursive: true });
+      mkdirSync("dist/js", { recursive: true });
+      writeFileSync("dist/css/main.css", "body {}");
+      writeFileSync("dist/css/main.css.map", "{}");
+      writeFileSync("dist/js/main.js", "console.log('dev')");
+      writeFileSync("dist/js/main.js.map", "{}");
+      writeFileSync("dist/index.html", '<html><head><link href="/css/main.css" rel="stylesheet"><script defer src="/js/main.js"></script></head><body></body></html>');
+    `,
+  );
+
+  writeFileSync(
+    join(dir, "fake-tizen.mjs"),
+    `#!/usr/bin/env node
+      import { mkdirSync, writeFileSync } from "node:fs";
+      import { join } from "node:path";
+      const output = process.argv[process.argv.indexOf("-o") + 1];
+      mkdirSync(output, { recursive: true });
+      writeFileSync(join(output, "signed.wgt"), "signed");
+    `,
+  );
+  chmodSync(join(dir, "fake-tizen.mjs"), 0o755);
+
+  writeFileSync(
+    join(dir, "platforms/tizen/config.xml"),
+    '<widget><tizen:application id="Old.app" package="Old"/><name>Old</name></widget>',
+  );
+  writeFileSync(join(dir, "platforms/tizen/icons/dev.png"), "dev");
+  writeFileSync(join(dir, "platforms/tizen/icon.png"), "prod");
+  writeFileSync(
+    join(dir, "platforms/tizen/hosted.html"),
+    '<html><head><link href="https://tv.put.io/css/main.css" rel="stylesheet"><script src="$WEBAPIS/webapis/webapis.js"></script><script defer src="https://tv.put.io/js/main.js"></script></head><body></body></html>',
+  );
+  writeFileSync(
+    join(dir, "taizn.json"),
+    JSON.stringify(
+      {
+        build: {
+          command: [process.execPath, "build.mjs"],
+          output: "dist",
+          requiredFiles: ["css/main.css", "js/main.js"],
+        },
+        signing: {
+          certificateDir: ".taizn/certificates",
+          profile: "test-profile",
+        },
+        widget: {
+          configXml: "platforms/tizen/config.xml",
+          excludeFiles: ["css/main.css.map"],
+          indexHtml: "dist/index.html",
+          injectWebapis: true,
+          rewriteAssetUrls: true,
+          variants: {
+            development: {
+              applicationId: "ExampleDev.app",
+              bundleName: "example-dev",
+              icon: "platforms/tizen/icons/dev.png",
+              name: "Example Dev",
+              packageId: "ExampleDev",
+            },
+            production: {
+              applicationId: "Example.app",
+              bundleName: "example",
+              excludeFiles: ["js/main.js.map"],
+              icon: "platforms/tizen/icon.png",
+              indexHtml: "platforms/tizen/hosted.html",
+              injectWebapis: false,
+              name: "Example",
+              packageId: "Example",
+              rewriteAssetUrls: false,
+            },
+          },
+        },
+      },
+      null,
+      2,
+    ),
+  );
+
+  return dir;
+};
