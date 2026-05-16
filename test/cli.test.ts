@@ -113,6 +113,39 @@ describe("taizn cli", () => {
     assert.notInclude(result.stdout, "Other App");
   });
 
+  it("lists installed Tizen applications as JSON", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["apps", "--json", "put"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const inventory = parseApplicationsJson(result.stdout);
+    assert.deepStrictEqual(inventory, {
+      applications: [{ id: "Example.app", name: "put.io" }],
+      query: "put",
+      target: "127.0.0.1:26101",
+    });
+  });
+
+  it("prints only JSON for installed applications when auto-picking one target", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["apps", "--json"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const inventory = parseApplicationsJson(result.stdout);
+    assert.deepStrictEqual(inventory.applications, [
+      { id: "Example.app", name: "put.io" },
+      { id: "Other.app", name: "Other App" },
+    ]);
+    assert.strictEqual(inventory.target, "127.0.0.1:26101");
+  });
+
   it("launches an installed Tizen application without requiring a project config", () => {
     const dir = createToolingFixture();
     const result = runTaizn(["launch", "Example.app"], dir, {
@@ -573,9 +606,27 @@ const ProofJsonSchema = Schema.Struct({
 
 type ProofJson = typeof ProofJsonSchema.Type;
 
+const ApplicationsJsonSchema = Schema.Struct({
+  applications: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      name: Schema.String,
+    }),
+  ),
+  query: Schema.optional(Schema.String),
+  target: Schema.String,
+});
+
+type ApplicationsJson = typeof ApplicationsJsonSchema.Type;
+
 const parseProofJson = (text: string): ProofJson => {
   const proof: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(ProofJsonSchema)(proof);
+};
+
+const parseApplicationsJson = (text: string): ApplicationsJson => {
+  const inventory: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(ApplicationsJsonSchema)(inventory);
 };
 
 const createToolingFixture = () => {

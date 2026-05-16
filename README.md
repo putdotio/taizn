@@ -48,6 +48,7 @@ Project files:
 taizn check
 taizn apps
 taizn apps put
+taizn apps --json put
 taizn launch GinifYRGmZ.putio
 taizn prove GinifYRGmZ.putio
 taizn prove --json GinifYRGmZ.putio
@@ -64,7 +65,8 @@ taizn --version
 
 `check` verifies the configured Tizen CLI and `sdb`, then prints connected
 targets without requiring `taizn.json`. `apps` lists installed applications on
-the target, with an optional query filter. `launch` starts an already-installed
+the target, with an optional query filter. Add `--json` to emit a structured
+inventory for agents and scripts. `launch` starts an already-installed
 application by exact application ID, exact name, or a unique query. `prove`
 checks the installed app inventory, launches the matched app, and prints a
 compact proof transcript. Add `--json` when an agent or script needs structured

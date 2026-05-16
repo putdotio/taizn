@@ -70,6 +70,10 @@ type ProofOptions = {
   readonly json?: boolean;
 };
 
+type ListInstalledApplicationsOptions = {
+  readonly json?: boolean;
+};
+
 export const checkTizen = Effect.fn("checkTizen")(function* (env: TaiznEnv) {
   const tizenPath = yield* resolveTizenCli(env);
   const sdbPath = yield* resolveSdb(env);
@@ -207,13 +211,31 @@ export const runWidget = Effect.fn("runWidget")(function* ({ config, env }: Taiz
 export const listInstalledApplications = Effect.fn("listInstalledApplications")(function* (
   env: TaiznEnv,
   query?: string,
+  options: ListInstalledApplicationsOptions = {},
 ) {
-  const { applications: installedApplications, target } = yield* loadInstalledApplications(env);
+  const { applications: installedApplications, target } = yield* loadInstalledApplications(env, {
+    quiet: options.json,
+  });
   const queryLabel = query?.trim();
   const normalizedQuery = normalizeQuery(queryLabel);
   const applications = installedApplications.filter((application) =>
     matchesApplicationQuery(application, normalizedQuery),
   );
+
+  if (options.json) {
+    yield* Console.log(
+      JSON.stringify({
+        applications: applications.map((application) => ({
+          id: application.applicationId,
+          name: application.name,
+        })),
+        query: queryLabel || undefined,
+        target,
+      }),
+    );
+    return;
+  }
+
   const suffix = queryLabel ? ` matching "${queryLabel}"` : "";
 
   yield* Console.log(`Installed Tizen applications${suffix} on ${target}:`);

@@ -33,11 +33,11 @@ const check = Command.make("check", {}, () =>
 
 const apps = Command.make(
   "apps",
-  { query: Argument.string("query").pipe(Argument.optional) },
-  ({ query }) =>
+  { json: Flag.boolean("json"), query: Argument.string("query").pipe(Argument.optional) },
+  ({ json, query }) =>
     Effect.gen(function* () {
       const env = yield* loadEnv();
-      yield* listInstalledApplications(env, Option.getOrUndefined(query));
+      yield* listInstalledApplications(env, Option.getOrUndefined(query), { json });
     }),
 );
 
