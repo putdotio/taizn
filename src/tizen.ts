@@ -66,6 +66,10 @@ type RunTarget = {
   readonly value: string;
 };
 
+type ProofOptions = {
+  readonly json?: boolean;
+};
+
 export const checkTizen = Effect.fn("checkTizen")(function* (env: TaiznEnv) {
   const tizenPath = yield* resolveTizenCli(env);
   const sdbPath = yield* resolveSdb(env);
@@ -239,10 +243,32 @@ export const launchInstalledApplication = Effect.fn("launchInstalledApplication"
 export const proveInstalledApplication = Effect.fn("proveInstalledApplication")(function* (
   env: TaiznEnv,
   query: string,
+  options: ProofOptions = {},
 ) {
   const tizenPath = yield* resolveTizenCli(env);
-  const { applications, target } = yield* loadInstalledApplications(env);
+  const { applications, target } = yield* loadInstalledApplications(env, { quiet: options.json });
   const application = yield* resolveInstalledApplication(query, applications);
+
+  if (options.json) {
+    const launchOutput = yield* launchApplication(tizenPath, target, application, {
+      captureOutput: true,
+    });
+
+    yield* Console.log(
+      JSON.stringify({
+        application: {
+          id: application.applicationId,
+          name: application.name,
+        },
+        launch: {
+          output: launchOutput.trim(),
+          started: true,
+        },
+        target,
+      }),
+    );
+    return;
+  }
 
   yield* Console.log(`Tizen target: ${target}`);
   yield* Console.log(`Installed application: ${application.name} (${application.applicationId})`);
@@ -535,6 +561,7 @@ const resolveRunTarget = Effect.fn("resolveRunTarget")(function* (env: TaiznEnv,
 const resolveRequiredSdbTarget = Effect.fn("resolveRequiredSdbTarget")(function* (
   env: TaiznEnv,
   sdbPath: string,
+  options: { readonly quiet?: boolean } = {},
 ) {
   if (env.target) {
     return env.target;
@@ -545,9 +572,11 @@ const resolveRequiredSdbTarget = Effect.fn("resolveRequiredSdbTarget")(function*
   if (devices.length === 1) {
     const device = devices[0];
     if (device) {
-      yield* Console.log(
-        `Using connected Tizen target: ${device.id}${device.label ? ` (${device.label})` : ""}`,
-      );
+      if (!options.quiet) {
+        yield* Console.log(
+          `Using connected Tizen target: ${device.id}${device.label ? ` (${device.label})` : ""}`,
+        );
+      }
 
       return device.id;
     }
@@ -562,14 +591,21 @@ const resolveRequiredSdbTarget = Effect.fn("resolveRequiredSdbTarget")(function*
   return yield* MissingTizenTarget.make({});
 });
 
-const loadInstalledApplications = Effect.fn("loadInstalledApplications")(function* (env: TaiznEnv) {
+const loadInstalledApplications = Effect.fn("loadInstalledApplications")(function* (
+  env: TaiznEnv,
+  options: { readonly quiet?: boolean } = {},
+) {
   const sdbPath = yield* resolveSdb(env);
 
   if (env.target) {
-    yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv() });
+    if (options.quiet) {
+      yield* capture(sdbPath, ["connect", env.target]);
+    } else {
+      yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv() });
+    }
   }
 
-  const target = yield* resolveRequiredSdbTarget(env, sdbPath);
+  const target = yield* resolveRequiredSdbTarget(env, sdbPath, { quiet: options.quiet });
   const output = yield* capture(sdbPath, ["-s", target, "shell", "0", "applist"]);
 
   return { applications: parseInstalledApplications(output), target };
@@ -658,10 +694,16 @@ const launchApplication = Effect.fn("launchApplication")(function* (
   tizenPath: string,
   target: string,
   application: TizenApplication,
+  options: { readonly captureOutput?: boolean } = {},
 ) {
+  if (options.captureOutput) {
+    return yield* capture(tizenPath, ["run", "-p", application.applicationId, "-s", target]);
+  }
+
   yield* run(tizenPath, ["run", "-p", application.applicationId, "-s", target], {
     env: yield* baseChildEnv(),
   });
+  return "";
 });
 
 const run = Effect.fn("run")(function* (

@@ -48,11 +48,14 @@ const launch = Command.make("launch", { query: Argument.string("query") }, ({ qu
   }),
 );
 
-const prove = Command.make("prove", { query: Argument.string("query") }, ({ query }) =>
-  Effect.gen(function* () {
-    const env = yield* loadEnv();
-    yield* proveInstalledApplication(env, query);
-  }),
+const prove = Command.make(
+  "prove",
+  { json: Flag.boolean("json"), query: Argument.string("query") },
+  ({ json, query }) =>
+    Effect.gen(function* () {
+      const env = yield* loadEnv();
+      yield* proveInstalledApplication(env, query, { json });
+    }),
 );
 
 const profile = Command.make("profile", {}, () => withContext((context) => createProfile(context)));

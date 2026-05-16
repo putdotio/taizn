@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { assert, describe, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { WebSocketServer } from "ws";
 import { fetchSamsungTvInfo } from "../src/remote.js";
 import { appBuildEnv, redactCommandArgs, TaiznSystem } from "../src/runtime.js";
@@ -152,6 +152,37 @@ describe("taizn cli", () => {
     assert.include(result.stdout, "Installed application: put.io (Example.app)");
     assert.include(result.stdout, "fake-tizen run -p Example.app -s 127.0.0.1:26101");
     assert.include(result.stdout, "Launch proof: Example.app started on 127.0.0.1:26101");
+  });
+
+  it("prints structured proof as JSON", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["prove", "--json", "Example.app"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const proof = parseProofJson(result.stdout);
+    assert.deepStrictEqual(proof.application, { id: "Example.app", name: "put.io" });
+    assert.strictEqual(proof.launch.started, true);
+    assert.include(proof.launch.output, "fake-tizen run -p Example.app -s 127.0.0.1:26101");
+    assert.strictEqual(proof.target, "127.0.0.1:26101");
+  });
+
+  it("prints only JSON for structured proof when auto-picking one target", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["prove", "--json", "Example.app"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const proof = parseProofJson(result.stdout);
+    assert.deepStrictEqual(proof.application, { id: "Example.app", name: "put.io" });
+    assert.strictEqual(proof.target, "127.0.0.1:26101");
   });
 
   it("reports schema errors with config paths", () => {
@@ -528,6 +559,25 @@ const createPackageFixture = () => {
   return dir;
 };
 
+const ProofJsonSchema = Schema.Struct({
+  application: Schema.Struct({
+    id: Schema.String,
+    name: Schema.String,
+  }),
+  launch: Schema.Struct({
+    output: Schema.String,
+    started: Schema.Boolean,
+  }),
+  target: Schema.String,
+});
+
+type ProofJson = typeof ProofJsonSchema.Type;
+
+const parseProofJson = (text: string): ProofJson => {
+  const proof: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(ProofJsonSchema)(proof);
+};
+
 const createToolingFixture = () => {
   const dir = mkdtempSync(join(tmpdir(), "taizn-tooling-config-"));
   writeFakeSdb(dir);
@@ -543,6 +593,10 @@ const writeFakeSdb = (dir: string) => {
       if (args[0] === "devices") {
         console.log("List of devices attached");
         console.log("127.0.0.1:26101\\tdevice\\tExampleTV");
+        process.exit(0);
+      }
+      if (args[0] === "connect") {
+        console.log(args[1] + " is already connected");
         process.exit(0);
       }
       if (args[0] === "-s" && args[2] === "shell" && args[3] === "0" && args[4] === "applist") {
