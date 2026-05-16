@@ -53,6 +53,7 @@ Live checks for a local Tizen toolchain and device:
 ```bash
 vp run live:test
 vp run live:test:install
+vp run live:test:prove
 ```
 
 See [Live Test](./live-test/README.md) for signing profile setup.

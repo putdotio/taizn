@@ -13,9 +13,11 @@ const configPath = join(appDir, "taizn.json");
 const configTemplatePath = join(appDir, "taizn.template.json");
 const mode = process.argv.includes("--profile")
   ? "profile"
-  : process.argv.includes("--install")
-    ? "install"
-    : "package";
+  : process.argv.includes("--prove")
+    ? "prove"
+    : process.argv.includes("--install")
+      ? "install"
+      : "package";
 
 if (existsSync(envPath)) {
   process.loadEnvFile(envPath);
@@ -84,8 +86,9 @@ function writeFixtureIcon() {
   );
 }
 
-function runTaizn(command: "install" | "package" | "profile") {
-  const result = spawnSync(process.execPath, [cliPath, command], {
+function runTaizn(command: "install" | "package" | "profile" | "prove") {
+  const args = command === "prove" ? ["prove", resolveProofQuery()] : [command];
+  const result = spawnSync(process.execPath, [cliPath, ...args], {
     cwd: appDir,
     env: {
       ...process.env,
@@ -97,4 +100,51 @@ function runTaizn(command: "install" | "package" | "profile") {
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }
+}
+
+function resolveProofQuery() {
+  if (process.env.TAIZN_LIVE_PROVE_APP) {
+    return process.env.TAIZN_LIVE_PROVE_APP;
+  }
+
+  const variant = process.env.TAIZN_VARIANT === "production" ? "production" : "development";
+  const applicationId = readTemplateApplicationId(variant);
+
+  if (applicationId) {
+    return applicationId;
+  }
+
+  return variant === "production" ? "TaiznLive.taizn" : "TaiznLiveD.taizn";
+}
+
+function readTemplateApplicationId(variant: "development" | "production") {
+  const parsed: unknown = JSON.parse(readFileSync(configTemplatePath, "utf8"));
+
+  if (!isRecord(parsed)) {
+    return null;
+  }
+
+  const widget = parsed.widget;
+
+  if (!isRecord(widget)) {
+    return null;
+  }
+
+  const variants = widget.variants;
+
+  if (!isRecord(variants)) {
+    return null;
+  }
+
+  const variantConfig = variants[variant];
+
+  if (!isRecord(variantConfig) || typeof variantConfig.applicationId !== "string") {
+    return null;
+  }
+
+  return variantConfig.applicationId;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

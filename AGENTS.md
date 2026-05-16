@@ -62,4 +62,5 @@ Live Tizen checks when the local toolchain/certs/device exist:
 vp run live:test:profile
 vp run live:test
 vp run live:test:install
+vp run live:test:prove
 ```

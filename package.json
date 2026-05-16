@@ -38,6 +38,7 @@
     "dev": "vp pack src/taizn.ts --watch",
     "live:test": "vp pack src/taizn.ts && node live-test/run-live-test.ts",
     "live:test:install": "vp pack src/taizn.ts && node live-test/run-live-test.ts --install",
+    "live:test:prove": "vp pack src/taizn.ts && node live-test/run-live-test.ts --prove",
     "live:test:profile": "vp pack src/taizn.ts && node live-test/run-live-test.ts --profile",
     "prepack": "vp pack src/taizn.ts",
     "prepare": "./scripts/prepare-effect.sh",
