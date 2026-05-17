@@ -136,7 +136,7 @@ supports `--dry-run`, `--json`, and `--artifact`.
 - widget archive inspection, generic submission validation, hosted asset probes,
   target inventory, log capture, and proof artifacts
 - Samsung TV metadata, websocket remote diagnostics, pairing, and key sequences
-- local live-test fixture roundtrips, including hosted asset load probes
+- local live-test setup, fixture roundtrips, and hosted asset load probes
 
 Consumer apps own product build scripts, private credentials, app-specific
 flows, release decisions, and Samsung TV Seller Office submissions. `taizn`
@@ -168,6 +168,12 @@ TAIZN_TV_TOKEN=<paired-remote-token>
 host is set. `TAIZN_TV_INFO_PORT` controls the HTTP metadata endpoint; the
 remote-control websocket still uses `TAIZN_TV_PORT`. `taizn tv pair` writes the
 paired remote token to `.taizn/remote.json`; keep `.taizn/` ignored.
+
+For live harness work in this repo, `vp run live:test:setup -- --from
+../consumer-app --target <tv-ip>` copies allowlisted local Tizen values and
+certificates from a consumer app into ignored `live-test/app/.taizn/` state.
+The checked-in fixture stays product-neutral; consumer apps own their own
+product flows and app IDs.
 
 ## Config
 

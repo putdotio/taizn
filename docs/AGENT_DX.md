@@ -53,6 +53,8 @@ Current score: **15 / 21**, agent-ready.
 
 ## New Harness Surfaces
 
+- `vp run live:test:setup -- --from <app-dir> --target <tv-ip>` bootstraps the
+  local fixture from allowlisted consumer app state and reports configured keys.
 - `inspect wgt --json <path>` extracts archive entries and `config.xml` metadata.
 - `validate submission --json [path]` checks generic selected-variant metadata
   without automating the Seller Office portal.

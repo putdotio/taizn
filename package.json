@@ -48,6 +48,7 @@
     "live:test:prove": "vp pack src/taizn.ts && node live-test/run-live-test.ts --prove",
     "live:test:profile": "vp pack src/taizn.ts && node live-test/run-live-test.ts --profile",
     "live:test:roundtrip": "vp pack src/taizn.ts && node live-test/run-live-test.ts --roundtrip",
+    "live:test:setup": "node live-test/setup-live-test-env.ts",
     "live:test:remote": "vp pack src/taizn.ts && node live-test/run-live-test.ts --remote",
     "live:test:smoke": "vp pack src/taizn.ts && node live-test/run-live-test.ts --smoke",
     "live:test:tv-assets": "vp pack src/taizn.ts && node live-test/run-live-test.ts --roundtrip --tv-assets",

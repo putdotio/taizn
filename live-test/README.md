@@ -9,6 +9,19 @@ optionally, a connected device.
 mkdir -p live-test/app/.taizn/certificates
 ```
 
+If another local consumer app already has `.taizn/.env` and certificates,
+bootstrap the fixture from that app without copying unrelated app config:
+
+```bash
+vp run live:test:setup -- --from ../consumer-app --target <tv-ip>
+```
+
+The setup command writes only allowlisted harness keys and certificate files into
+ignored `live-test/app/.taizn/` state. It also reads the source app's
+`taizn.json` signing profile into `TAIZN_LIVE_PROFILE`, and it adds default
+local Tizen CLI paths when they exist. Add `--json` for a machine-readable
+summary, or use `--help` to list all overrides.
+
 Put signing files here:
 
 - `live-test/app/.taizn/certificates/author.p12`
@@ -34,6 +47,7 @@ LIVE_TEST_REQUIRE_REMOTE=0
 ## Commands
 
 ```bash
+vp run live:test:setup -- --from ../consumer-app --target <tv-ip>
 vp run live:test:profile
 vp run live:test
 vp run live:test:doctor

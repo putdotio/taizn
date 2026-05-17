@@ -19,6 +19,13 @@ import {
   resolveSmokeTarget,
   selectBeaconHost,
 } from "../live-test/harness-core.ts";
+import {
+  buildLiveSetupEnv,
+  normalizeTizenTarget,
+  parseEnvAssignments,
+  readSigningProfileFromConfigSource,
+  serializeEnvAssignments,
+} from "../live-test/setup-core.ts";
 
 describe("live test harness core", () => {
   it("keeps roundtrip proof tied to the selected fixture variant", () => {
@@ -224,6 +231,50 @@ describe("live test harness core", () => {
       readTemplateVariantStringFromSource("{}", "production", "applicationId"),
       null,
     );
+  });
+
+  it("builds a live setup env from allowlisted source values and overrides", () => {
+    const source = parseEnvAssignments(`
+TAIZN_CERT_PASSWORD=cert
+TAIZN_DIST_PASSWORD="dist value"
+PUBLIC_PUTIO_API_URL=https://example.invalid
+`);
+    const result = buildLiveSetupEnv(
+      { TAIZN_TARGET: "old-target:26101" },
+      source,
+      { profile: "fixture-profile", requireRemote: true, target: "192.0.2.10" },
+      { TAIZN_SDB: "/opt/tizen/sdb" },
+    );
+
+    assert.strictEqual(result.values.TAIZN_CERT_PASSWORD, "cert");
+    assert.strictEqual(result.values.TAIZN_DIST_PASSWORD, "dist value");
+    assert.strictEqual(result.values.TAIZN_LIVE_PROFILE, "fixture-profile");
+    assert.strictEqual(result.values.TAIZN_TARGET, "192.0.2.10:26101");
+    assert.strictEqual(result.values.TAIZN_SDB, "/opt/tizen/sdb");
+    assert.strictEqual(result.values.LIVE_TEST_REQUIRE_REMOTE, "1");
+    assert.strictEqual(result.values.PUBLIC_PUTIO_API_URL, undefined);
+    assert.deepStrictEqual(result.missing, []);
+  });
+
+  it("serializes live setup env values for Node loadEnvFile", () => {
+    assert.strictEqual(
+      serializeEnvAssignments({
+        TAIZN_CERT_PASSWORD: "cert",
+        TAIZN_DIST_PASSWORD: "dist value",
+      }),
+      'TAIZN_CERT_PASSWORD=cert\nTAIZN_DIST_PASSWORD="dist value"\n',
+    );
+  });
+
+  it("reads source signing profiles and normalizes Tizen targets", () => {
+    assert.strictEqual(
+      readSigningProfileFromConfigSource(
+        JSON.stringify({ signing: { profile: "source-profile" } }),
+      ),
+      "source-profile",
+    );
+    assert.strictEqual(normalizeTizenTarget("192.0.2.10"), "192.0.2.10:26101");
+    assert.strictEqual(normalizeTizenTarget("192.0.2.10:26102"), "192.0.2.10:26102");
   });
 });
 
