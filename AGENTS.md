@@ -1,7 +1,7 @@
 # Agent Guide
 
-`taizn` is a small Node CLI that wraps Tizen CLI packaging/install work for a
-consumer app. Keep it a typed shell-out tool, not an app framework.
+`taizn` is a typed Tizen TV packaging and live-device proof harness for
+consumer apps. Keep it a shell-out tool, not an app framework.
 
 ## Patterns
 

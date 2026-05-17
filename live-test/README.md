@@ -1,6 +1,6 @@
 # Live Test
 
-Small fixture app for checking `taizn` against a local Tizen toolchain and,
+Fixture harness for checking `taizn` against a local Tizen toolchain and,
 optionally, a connected device.
 
 ## Setup

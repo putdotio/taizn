@@ -5,7 +5,7 @@
 
   <h1>taizn</h1>
 
-  <p>A tiny CLI companion for interacting with Tizen ecosystem.</p>
+  <p>A typed Tizen TV packaging, install, remote-control, and live proof harness.</p>
 
   <p>
     <a href="https://github.com/putdotio/taizn/actions/workflows/ci.yml?query=branch%3Amain" style="text-decoration:none;"><img src="https://img.shields.io/github/actions/workflow/status/putdotio/taizn/ci.yml?branch=main&style=flat&label=ci&colorA=000000&colorB=000000" alt="CI"></a>
@@ -22,6 +22,12 @@ pnpm add -D @putdotio/taizn
 
 Install the Tizen command-line tools and make sure `tizen` and `sdb` work
 locally.
+
+`taizn` wraps Tizen Studio CLI and Samsung TV remote-control primitives for app
+repos that need repeatable widget packaging and real-device proof. It owns the
+generic build, sign, install, launch, target inventory, remote diagnostics, and
+hosted-asset roundtrip layers; app-specific journeys, credentials, content IDs,
+and product assertions stay in the consumer app repo.
 
 ## Usage
 
@@ -89,6 +95,21 @@ diagnostics, to `tv info` for a structured TV capability snapshot, or to
 `tv press` for a structured key-sequence receipt. See
 [Samsung TV Remote](./docs/TV_REMOTE.md) for pairing, environment, and limits.
 `tv press` accepts one key or a sequence of keys.
+
+## Boundaries
+
+`taizn` is the generic Tizen TV harness layer:
+
+- Tizen CLI and `sdb` readiness checks with structured target output
+- widget staging, signing profile import, package, install, and run commands
+- installed app inventory, launch by exact or unique query, and proof transcripts
+- Samsung TV metadata, websocket remote diagnostics, pairing, and key sequences
+- local live-test fixture roundtrips, including hosted asset load probes
+
+Consumer apps own product build scripts, private credentials, app-specific
+flows, release decisions, and Samsung TV Seller Office submissions. `taizn`
+prepares and proves artifacts for those workflows; it does not automate the TV
+Seller Office portal.
 
 ## Environment
 

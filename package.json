@@ -1,11 +1,15 @@
 {
   "name": "@putdotio/taizn",
   "version": "1.14.0",
-  "description": "A tiny CLI companion for interacting with Tizen ecosystem.",
+  "description": "A typed Tizen TV packaging, install, remote-control, and live proof harness.",
   "keywords": [
     "cli",
+    "harness",
     "samsung",
+    "samsung-tv",
     "tizen",
+    "tizen-tv",
+    "tv",
     "widget"
   ],
   "homepage": "https://github.com/putdotio/taizn#readme",
