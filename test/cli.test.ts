@@ -918,7 +918,10 @@ describe("taizn cli", () => {
 
   it("formats output=json errors as structured JSON", () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-json-error-"));
-    const result = runTaizn(["logs", "capture", "--output=json"], dir);
+    const result = runTaizn(["logs", "capture", "--output=json"], dir, {
+      TAIZN_SDB: "/bin/echo",
+      TAIZN_TARGET: "",
+    });
 
     assert.strictEqual(result.status, 1);
     assert.strictEqual(result.stdout, "");
@@ -933,7 +936,10 @@ describe("taizn cli", () => {
 
   it("formats output ndjson errors as structured JSON", () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-ndjson-error-"));
-    const result = runTaizn(["logs", "capture", "--output", "ndjson"], dir);
+    const result = runTaizn(["logs", "capture", "--output", "ndjson"], dir, {
+      TAIZN_SDB: "/bin/echo",
+      TAIZN_TARGET: "",
+    });
 
     assert.strictEqual(result.status, 1);
     assert.strictEqual(result.stdout, "");
