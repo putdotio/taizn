@@ -130,20 +130,20 @@ describe("taizn cli", () => {
 
   it("lists installed Tizen applications without requiring a project config", () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["apps", "put"], dir, {
+    const result = runTaizn(["apps", "example"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
     });
 
     assert.strictEqual(result.status, 0);
-    assert.include(result.stdout, 'Installed Tizen applications matching "put"');
-    assert.include(result.stdout, "- put.io (Example.app)");
+    assert.include(result.stdout, 'Installed Tizen applications matching "example"');
+    assert.include(result.stdout, "- Example App (Example.app)");
     assert.notInclude(result.stdout, "Other App");
   });
 
   it("lists installed Tizen applications as JSON", () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["apps", "--json", "put"], dir, {
+    const result = runTaizn(["apps", "--json", "example"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
     });
@@ -152,8 +152,8 @@ describe("taizn cli", () => {
     assert.strictEqual(result.stderr, "");
     const inventory = parseApplicationsJson(result.stdout);
     assert.deepStrictEqual(inventory, {
-      applications: [{ id: "Example.app", name: "put.io" }],
-      query: "put",
+      applications: [{ id: "Example.app", name: "Example App" }],
+      query: "example",
       target: "127.0.0.1:26101",
     });
   });
@@ -168,7 +168,7 @@ describe("taizn cli", () => {
     assert.strictEqual(result.stderr, "");
     const inventory = parseApplicationsJson(result.stdout);
     assert.deepStrictEqual(inventory.applications, [
-      { id: "Example.app", name: "put.io" },
+      { id: "Example.app", name: "Example App" },
       { id: "Other.app", name: "Other App" },
     ]);
     assert.strictEqual(inventory.target, "127.0.0.1:26101");
@@ -184,7 +184,7 @@ describe("taizn cli", () => {
 
     assert.strictEqual(result.status, 0);
     assert.include(result.stdout, "fake-tizen run -p Example.app -s 127.0.0.1:26101");
-    assert.include(result.stdout, "Launched put.io (Example.app) on 127.0.0.1:26101");
+    assert.include(result.stdout, "Launched Example App (Example.app) on 127.0.0.1:26101");
   });
 
   it("rejects ambiguous installed application launch queries", () => {
@@ -210,7 +210,7 @@ describe("taizn cli", () => {
 
     assert.strictEqual(result.status, 0);
     assert.include(result.stdout, "Tizen target: 127.0.0.1:26101");
-    assert.include(result.stdout, "Installed application: put.io (Example.app)");
+    assert.include(result.stdout, "Installed application: Example App (Example.app)");
     assert.include(result.stdout, "fake-tizen run -p Example.app -s 127.0.0.1:26101");
     assert.include(result.stdout, "Launch proof: Example.app started on 127.0.0.1:26101");
   });
@@ -226,7 +226,7 @@ describe("taizn cli", () => {
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
     const proof = parseProofJson(result.stdout);
-    assert.deepStrictEqual(proof.application, { id: "Example.app", name: "put.io" });
+    assert.deepStrictEqual(proof.application, { id: "Example.app", name: "Example App" });
     assert.strictEqual(proof.launch.started, true);
     assert.include(proof.launch.output, "fake-tizen run -p Example.app -s 127.0.0.1:26101");
     assert.strictEqual(proof.target, "127.0.0.1:26101");
@@ -242,7 +242,7 @@ describe("taizn cli", () => {
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
     const proof = parseProofJson(result.stdout);
-    assert.deepStrictEqual(proof.application, { id: "Example.app", name: "put.io" });
+    assert.deepStrictEqual(proof.application, { id: "Example.app", name: "Example App" });
     assert.strictEqual(proof.target, "127.0.0.1:26101");
   });
 
@@ -725,8 +725,8 @@ describe("taizn cli", () => {
 
     const stagedHtml = readFileSync(join(dir, ".taizn/build/stage/index.html"), "utf8");
 
-    assert.include(stagedHtml, 'src="https://tv.put.io/js/main.js"');
-    assert.include(stagedHtml, 'href="https://tv.put.io/css/main.css"');
+    assert.include(stagedHtml, 'src="https://example.com/assets/main.js"');
+    assert.include(stagedHtml, 'href="https://example.com/assets/main.css"');
     assert.notInclude(stagedHtml, 'src="./js/main.js"');
     assert.throws(() => readFileSync(join(dir, ".taizn/build/stage/css/main.css.map")));
     assert.throws(() => readFileSync(join(dir, ".taizn/build/stage/js/main.js.map")));
@@ -777,7 +777,7 @@ const createPackageFixture = () => {
   writeFileSync(join(dir, "platforms/tizen/icon.png"), "prod");
   writeFileSync(
     join(dir, "platforms/tizen/hosted.html"),
-    '<html><head><link href="https://tv.put.io/css/main.css" rel="stylesheet"><script src="$WEBAPIS/webapis/webapis.js"></script><script defer src="https://tv.put.io/js/main.js"></script></head><body></body></html>',
+    '<html><head><link href="https://example.com/assets/main.css" rel="stylesheet"><script src="$WEBAPIS/webapis/webapis.js"></script><script defer src="https://example.com/assets/main.js"></script></head><body></body></html>',
   );
   writeFileSync(
     join(dir, "taizn.json"),
@@ -1023,7 +1023,7 @@ const writeFakeSdb = (dir: string) => {
         console.log("\\tApplication List for user 5001");
         console.log("\\t Name \\t AppID ");
         console.log("\\t=================================================");
-        console.log("\\t'put.io'\\t 'Example.app'");
+        console.log("\\t'Example App'\\t 'Example.app'");
         console.log("\\t'Other App'\\t 'Other.app'");
         process.exit(0);
       }

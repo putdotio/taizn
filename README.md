@@ -1,8 +1,4 @@
 <div align="center">
-  <p>
-    <img src="https://static.put.io/images/putio-boncuk.png" width="72">
-  </p>
-
   <h1>taizn</h1>
 
   <p>A typed Tizen TV packaging, install, remote-control, and live proof harness.</p>
@@ -54,11 +50,11 @@ Project files:
 taizn check
 taizn check --json
 taizn apps
-taizn apps put
-taizn apps --json put
-taizn launch GinifYRGmZ.putio
-taizn prove GinifYRGmZ.putio
-taizn prove --json GinifYRGmZ.putio
+taizn apps example
+taizn apps --json example
+taizn launch Example.app
+taizn prove Example.app
+taizn prove --json Example.app
 taizn profile
 taizn package
 taizn install

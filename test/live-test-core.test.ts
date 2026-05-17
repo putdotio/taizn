@@ -119,16 +119,16 @@ describe("live test harness core", () => {
   it("parses fetch probe URLs from comma or newline separated env values", () => {
     assert.deepStrictEqual(parseFetchUrls(undefined), []);
     assert.deepStrictEqual(
-      parseFetchUrls(" https://tv.put.io/js/main.js,https://tv.put.io/css/main.css\n"),
-      ["https://tv.put.io/js/main.js", "https://tv.put.io/css/main.css"],
+      parseFetchUrls(" https://example.com/assets/app.js,https://example.com/assets/app.css\n"),
+      ["https://example.com/assets/app.js", "https://example.com/assets/app.css"],
     );
   });
 
-  it("resolves the tv.put.io asset preset unless explicit fetch URLs are configured", () => {
+  it("resolves the hosted asset preset unless explicit fetch URLs are configured", () => {
     assert.deepStrictEqual(resolveFetchProbeUrls({}, false), []);
     assert.deepStrictEqual(resolveFetchProbeUrls({}, true), [
-      "https://tv.put.io/js/main.js",
-      "https://tv.put.io/css/main.css",
+      "https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css",
     ]);
     assert.deepStrictEqual(
       resolveFetchProbeUrls({ LIVE_TEST_FETCH_URLS: "https://example.test/app.js" }, true),
@@ -139,7 +139,7 @@ describe("live test harness core", () => {
   it("treats failed or malformed fetch probe results as roundtrip failures", () => {
     assert.deepStrictEqual(failedFetchProbes(undefined), []);
     assert.deepStrictEqual(
-      failedFetchProbes([{ ok: true, url: "https://tv.put.io/js/main.js" }]),
+      failedFetchProbes([{ ok: true, url: "https://example.com/assets/app.js" }]),
       [],
     );
     assert.deepStrictEqual(failedFetchProbes({ ok: true }), [
@@ -153,14 +153,14 @@ describe("live test harness core", () => {
         {
           error: "Load failed",
           ok: false,
-          url: "https://tv.put.io/css/main.css",
+          url: "https://example.com/assets/app.css",
         },
       ]),
       [
         {
           error: "Load failed",
           reason: "fetch probe returned ok:false",
-          url: "https://tv.put.io/css/main.css",
+          url: "https://example.com/assets/app.css",
         },
       ],
     );
@@ -168,9 +168,9 @@ describe("live test harness core", () => {
       fetchProbeFailureLabel({
         error: "Load failed",
         reason: "fetch probe returned ok:false",
-        url: "https://tv.put.io/css/main.css",
+        url: "https://example.com/assets/app.css",
       }),
-      "https://tv.put.io/css/main.css: Load failed",
+      "https://example.com/assets/app.css: Load failed",
     );
   });
 

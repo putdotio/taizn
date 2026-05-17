@@ -25,7 +25,7 @@ TAIZN_TARGET=<tv-ip>:26101
 TAIZN_LIVE_BEACON_HOST=<computer-ip-reachable-from-tv>
 TAIZN_LIVE_BEACON_TIMEOUT_MS=15000
 TAIZN_TV_TIMEOUT_MS=5000
-LIVE_TEST_FETCH_URLS=https://tv.put.io/js/main.js,https://tv.put.io/css/main.css
+LIVE_TEST_FETCH_URLS=https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js,https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css
 LIVE_TEST_REMOTE_DELAY_MS=250
 LIVE_TEST_REMOTE_KEYS=KEY_UP,KEY_ENTER
 LIVE_TEST_REQUIRE_REMOTE=0
@@ -75,8 +75,7 @@ vp run live:test:tv-assets:production
   step of `.taizn/live-roundtrip.json`.
 - `live:test:smoke` writes `.taizn/live-smoke.json` with structured `check`,
   `apps`, `prove`, and `tv doctor` results from the selected target.
-- `live:test:tv-assets` runs roundtrip with asset load probes for
-  `https://tv.put.io/js/main.js` and `https://tv.put.io/css/main.css`.
+- `live:test:tv-assets` runs roundtrip with neutral hosted asset load probes.
 - `live:test:tv-assets:production` runs the same proof against the production
   fixture variant.
 
@@ -97,9 +96,9 @@ fixture's per-asset timeout.
 When `LIVE_TEST_FETCH_URLS` is set, `.js` URLs are verified by loading a
 `script` element and `.css` URLs are verified by loading a stylesheet link.
 Other URL types use `fetch`. The `live:test:tv-assets` presets use this path to
-prove the TV WebView can load:
+prove the TV WebView can load neutral public assets:
 
 ```txt
-https://tv.put.io/js/main.js
-https://tv.put.io/css/main.css
+https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js
+https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css
 ```

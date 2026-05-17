@@ -3,6 +3,19 @@
 `taizn` is a typed Tizen TV packaging and live-device proof harness for
 consumer apps. Keep it a shell-out tool, not an app framework.
 
+## Generic Tool Boundary
+
+- Keep `taizn` free of put.io product behavior. Do not add put.io app IDs,
+  hosted app URLs, content IDs, account data, credentials, journeys, or product
+  assertions.
+- `@putdotio/taizn`, `putdotio/taizn`, release-bot wiring, copyright, and
+  security contacts are ownership/publishing metadata only; do not treat them
+  as permission to add product-specific fixtures.
+- Use neutral examples such as `Example.app`, `Fixture.app`, and public
+  third-party asset URLs when docs or tests need sample app data.
+- Consumer repos own their own `LIVE_TEST_FETCH_URLS`, launch/proof targets,
+  product smoke flows, and store-submission metadata.
+
 ## Patterns
 
 - Keep CLI wiring thin: parse/dispatch commands, then call named implementation functions.
@@ -75,8 +88,7 @@ vp run live:test:tv-assets:production
 Use `LIVE_TEST_FETCH_URLS` with `live:test:roundtrip` when the TV WebView needs
 to prove it can fetch specific remote assets.
 Use `live:test:tv-assets` or `live:test:tv-assets:production` to run that same
-roundtrip against `https://tv.put.io/js/main.js` and
-`https://tv.put.io/css/main.css`.
+roundtrip against the neutral hosted-asset probe preset.
 Use `LIVE_TEST_REQUIRE_REMOTE=1` with `live:test:remote` when websocket remote
 control is a required gate instead of a diagnostic artifact.
 Use `LIVE_TEST_REMOTE_KEYS` only after `taizn tv pair` has configured a

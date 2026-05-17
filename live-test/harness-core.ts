@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 type LiveTestEnv = Record<string, string | undefined>;
 type LiveTestVariant = "development" | "production";
 
-export const tvPutioAssetUrls = ["https://tv.put.io/js/main.js", "https://tv.put.io/css/main.css"];
+export const hostedAssetProbeUrls = [
+  "https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css",
+];
 
 export type FetchProbeFailure = {
   readonly error?: string;
@@ -110,7 +113,7 @@ export function resolveFetchProbeUrls(env: LiveTestEnv, useTvAssetDefaults: bool
     return configuredUrls;
   }
 
-  return useTvAssetDefaults ? tvPutioAssetUrls : [];
+  return useTvAssetDefaults ? hostedAssetProbeUrls : [];
 }
 
 export function parseRemoteKeys(value: string | undefined) {

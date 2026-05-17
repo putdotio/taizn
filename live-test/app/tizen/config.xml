@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget xmlns:tizen="http://tizen.org/ns/widgets" xmlns="http://www.w3.org/ns/widgets" id="https://github.com/putdotio/taizn/live-test" version="1.0.0" height="1080" width="1920" viewmodes="maximized">
+<widget xmlns:tizen="http://tizen.org/ns/widgets" xmlns="http://www.w3.org/ns/widgets" id="TaiznLiveD.taizn" version="1.0.0" height="1080" width="1920" viewmodes="maximized">
   <access origin="*" subdomains="true"></access>
   <tizen:application id="TaiznLiveD.taizn" package="TaiznLiveD" required_version="2.3"/>
-  <author href="https://github.com/putdotio/taizn" email="devs@put.io">taizn</author>
+  <author href="https://example.com/taizn-live-test" email="taizn@example.com">taizn</author>
   <content src="index.html"/>
   <description>Live test app for taizn packaging and install checks.</description>
   <feature name="http://tizen.org/feature/network.wifi"/>
