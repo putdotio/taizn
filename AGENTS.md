@@ -43,6 +43,18 @@ consumer apps. Keep it a shell-out tool, not an app framework.
 - `install` should only auto-pick a target when exactly one `sdb devices` target is connected.
 - `tv` commands should not require a consumer `taizn.json`; they use `TAIZN_TV_HOST`, `.taizn/remote.json`, or the host part of `TAIZN_TARGET`.
 - `tv` commands send Samsung remote keys only; do not imply screenshot, app launch, or widget install support there.
+- `tv script` is still a remote-key driver only. JSON scripts may encode key
+  sequences and delays, but not product journeys, visual assertions, or content
+  expectations.
+- `inspect wgt`, `validate submission`, `probe hosted-assets`, `logs capture`,
+  and `targets` are generic harness surfaces. Keep product-specific checks in
+  consumer repos.
+- Agent-facing commands should prefer `--json`, support `--artifact` for proof
+  when useful, use `--fields` for context control, sandbox artifact paths to the
+  app directory, and document their Agent DX posture in `docs/AGENT_DX.md`.
+- Mutating platform commands should expose `--dry-run` unless a dry run would
+  be misleading. If a dry run is not real proof, say what it validates.
+- Keep `skills/taizn/SKILL.md` aligned when command-surface guardrails change.
 - Unit tests use `@effect/vitest` through `vp run test`; only `vp run live:test:*` proves real Tizen behavior.
 
 ## When Contracts Change

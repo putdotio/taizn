@@ -1,6 +1,7 @@
 import { Console, Effect, FileSystem, Stream } from "effect";
 import { ChildProcess } from "effect/unstable/process";
 import { ChildProcessSpawner } from "effect/unstable/process";
+import { spawn } from "node:child_process";
 import { join } from "node:path";
 import type { TaiznContext } from "./context.js";
 import type { TizenConfig, TizenVariant } from "./config.js";
@@ -22,6 +23,7 @@ import {
   ApplicationNotFound,
   CommandFailed,
   FileSystemFailure,
+  InvalidInput,
   MissingPassword,
   MissingTizenTarget,
   MultipleApplicationsMatched,
@@ -29,19 +31,20 @@ import {
   PackageNotProduced,
 } from "./errors.js";
 import { escapeXml, setXmlAttribute } from "./xml.js";
+import { jsonForOutput, validateAgentResourceInput, writeJsonArtifact } from "./io.js";
 
 type Certificates = {
   readonly author: string;
   readonly distributor: string;
 };
 
-type SdbDevice = {
+export type SdbDevice = {
   readonly id: string;
   readonly label: string;
   readonly state: string;
 };
 
-type TizenApplication = {
+export type TizenApplication = {
   readonly applicationId: string;
   readonly name: string;
 };
@@ -67,14 +70,21 @@ type RunTarget = {
 };
 
 type ProofOptions = {
+  readonly artifact?: string;
+  readonly dryRun?: boolean;
+  readonly fields?: string;
   readonly json?: boolean;
 };
 
 type ListInstalledApplicationsOptions = {
+  readonly artifact?: string;
+  readonly fields?: string;
   readonly json?: boolean;
 };
 
 type CheckOptions = {
+  readonly artifact?: string;
+  readonly fields?: string;
   readonly json?: boolean;
 };
 
@@ -85,22 +95,25 @@ export const checkTizen = Effect.fn("checkTizen")(function* (
   const tizenPath = yield* resolveTizenCli(env);
   const sdbPath = yield* resolveSdb(env);
   const devices = yield* listSdbDevices(sdbPath);
+  const result = {
+    configuredTarget: env.target,
+    targets: devices.map((device) => ({
+      id: device.id,
+      label: device.label,
+      state: device.state,
+    })),
+    tools: {
+      sdb: sdbPath,
+      tizenCli: tizenPath,
+    },
+  };
+
+  if (options.artifact) {
+    yield* writeJsonArtifact(options.artifact, result);
+  }
 
   if (options.json) {
-    yield* Console.log(
-      JSON.stringify({
-        configuredTarget: env.target,
-        targets: devices.map((device) => ({
-          id: device.id,
-          label: device.label,
-          state: device.state,
-        })),
-        tools: {
-          sdb: sdbPath,
-          tizenCli: tizenPath,
-        },
-      }),
-    );
+    yield* Console.log(yield* jsonForOutput(result, { fields: options.fields }));
     return;
   }
 
@@ -109,6 +122,9 @@ export const checkTizen = Effect.fn("checkTizen")(function* (
 
   if (devices.length === 0) {
     yield* Console.log("connected targets: none");
+    if (options.artifact) {
+      yield* Console.log(`Check artifact: ${options.artifact}`);
+    }
     return;
   }
 
@@ -117,9 +133,31 @@ export const checkTizen = Effect.fn("checkTizen")(function* (
   for (const device of devices) {
     yield* Console.log(`- ${device.id}${device.label ? ` (${device.label})` : ""}`);
   }
+
+  if (options.artifact) {
+    yield* Console.log(`Check artifact: ${options.artifact}`);
+  }
 });
 
-export const createProfile = Effect.fn("createProfile")(function* ({ config, env }: TaiznContext) {
+export const createProfile = Effect.fn("createProfile")(function* (
+  { config, env }: TaiznContext,
+  options: { readonly dryRun?: boolean } = {},
+) {
+  const certificates = yield* getCertificates(config);
+  const tizenPath = yield* resolveTizenCli(env);
+
+  if (options.dryRun) {
+    yield* Console.log(
+      JSON.stringify({
+        certificates,
+        dryRun: true,
+        profile: config.signing.profile,
+        tizenCli: tizenPath,
+      }),
+    );
+    return;
+  }
+
   const password = yield* readPassword(env.certPassword, "Tizen certificate password: ");
 
   if (!password) {
@@ -129,9 +167,7 @@ export const createProfile = Effect.fn("createProfile")(function* ({ config, env
     });
   }
 
-  const certificates = yield* getCertificates(config);
   const distributorPassword = env.distPassword ?? password;
-  const tizenPath = yield* resolveTizenCli(env);
 
   yield* run(
     tizenPath,
@@ -157,11 +193,28 @@ export const createProfile = Effect.fn("createProfile")(function* ({ config, env
   yield* Console.log(`Configured active Tizen signing profile: ${config.signing.profile}`);
 });
 
-export const packageWidget = Effect.fn("packageWidget")(function* ({ config, env }: TaiznContext) {
+export const packageWidget = Effect.fn("packageWidget")(function* (
+  { config, env }: TaiznContext,
+  options: { readonly dryRun?: boolean } = {},
+) {
   const [command, ...args] = config.build.command;
   const tizenPath = yield* resolveTizenCli(env);
   const paths = yield* getPaths();
   const variant = getVariant(config, env.variant);
+  const installable = plannedWidgetPath(paths.outputDir, variant);
+
+  if (options.dryRun) {
+    yield* Console.log(
+      JSON.stringify({
+        buildCommand: config.build.command,
+        dryRun: true,
+        output: installable,
+        tizenCli: tizenPath,
+        variant: env.variant,
+      }),
+    );
+    return installable;
+  }
 
   yield* run(command, args, { env: yield* appBuildEnv() });
   yield* stageWidget(config, variant);
@@ -182,7 +235,6 @@ export const packageWidget = Effect.fn("packageWidget")(function* ({ config, env
   );
 
   const built = yield* findBuiltWidget();
-  const installable = join(paths.outputDir, `${variant.bundleName}.wgt`);
 
   if (built !== installable) {
     const fs = yield* FileSystem.FileSystem;
@@ -199,35 +251,69 @@ export const packageWidget = Effect.fn("packageWidget")(function* ({ config, env
   return installable;
 });
 
-export const installWidget = Effect.fn("installWidget")(function* (context: TaiznContext) {
-  const built = yield* packageWidget(context);
-  const target = yield* resolveInstallTarget(context.env);
+export const installWidget = Effect.fn("installWidget")(function* (
+  context: TaiznContext,
+  options: { readonly dryRun?: boolean } = {},
+) {
+  const paths = yield* getPaths();
+  const variant = getVariant(context.config, context.env.variant);
+  const built = options.dryRun
+    ? plannedWidgetPath(paths.outputDir, variant)
+    : yield* packageWidget(context);
+  const target = yield* resolveInstallTarget(context.env, { quiet: options.dryRun });
   const sdbPath = yield* resolveSdb(context.env);
   const tizenPath = yield* resolveTizenCli(context.env);
+  const installArgs = target ? ["install", "-n", built, "-s", target] : ["install", "-n", built];
+
+  if (options.dryRun) {
+    yield* Console.log(
+      JSON.stringify({
+        dryRun: true,
+        installArgs,
+        sdb: sdbPath,
+        target,
+        tizenCli: tizenPath,
+      }),
+    );
+    return;
+  }
 
   if (context.env.target) {
     yield* run(sdbPath, ["connect", context.env.target], { env: yield* baseChildEnv() });
   }
 
-  const installArgs = target ? ["install", "-n", built, "-s", target] : ["install", "-n", built];
-
   yield* run(tizenPath, installArgs, { env: yield* baseChildEnv() });
 });
 
-export const runWidget = Effect.fn("runWidget")(function* ({ config, env }: TaiznContext) {
+export const runWidget = Effect.fn("runWidget")(function* (
+  { config, env }: TaiznContext,
+  options: { readonly dryRun?: boolean } = {},
+) {
   const variant = getVariant(config, env.variant);
   const sdbPath = yield* resolveSdb(env);
   const tizenPath = yield* resolveTizenCli(env);
-
-  if (env.target) {
-    yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv() });
-  }
-
-  const target = yield* resolveRunTarget(env, sdbPath);
+  const target = yield* resolveRunTarget(env, sdbPath, { quiet: options.dryRun });
   // Real Samsung TVs launch web widgets here by application id; package id fails.
   const runArgs = target
     ? ["run", "-p", variant.applicationId, target.flag, target.value]
     : ["run", "-p", variant.applicationId];
+
+  if (options.dryRun) {
+    yield* Console.log(
+      JSON.stringify({
+        applicationId: variant.applicationId,
+        dryRun: true,
+        runArgs,
+        target,
+        tizenCli: tizenPath,
+      }),
+    );
+    return;
+  }
+
+  if (env.target) {
+    yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv() });
+  }
 
   yield* run(tizenPath, runArgs, { env: yield* baseChildEnv() });
   yield* Console.log(`Launched ${variant.applicationId}`);
@@ -246,18 +332,21 @@ export const listInstalledApplications = Effect.fn("listInstalledApplications")(
   const applications = installedApplications.filter((application) =>
     matchesApplicationQuery(application, normalizedQuery),
   );
+  const result = {
+    applications: applications.map((application) => ({
+      id: application.applicationId,
+      name: application.name,
+    })),
+    query: queryLabel || undefined,
+    target,
+  };
+
+  if (options.artifact) {
+    yield* writeJsonArtifact(options.artifact, result);
+  }
 
   if (options.json) {
-    yield* Console.log(
-      JSON.stringify({
-        applications: applications.map((application) => ({
-          id: application.applicationId,
-          name: application.name,
-        })),
-        query: queryLabel || undefined,
-        target,
-      }),
-    );
+    yield* Console.log(yield* jsonForOutput(result, { fields: options.fields }));
     return;
   }
 
@@ -267,21 +356,44 @@ export const listInstalledApplications = Effect.fn("listInstalledApplications")(
 
   if (applications.length === 0) {
     yield* Console.log("none");
+    if (options.artifact) {
+      yield* Console.log(`Apps artifact: ${options.artifact}`);
+    }
     return;
   }
 
   for (const application of applications) {
     yield* Console.log(`- ${application.name} (${application.applicationId})`);
   }
+
+  if (options.artifact) {
+    yield* Console.log(`Apps artifact: ${options.artifact}`);
+  }
 });
 
 export const launchInstalledApplication = Effect.fn("launchInstalledApplication")(function* (
   env: TaiznEnv,
   query: string,
+  options: { readonly dryRun?: boolean } = {},
 ) {
   const tizenPath = yield* resolveTizenCli(env);
-  const { applications, target } = yield* loadInstalledApplications(env);
+  const { applications, target } = yield* loadInstalledApplications(env, { quiet: options.dryRun });
   const application = yield* resolveInstalledApplication(query, applications);
+
+  if (options.dryRun) {
+    yield* Console.log(
+      JSON.stringify({
+        application: {
+          id: application.applicationId,
+          name: application.name,
+        },
+        dryRun: true,
+        target,
+        tizenCli: tizenPath,
+      }),
+    );
+    return;
+  }
 
   yield* launchApplication(tizenPath, target, application);
   yield* Console.log(`Launched ${application.name} (${application.applicationId}) on ${target}`);
@@ -292,35 +404,143 @@ export const proveInstalledApplication = Effect.fn("proveInstalledApplication")(
   query: string,
   options: ProofOptions = {},
 ) {
+  yield* validateAgentResourceInput("application query", query);
   const tizenPath = yield* resolveTizenCli(env);
   const { applications, target } = yield* loadInstalledApplications(env, { quiet: options.json });
   const application = yield* resolveInstalledApplication(query, applications);
+  const launchOutput = options.dryRun
+    ? ""
+    : yield* launchApplication(tizenPath, target, application, {
+        captureOutput: true,
+      });
+  const proof = {
+    application: {
+      id: application.applicationId,
+      name: application.name,
+    },
+    createdAt: new Date().toISOString(),
+    dryRun: options.dryRun === true,
+    launch: {
+      output: launchOutput.trim(),
+      started: options.dryRun !== true,
+    },
+    target,
+    tizenCli: tizenPath,
+  };
+
+  if (options.artifact) {
+    yield* writeJsonArtifact(options.artifact, proof);
+  }
 
   if (options.json) {
-    const launchOutput = yield* launchApplication(tizenPath, target, application, {
-      captureOutput: true,
-    });
-
-    yield* Console.log(
-      JSON.stringify({
-        application: {
-          id: application.applicationId,
-          name: application.name,
-        },
-        launch: {
-          output: launchOutput.trim(),
-          started: true,
-        },
-        target,
-      }),
-    );
+    yield* Console.log(yield* jsonForOutput(proof, { fields: options.fields }));
     return;
   }
 
   yield* Console.log(`Tizen target: ${target}`);
   yield* Console.log(`Installed application: ${application.name} (${application.applicationId})`);
-  yield* launchApplication(tizenPath, target, application);
-  yield* Console.log(`Launch proof: ${application.applicationId} started on ${target}`);
+  if (options.dryRun) {
+    yield* Console.log(`Launch proof dry-run: ${application.applicationId} resolved on ${target}`);
+  } else {
+    yield* Console.log(launchOutput.trim());
+    yield* Console.log(`Launch proof: ${application.applicationId} started on ${target}`);
+  }
+  if (options.artifact) {
+    yield* Console.log(`Proof artifact: ${options.artifact}`);
+  }
+});
+
+export const listTizenTargets = Effect.fn("listTizenTargets")(function* (env: TaiznEnv) {
+  const sdbPath = yield* resolveSdb(env);
+  return yield* listSdbDevices(sdbPath);
+});
+
+export const captureTizenLogs = Effect.fn("captureTizenLogs")(function* (
+  env: TaiznEnv,
+  options: {
+    readonly app?: string;
+    readonly artifact?: string;
+    readonly durationMs?: number;
+    readonly fields?: string;
+    readonly json?: boolean;
+    readonly output?: string;
+  } = {},
+) {
+  const outputMode = options.output ?? "text";
+
+  if (outputMode !== "json" && outputMode !== "ndjson" && outputMode !== "text") {
+    return yield* InvalidInput.make({
+      details: `expected json, ndjson, or text. Received: ${outputMode}`,
+      label: "logs output",
+    });
+  }
+
+  const sdbPath = yield* resolveSdb(env);
+  const quiet = options.json || outputMode === "json" || outputMode === "ndjson";
+
+  if (env.target) {
+    if (quiet) {
+      yield* capture(sdbPath, ["connect", env.target]);
+    } else {
+      yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv() });
+    }
+  }
+
+  const target = yield* resolveRequiredSdbTarget(env, sdbPath, {
+    quiet,
+  });
+  const durationMs = options.durationMs ?? 0;
+
+  if (durationMs < 0) {
+    return yield* InvalidInput.make({
+      details: `expected a non-negative integer. Received: ${durationMs}`,
+      label: "logs duration-ms",
+    });
+  }
+
+  const output =
+    durationMs > 0
+      ? yield* captureForDuration(sdbPath, ["-s", target, "dlog"], durationMs)
+      : yield* capture(sdbPath, ["-s", target, "dlog", "-d"]);
+  const lines = output
+    .split("\n")
+    .filter((line) => line && (!options.app || line.includes(options.app)));
+  const artifact = {
+    app: options.app,
+    capturedAt: new Date().toISOString(),
+    durationMs,
+    lineCount: lines.length,
+    lines,
+    target,
+  };
+
+  if (options.artifact) {
+    yield* writeJsonArtifact(options.artifact, artifact);
+  }
+
+  if (outputMode === "ndjson") {
+    for (const [index, line] of lines.entries()) {
+      yield* Console.log(
+        JSON.stringify({
+          app: options.app,
+          index,
+          line,
+          target,
+        }),
+      );
+    }
+    return;
+  }
+
+  if (options.json || outputMode === "json") {
+    yield* Console.log(yield* jsonForOutput(artifact, { fields: options.fields }));
+    return;
+  }
+
+  yield* Console.log(`Captured ${lines.length} log lines from ${target}`);
+  if (options.artifact) {
+    yield* Console.log(`Log artifact: ${options.artifact}`);
+  }
 });
 
 const resolveTizenCli = Effect.fn("resolveTizenCli")(function* (env: TaiznEnv) {
@@ -333,6 +553,9 @@ const resolveSdb = Effect.fn("resolveSdb")(function* (env: TaiznEnv) {
 
 const getVariant = (config: TizenConfig, variant: "development" | "production") =>
   config.widget.variants[variant];
+
+const plannedWidgetPath = (outputDir: string, variant: TizenVariant) =>
+  join(outputDir, `${variant.bundleName}.wgt`);
 
 const getWidgetStageOptions = (config: TizenConfig, variant: TizenVariant): WidgetStageOptions => ({
   excludeFiles: [...(config.widget.excludeFiles ?? []), ...(variant.excludeFiles ?? [])],
@@ -551,7 +774,10 @@ const parseSdbDevice = (line: string): SdbDevice => {
   return { id, label, state };
 };
 
-const resolveInstallTarget = Effect.fn("resolveInstallTarget")(function* (env: TaiznEnv) {
+const resolveInstallTarget = Effect.fn("resolveInstallTarget")(function* (
+  env: TaiznEnv,
+  options: { readonly quiet?: boolean } = {},
+) {
   if (env.target) {
     return env.target;
   }
@@ -561,9 +787,11 @@ const resolveInstallTarget = Effect.fn("resolveInstallTarget")(function* (env: T
   if (devices.length === 1) {
     const device = devices[0];
     if (device) {
-      yield* Console.log(
-        `Using connected Tizen target: ${device.id}${device.label ? ` (${device.label})` : ""}`,
-      );
+      if (!options.quiet) {
+        yield* Console.log(
+          `Using connected Tizen target: ${device.id}${device.label ? ` (${device.label})` : ""}`,
+        );
+      }
 
       return device.id;
     }
@@ -578,7 +806,11 @@ const resolveInstallTarget = Effect.fn("resolveInstallTarget")(function* (env: T
   return undefined;
 });
 
-const resolveRunTarget = Effect.fn("resolveRunTarget")(function* (env: TaiznEnv, sdbPath: string) {
+const resolveRunTarget = Effect.fn("resolveRunTarget")(function* (
+  env: TaiznEnv,
+  sdbPath: string,
+  options: { readonly quiet?: boolean } = {},
+) {
   if (env.target) {
     return { flag: "-s", value: env.target } satisfies RunTarget;
   }
@@ -588,9 +820,11 @@ const resolveRunTarget = Effect.fn("resolveRunTarget")(function* (env: TaiznEnv,
   if (devices.length === 1) {
     const device = devices[0];
     if (device) {
-      yield* Console.log(
-        `Using connected Tizen target: ${device.id}${device.label ? ` (${device.label})` : ""}`,
-      );
+      if (!options.quiet) {
+        yield* Console.log(
+          `Using connected Tizen target: ${device.id}${device.label ? ` (${device.label})` : ""}`,
+        );
+      }
 
       return { flag: "-s", value: device.id } satisfies RunTarget;
     }
@@ -808,4 +1042,54 @@ const capture = Effect.fn("capture")(function* (command: string, args: ReadonlyA
   }
 
   return output.output;
+});
+
+const captureForDuration = Effect.fn("captureForDuration")(function* (
+  command: string,
+  args: ReadonlyArray<string>,
+  durationMs: number,
+) {
+  const paths = yield* getPaths();
+  const env = yield* withTizenPath(yield* baseChildEnv());
+
+  return yield* Effect.tryPromise({
+    try: () =>
+      new Promise<string>((resolve, reject) => {
+        const child = spawn(command, args, {
+          cwd: paths.appDir,
+          env,
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        let stderr = "";
+        let stdout = "";
+        let timedOut = false;
+
+        child.stdout.setEncoding("utf8");
+        child.stderr.setEncoding("utf8");
+        child.stdout.on("data", (chunk: string) => {
+          stdout += chunk;
+        });
+        child.stderr.on("data", (chunk: string) => {
+          stderr += chunk;
+        });
+
+        const timer = setTimeout(() => {
+          timedOut = true;
+          child.kill("SIGTERM");
+        }, durationMs);
+
+        child.on("error", reject);
+        child.on("close", (code, signal) => {
+          clearTimeout(timer);
+
+          if (timedOut || code === 0 || signal === "SIGTERM") {
+            resolve(stdout);
+            return;
+          }
+
+          reject(new Error(stderr.trim() || `exit ${code ?? signal ?? "unknown"}`));
+        });
+      }),
+    catch: () => CommandFailed.make({ args: redactCommandArgs(args), command }),
+  });
 });

@@ -79,6 +79,33 @@ describe("taizn cli", () => {
     assert.strictEqual(result.stderr, "");
   });
 
+  it("describes the agent-facing command surface as JSON", () => {
+    const result = runTaizn(["describe"]);
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const described = parseDescribeJson(result.stdout);
+    assert.strictEqual(described.name, "taizn");
+    assert.isAtLeast(described.agentDx.total, 15);
+    assert.isTrue(described.commands.some((command) => command.command === "prove"));
+    assert.isTrue(described.commands.some((command) => command.command === "probe hosted-assets"));
+    assert.isFalse(described.commands.some((command) => command.command === "targets"));
+    assert.isFalse(described.commands.some((command) => command.command === "tv"));
+    assert.isTrue(described.commands.some((command) => command.command === "targets list"));
+    assert.isTrue(described.commands.some((command) => command.command === "tv press"));
+    for (const command of ["launch", "profile", "package", "install", "run"]) {
+      assert.isTrue(
+        described.commands.some((describedCommand) => describedCommand.command === command),
+      );
+    }
+    const tvPair = described.commands.find((command) => command.command === "tv pair");
+    assert.deepStrictEqual(tvPair?.flags, ["--dry-run"]);
+    const tvPress = described.commands.find((command) => command.command === "tv press");
+    assert.include(tvPress?.flags ?? [], "--delay-ms <ms>");
+    const tvScript = described.commands.find((command) => command.command === "tv script");
+    assert.isFalse(tvScript?.fieldMask);
+  });
+
   it("reports missing config without a stack trace", () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-missing-config-"));
     const result = runTaizn(["package"], dir);
@@ -158,6 +185,18 @@ describe("taizn cli", () => {
     });
   });
 
+  it("applies field masks to structured read output", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["apps", "--json", "--fields", "target", "example"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    assert.deepStrictEqual(JSON.parse(result.stdout), { target: "127.0.0.1:26101" });
+  });
+
   it("prints only JSON for installed applications when auto-picking one target", () => {
     const dir = createToolingFixture();
     const result = runTaizn(["apps", "--json"], dir, {
@@ -230,6 +269,77 @@ describe("taizn cli", () => {
     assert.strictEqual(proof.launch.started, true);
     assert.include(proof.launch.output, "fake-tizen run -p Example.app -s 127.0.0.1:26101");
     assert.strictEqual(proof.target, "127.0.0.1:26101");
+  });
+
+  it("does not claim dry-run proofs launched the app", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["prove", "--dry-run", "Example.app"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.include(result.stdout, "Launch proof dry-run");
+    assert.notInclude(result.stdout, "started on");
+  });
+
+  it("returns structured errors in JSON mode", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["prove", "--json", "../Example.app"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+
+    assert.strictEqual(result.status, 1);
+    assert.strictEqual(result.stdout, "");
+    assert.deepStrictEqual(JSON.parse(result.stderr), {
+      error: {
+        message: "Invalid application query: path traversal segments are not allowed",
+        type: "InvalidInput",
+      },
+      ok: false,
+    });
+  });
+
+  it("returns structured CLI parse errors in JSON mode", () => {
+    const result = runTaizn(["prove", "--json"]);
+
+    assert.strictEqual(result.status, 1);
+    assert.strictEqual(result.stdout, "");
+    assert.deepStrictEqual(JSON.parse(result.stderr), {
+      error: {
+        message: "Missing required argument: query",
+        type: "ShowHelp",
+      },
+      ok: false,
+    });
+  });
+
+  it("writes proof artifacts inside the app directory", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["prove", "--artifact", ".taizn/proof.json", "Example.app"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+
+    assert.strictEqual(result.status, 0);
+    const proof = parseProofJson(readFileSync(join(dir, ".taizn/proof.json"), "utf8"));
+    assert.strictEqual(proof.application.id, "Example.app");
+  });
+
+  it("rejects proof artifact paths outside the app directory", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["prove", "--artifact", "../proof.json", "Example.app"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+
+    assert.strictEqual(result.status, 1);
+    assert.include(result.stderr, "output path must stay inside the app directory");
   });
 
   it("prints only JSON for structured proof when auto-picking one target", () => {
@@ -678,9 +788,388 @@ describe("taizn cli", () => {
       });
       assert.lengthOf(receivedKeys, 3);
       assert.include(receivedKeys[2] ?? "", '"DataOfCmd":"KEY_LEFT"');
+
+      writeFileSync(
+        join(dir, "keys.json"),
+        JSON.stringify({ delayMs: 1, steps: [{ keys: ["KEY_DOWN", "KEY_ENTER"] }] }),
+      );
+      const script = await runTaiznAsync(["tv", "script", "--json", "--file", "keys.json"], dir);
+
+      assert.strictEqual(script.status, 0);
+      assert.strictEqual(script.stderr, "");
+      assert.strictEqual(parseTvScriptJson(script.stdout).keyCount, 2);
+      assert.lengthOf(receivedKeys, 5);
+      assert.include(receivedKeys[3] ?? "", '"DataOfCmd":"KEY_DOWN"');
+      assert.include(receivedKeys[4] ?? "", '"DataOfCmd":"KEY_ENTER"');
     } finally {
       server.close();
     }
+  });
+
+  it("dry-runs Samsung TV remote scripts from JSON", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-script-"));
+    writeFileSync(
+      join(dir, "keys.json"),
+      JSON.stringify({ delayMs: 1, steps: [{ keys: ["KEY_UP", "KEY_ENTER"] }] }),
+    );
+
+    const result = runTaizn(["tv", "script", "--dry-run", "--json", "--file", "keys.json"], dir);
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const script = parseTvScriptJson(result.stdout);
+    assert.strictEqual(script.dryRun, true);
+    assert.strictEqual(script.keyCount, 2);
+  });
+
+  it("dry-runs Samsung TV remote keys without a paired token", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-press-dry-run-"));
+    const result = runTaizn(["tv", "press", "--dry-run", "--json", "KEY_HOME"], dir, {
+      TAIZN_TV_HOST: "127.0.0.1",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const press = JSON.parse(result.stdout);
+    assert.strictEqual(press.dryRun, true);
+    assert.strictEqual(press.keyCount, 1);
+    assert.deepStrictEqual(press.keys, ["KEY_HOME"]);
+    assert.strictEqual(press.target.url, "wss://127.0.0.1:8002");
+  });
+
+  it("dry-runs mutating package and run commands", () => {
+    const dir = createPackageFixture();
+    const packageResult = runTaizn(["package", "--dry-run"], dir, {
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+    const runResult = runTaizn(["run", "--dry-run"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+
+    assert.strictEqual(packageResult.status, 0);
+    assert.strictEqual(JSON.parse(packageResult.stdout).dryRun, true);
+    assert.strictEqual(runResult.status, 0);
+    assert.strictEqual(JSON.parse(runResult.stdout).dryRun, true);
+  });
+
+  it("keeps dry-run launch JSON quiet when auto-picking one target", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["launch", "--dry-run", "Example.app"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    assert.strictEqual(JSON.parse(result.stdout).target, "127.0.0.1:26101");
+  });
+
+  it("captures target logs as JSON", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["logs", "capture", "--json", "--app", "Example"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const logs = parseLogsJson(result.stdout);
+    assert.strictEqual(logs.lineCount, 1);
+    assert.include(logs.lines[0] ?? "", "Example");
+  });
+
+  it("connects configured targets before log capture", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["logs", "capture", "--json", "--app", "Example"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "192.0.2.10:26101",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    assert.strictEqual(parseLogsJson(result.stdout).target, "192.0.2.10:26101");
+  });
+
+  it("honors explicit JSON log output mode", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["logs", "capture", "--output", "json", "--app", "Example"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    assert.strictEqual(parseLogsJson(result.stdout).lineCount, 1);
+  });
+
+  it("captures target logs as text by default", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["logs", "capture", "--app", "Example"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    assert.include(result.stdout, "Captured 1 log lines from 127.0.0.1:26101");
+  });
+
+  it("formats output=json errors as structured JSON", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-json-error-"));
+    const result = runTaizn(["logs", "capture", "--output=json"], dir);
+
+    assert.strictEqual(result.status, 1);
+    assert.strictEqual(result.stdout, "");
+    assert.deepStrictEqual(JSON.parse(result.stderr), {
+      error: {
+        message: "No Tizen target is connected. Set TAIZN_TARGET or connect exactly one device.",
+        type: "MissingTizenTarget",
+      },
+      ok: false,
+    });
+  });
+
+  it("formats output ndjson errors as structured JSON", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-ndjson-error-"));
+    const result = runTaizn(["logs", "capture", "--output", "ndjson"], dir);
+
+    assert.strictEqual(result.status, 1);
+    assert.strictEqual(result.stdout, "");
+    assert.deepStrictEqual(JSON.parse(result.stderr), {
+      error: {
+        message: "No Tizen target is connected. Set TAIZN_TARGET or connect exactly one device.",
+        type: "MissingTizenTarget",
+      },
+      ok: false,
+    });
+  });
+
+  it("honors target log capture duration", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["logs", "capture", "--json", "--duration-ms", "500"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const logs = parseLogsJson(result.stdout);
+    assert.isAtLeast(logs.lineCount, 1);
+    assert.include(logs.lines[0] ?? "", "streamed");
+  });
+
+  it("streams target logs as NDJSON", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["logs", "capture", "--output", "ndjson", "--app", "Example"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const lines = result.stdout
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    assert.lengthOf(lines, 1);
+    assert.include(lines[0].line, "Example");
+  });
+
+  it("keeps NDJSON logs quiet when auto-picking one target", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["logs", "capture", "--output", "ndjson", "--app", "Example"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const lines = result.stdout
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    assert.lengthOf(lines, 1);
+    assert.include(lines[0].line, "Example");
+  });
+
+  it("rejects invalid log output mode before resolving device tooling", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-log-output-"));
+    const result = runTaizn(["logs", "capture", "--output", "yaml"], dir);
+
+    assert.strictEqual(result.status, 1);
+    assert.include(result.stderr, "Invalid logs output");
+    assert.notInclude(result.stderr, "sdb not found");
+  });
+
+  it("lists connected and aliased targets as JSON", () => {
+    const dir = createToolingFixture();
+    mkdirSync(join(dir, ".taizn"), { recursive: true });
+    writeFileSync(
+      join(dir, ".taizn/targets.json"),
+      JSON.stringify({ targets: [{ alias: "living-room", target: "127.0.0.1:26101" }] }),
+    );
+
+    const result = runTaizn(["targets", "list", "--json"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const targets = parseTargetsJson(result.stdout);
+    assert.strictEqual(targets.aliases[0]?.alias, "living-room");
+    assert.strictEqual(targets.connected[0]?.id, "127.0.0.1:26101");
+  });
+
+  it("dry-runs configured hosted asset probes", () => {
+    const dir = createPackageFixture();
+    const result = runTaizn(["probe", "hosted-assets", "--dry-run", "--json"], dir, {
+      TAIZN_VARIANT: "production",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const probe = parseProbeJson(result.stdout);
+    assert.deepStrictEqual(probe.urls, [
+      "https://example.com/assets/main.css",
+      "https://example.com/assets/main.js",
+    ]);
+  });
+
+  it("validates hosted asset URLs during dry-run", () => {
+    const dir = createPackageFixture();
+    const result = runTaizn(["probe", "hosted-assets", "--dry-run", "--json", "not-a-url"], dir);
+
+    assert.strictEqual(result.status, 1);
+    assert.include(result.stderr, "Invalid asset URL");
+  });
+
+  it("fails hosted asset probes when any fetch fails", async () => {
+    const dir = createPackageFixture();
+    const server = createServer((_request, response) => {
+      response.writeHead(404);
+      response.end("missing");
+    });
+
+    try {
+      await waitForHttpServer(server);
+      const address = server.address();
+
+      if (!address || typeof address === "string") {
+        throw new Error("Expected TCP HTTP test server address.");
+      }
+
+      const result = await runTaiznAsync(
+        ["probe", "hosted-assets", "--json", `http://127.0.0.1:${address.port}/missing.js`],
+        dir,
+      );
+
+      assert.strictEqual(result.status, 1);
+      const probe = JSON.parse(result.stdout);
+      assert.strictEqual(probe.probes[0]?.ok, false);
+      assert.include(result.stderr, "hosted asset probe");
+    } finally {
+      server.close();
+    }
+  });
+
+  it("validates generic submission metadata without portal automation", () => {
+    const dir = createPackageFixture();
+    const result = runTaizn(["validate", "submission", "--json"], dir, {
+      TAIZN_VARIANT: "production",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const validation = parseSubmissionJson(result.stdout);
+    assert.strictEqual(validation.ok, true);
+    assert.strictEqual(validation.hostedAssets.length, 2);
+  });
+
+  it("fails submission validation when configured metadata is invalid", () => {
+    const dir = createPackageFixture();
+    const config = JSON.parse(readFileSync(join(dir, "taizn.json"), "utf8"));
+
+    config.widget.variants.production.applicationId = "Bad?app";
+    writeFileSync(join(dir, "taizn.json"), JSON.stringify(config, null, 2));
+
+    const result = runTaizn(["validate", "submission", "--json"], dir, {
+      TAIZN_VARIANT: "production",
+    });
+
+    assert.strictEqual(result.status, 1);
+    const validation = JSON.parse(result.stdout);
+    assert.strictEqual(validation.ok, false);
+    assert.include(validation.problems[0] ?? "", "applicationId");
+  });
+
+  it("fails submission validation when Tizen identifiers contain spaces", () => {
+    const dir = createPackageFixture();
+    const config = JSON.parse(readFileSync(join(dir, "taizn.json"), "utf8"));
+
+    config.widget.variants.production.applicationId = "Bad App";
+    config.widget.variants.production.packageId = "Bad Package";
+    writeFileSync(join(dir, "taizn.json"), JSON.stringify(config, null, 2));
+
+    const result = runTaizn(["validate", "submission", "--json"], dir, {
+      TAIZN_VARIANT: "production",
+    });
+
+    assert.strictEqual(result.status, 1);
+    const validation = JSON.parse(result.stdout);
+    assert.strictEqual(validation.ok, false);
+    assert.include(validation.problems.join("\n"), "applicationId");
+    assert.include(validation.problems.join("\n"), "packageId");
+  });
+
+  it("fails submission validation when archive metadata mismatches the selected variant", () => {
+    const dir = createPackageFixture();
+    const path = join(dir, "bad.wgt");
+    writeFileSync(
+      path,
+      makeStoredZip([
+        {
+          content:
+            '<widget><tizen:application id="Other.app" package="Other"/><name>Other</name></widget>',
+          name: "config.xml",
+        },
+      ]),
+    );
+
+    const result = runTaizn(["validate", "submission", "--json", path], dir, {
+      TAIZN_VARIANT: "production",
+    });
+
+    assert.strictEqual(result.status, 1);
+    const validation = JSON.parse(result.stdout);
+    assert.strictEqual(validation.ok, false);
+    assert.include(validation.problems.join("\n"), "archive applicationId");
+    assert.include(validation.problems.join("\n"), "archive packageId");
+  });
+
+  it("inspects Tizen widget archive metadata as JSON", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-inspect-wgt-"));
+    const path = join(dir, "fixture.wgt");
+    writeFileSync(
+      path,
+      makeStoredZip([
+        {
+          content:
+            '<widget><tizen:application id="Example.app" package="Example"/><name>Example</name><tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/></widget>',
+          name: "config.xml",
+        },
+        { content: "<html></html>", name: "index.html" },
+      ]),
+    );
+
+    const result = runTaizn(["inspect", "wgt", "--json", path], dir);
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const inspected = parseInspectJson(result.stdout);
+    assert.strictEqual(inspected.config.applicationId, "Example.app");
+    assert.strictEqual(inspected.entryCount, 2);
   });
 
   it("runs the configured widget variant on the target", () => {
@@ -968,6 +1457,94 @@ const TvDoctorJsonSchema = Schema.Struct({
 
 type TvDoctorJson = typeof TvDoctorJsonSchema.Type;
 
+const DescribeJsonSchema = Schema.Struct({
+  agentDx: Schema.Struct({
+    total: Schema.Number,
+  }),
+  commands: Schema.Array(
+    Schema.Struct({
+      command: Schema.String,
+      fieldMask: Schema.Boolean,
+      flags: Schema.Array(Schema.String),
+      purpose: Schema.String,
+    }),
+  ),
+  name: Schema.String,
+});
+
+type DescribeJson = typeof DescribeJsonSchema.Type;
+
+const TvScriptJsonSchema = Schema.Struct({
+  dryRun: Schema.Boolean,
+  file: Schema.String,
+  keyCount: Schema.Number,
+  steps: Schema.Array(
+    Schema.Struct({
+      delayMs: Schema.Number,
+      keys: Schema.Array(Schema.String),
+    }),
+  ),
+});
+
+type TvScriptJson = typeof TvScriptJsonSchema.Type;
+
+const LogsJsonSchema = Schema.Struct({
+  lineCount: Schema.Number,
+  lines: Schema.Array(Schema.String),
+  target: Schema.String,
+});
+
+type LogsJson = typeof LogsJsonSchema.Type;
+
+const TargetsJsonSchema = Schema.Struct({
+  aliases: Schema.Array(
+    Schema.Struct({
+      alias: Schema.String,
+      target: Schema.String,
+      tvHost: Schema.optional(Schema.String),
+    }),
+  ),
+  connected: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      label: Schema.String,
+      state: Schema.String,
+    }),
+  ),
+});
+
+type TargetsJson = typeof TargetsJsonSchema.Type;
+
+const ProbeJsonSchema = Schema.Struct({
+  urls: Schema.Array(Schema.String),
+});
+
+type ProbeJson = typeof ProbeJsonSchema.Type;
+
+const SubmissionJsonSchema = Schema.Struct({
+  hostedAssets: Schema.Array(Schema.String),
+  ok: Schema.Boolean,
+});
+
+type SubmissionJson = typeof SubmissionJsonSchema.Type;
+
+const InspectJsonSchema = Schema.Struct({
+  config: Schema.Struct({
+    applicationId: Schema.String,
+    name: Schema.String,
+    packageId: Schema.String,
+    privileges: Schema.Array(Schema.String),
+  }),
+  entryCount: Schema.Number,
+});
+
+type InspectJson = typeof InspectJsonSchema.Type;
+
+const parseDescribeJson = (text: string): DescribeJson => {
+  const described: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(DescribeJsonSchema)(described);
+};
+
 const parseProofJson = (text: string): ProofJson => {
   const proof: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(ProofJsonSchema)(proof);
@@ -996,6 +1573,36 @@ const parseTvPressJson = (text: string): TvPressJson => {
 const parseTvDoctorJson = (text: string): TvDoctorJson => {
   const doctor: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(TvDoctorJsonSchema)(doctor);
+};
+
+const parseTvScriptJson = (text: string): TvScriptJson => {
+  const script: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(TvScriptJsonSchema)(script);
+};
+
+const parseLogsJson = (text: string): LogsJson => {
+  const logs: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(LogsJsonSchema)(logs);
+};
+
+const parseTargetsJson = (text: string): TargetsJson => {
+  const targets: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(TargetsJsonSchema)(targets);
+};
+
+const parseProbeJson = (text: string): ProbeJson => {
+  const probe: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(ProbeJsonSchema)(probe);
+};
+
+const parseSubmissionJson = (text: string): SubmissionJson => {
+  const submission: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(SubmissionJsonSchema)(submission);
+};
+
+const parseInspectJson = (text: string): InspectJson => {
+  const inspected: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(InspectJsonSchema)(inspected);
 };
 
 const createToolingFixture = () => {
@@ -1027,6 +1634,16 @@ const writeFakeSdb = (dir: string) => {
         console.log("\\t'Other App'\\t 'Other.app'");
         process.exit(0);
       }
+      if (args[0] === "-s" && args[2] === "dlog" && args[3] === "-d") {
+        console.log("I/Example: launched");
+        console.log("I/Other: idle");
+        process.exit(0);
+      }
+      if (args[0] === "-s" && args[2] === "dlog") {
+        console.log("I/Example: streamed");
+        setInterval(() => console.log("I/Other: streamed"), 5);
+        await new Promise(() => {});
+      }
       process.exit(0);
     `,
   );
@@ -1056,3 +1673,25 @@ const waitForHttpServer = (server: ReturnType<typeof createServer>) =>
     server.once("listening", () => resolve());
     server.once("error", reject);
   });
+
+const makeStoredZip = (entries: readonly { readonly content: string; readonly name: string }[]) =>
+  Buffer.concat(entries.map(makeStoredZipEntry));
+
+const makeStoredZipEntry = (entry: { readonly content: string; readonly name: string }) => {
+  const name = Buffer.from(entry.name);
+  const content = Buffer.from(entry.content);
+  const header = Buffer.alloc(30);
+
+  header.writeUInt32LE(0x04034b50, 0);
+  header.writeUInt16LE(20, 4);
+  header.writeUInt16LE(0, 6);
+  header.writeUInt16LE(0, 8);
+  header.writeUInt32LE(0, 10);
+  header.writeUInt32LE(0, 14);
+  header.writeUInt32LE(content.length, 18);
+  header.writeUInt32LE(content.length, 22);
+  header.writeUInt16LE(name.length, 26);
+  header.writeUInt16LE(0, 28);
+
+  return Buffer.concat([header, name, content]);
+};

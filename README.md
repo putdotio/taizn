@@ -49,25 +49,44 @@ Project files:
 ```bash
 taizn check
 taizn check --json
+taizn check --artifact .taizn/check.json
+taizn describe
+taizn dx score
 taizn apps
 taizn apps example
 taizn apps --json example
-taizn launch Example.app
+taizn apps --artifact .taizn/apps.json example
+taizn apps --json --fields applications example
+taizn launch --dry-run Example.app
 taizn prove Example.app
 taizn prove --json Example.app
-taizn profile
-taizn package
-taizn install
-taizn run
+taizn prove --dry-run --json --fields application.id,target Example.app
+taizn prove --artifact .taizn/proof.json Example.app
+taizn inspect wgt .taizn/build/output/example.wgt
+taizn inspect wgt --json --fields config,entryCount .taizn/build/output/example.wgt
+taizn validate submission
+taizn validate submission --json .taizn/build/output/example.wgt
+taizn probe hosted-assets --dry-run --json
+taizn logs capture --json --app Example.app
+taizn logs capture --output ndjson --app Example.app
+taizn targets list --json
+taizn targets current --json
+taizn profile --dry-run
+taizn package --dry-run
+taizn install --dry-run
+taizn run --dry-run
 taizn tv doctor
 taizn tv doctor --json
 taizn tv doctor --connect --json
 taizn tv info
 taizn tv info --json
-taizn tv pair
+taizn tv pair --dry-run
 taizn tv press KEY_ENTER
 taizn tv press --json KEY_ENTER
+taizn tv press --dry-run --json KEY_ENTER
+taizn tv press --artifact .taizn/tv-press.json KEY_ENTER
 taizn tv press --delay-ms 250 KEY_HOME KEY_DOWN KEY_ENTER
+taizn tv script --file .taizn/remote-script.json --dry-run --json
 taizn --version
 ```
 
@@ -75,11 +94,23 @@ taizn --version
 targets without requiring `taizn.json`. Add `--json` to emit the configured
 tool paths and connected targets for agents and scripts. `apps` lists installed
 applications on the target, with an optional query filter. Add `--json` to emit
-a structured inventory for agents and scripts. `launch` starts an already-installed
+a structured inventory for agents and scripts. Most JSON commands support
+`--fields <mask>` to keep agent context small. `launch` starts an already-installed
 application by exact application ID, exact name, or a unique query. `prove`
 checks the installed app inventory, launches the matched app, and prints a
 compact proof transcript. Add `--json` when an agent or script needs structured
-proof output. `profile` imports
+proof output, or `--artifact <path>` to write the same proof inside the app
+directory. `describe` prints the agent-facing command surface as JSON, and
+`dx score` prints the current Agent DX CLI scorecard.
+`inspect wgt` reads a `.wgt` archive and extracts neutral metadata such as
+entries, `config.xml`, application ID, package ID, name, and privileges.
+`validate submission` checks generic package metadata for the selected variant
+without automating Samsung TV Seller Office. `probe hosted-assets` discovers
+configured hosted asset URLs from the selected variant's index HTML, or accepts
+URLs as arguments, and can dry-run or probe them from the local machine.
+`logs capture` records a bounded `sdb dlog -d` snapshot and supports
+`--output ndjson` for one object per log line. `targets` reports
+configured, connected, and optional `.taizn/targets.json` alias state. `profile` imports
 `.taizn/certificates/author.p12` and
 `.taizn/certificates/distributor.p12` into a Tizen security profile.
 `package` builds and signs a `.wgt`. `install` packages and sideloads it.
@@ -90,7 +121,10 @@ key presses. Add `--json` to `tv doctor` for structured host/token/connection
 diagnostics, to `tv info` for a structured TV capability snapshot, or to
 `tv press` for a structured key-sequence receipt. See
 [Samsung TV Remote](./docs/TV_REMOTE.md) for pairing, environment, and limits.
-`tv press` accepts one key or a sequence of keys.
+`--dry-run` validates mutating platform commands without changing device or
+package state where the underlying platform allows it. `tv press` accepts one
+key or a sequence of keys. `tv script` accepts a small JSON key recipe and
+supports `--dry-run`, `--json`, and `--artifact`.
 
 ## Boundaries
 
@@ -99,6 +133,8 @@ diagnostics, to `tv info` for a structured TV capability snapshot, or to
 - Tizen CLI and `sdb` readiness checks with structured target output
 - widget staging, signing profile import, package, install, and run commands
 - installed app inventory, launch by exact or unique query, and proof transcripts
+- widget archive inspection, generic submission validation, hosted asset probes,
+  target inventory, log capture, and proof artifacts
 - Samsung TV metadata, websocket remote diagnostics, pairing, and key sequences
 - local live-test fixture roundtrips, including hosted asset load probes
 
@@ -184,6 +220,7 @@ bundle local app assets but production packages should load hosted asset URLs.
 ## Docs
 
 - [Distribution](./docs/DISTRIBUTION.md)
+- [Agent DX](./docs/AGENT_DX.md)
 - [Live Test](./live-test/README.md)
 - [Samsung TV Remote](./docs/TV_REMOTE.md)
 - [Security](./SECURITY.md)

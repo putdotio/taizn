@@ -36,6 +36,15 @@ export class InvalidJson extends Schema.TaggedErrorClass<InvalidJson>()("Invalid
   }
 }
 
+export class InvalidInput extends Schema.TaggedErrorClass<InvalidInput>()("InvalidInput", {
+  label: Schema.String,
+  details: Schema.String,
+}) {
+  override get message(): string {
+    return `Invalid ${this.label}: ${this.details}`;
+  }
+}
+
 export class MissingFile extends Schema.TaggedErrorClass<MissingFile>()("MissingFile", {
   label: Schema.String,
   path: Schema.String,
@@ -206,6 +215,7 @@ export type TaiznError =
   | FileSystemFailure
   | InvalidConfig
   | InvalidEnvironment
+  | InvalidInput
   | InvalidJson
   | MissingFile
   | MissingPassword
@@ -222,3 +232,12 @@ export type TaiznError =
   | TvRemoteUnauthorized;
 
 export const renderError = (error: TaiznError) => error.message;
+
+export const renderErrorJson = (error: TaiznError) =>
+  JSON.stringify({
+    error: {
+      message: error.message,
+      type: error._tag,
+    },
+    ok: false,
+  });

@@ -11,10 +11,12 @@ taizn tv doctor --json
 taizn tv doctor --connect --json
 taizn tv info
 taizn tv info --json
-taizn tv pair
+taizn tv pair --dry-run
 taizn tv press KEY_ENTER
 taizn tv press --json KEY_ENTER
+taizn tv press --dry-run --json KEY_ENTER
 taizn tv press --delay-ms 250 KEY_HOME KEY_DOWN KEY_ENTER
+taizn tv script --file .taizn/remote-script.json --dry-run --json
 ```
 
 - `doctor` reports the resolved host, local `.taizn/remote.json` state, token
@@ -26,11 +28,30 @@ taizn tv press --delay-ms 250 KEY_HOME KEY_DOWN KEY_ENTER
   and scripts.
 - `pair` opens a Samsung remote websocket and waits for the TV to approve the
   client. When pairing succeeds, it stores the token in `.taizn/remote.json`.
+  Use `--dry-run` to validate host resolution without opening the websocket.
 - `press` reconnects with the paired token and sends a Samsung remote key such
   as `KEY_HOME`, `KEY_BACK`, `KEY_UP`, `KEY_DOWN`, `KEY_LEFT`, `KEY_RIGHT`, or
   `KEY_ENTER`. Pass multiple keys to send a navigation sequence on one
   websocket connection. `--delay-ms` controls the delay between sequence keys.
-  Add `--json` to emit a redacted receipt with the target, delay, and keys sent.
+  Add `--json` to emit a redacted receipt with the target, delay, and keys sent,
+  or `--artifact .taizn/tv-press.json` to keep that receipt. Use `--dry-run`
+  to validate key input and resolved remote state without sending keys.
+- `script` reads a JSON key recipe, validates it, and sends each step through
+  the paired remote token. Use `--dry-run` while assembling a flow, `--json` for
+  a structured receipt, and `--artifact .taizn/remote-script-proof.json` for a
+  durable proof file.
+
+Script format:
+
+```json
+{
+  "delayMs": 250,
+  "steps": [
+    { "keys": ["KEY_HOME", "KEY_DOWN", "KEY_ENTER"] },
+    { "delayMs": 500, "key": "KEY_RETURN" }
+  ]
+}
+```
 
 ## Environment
 

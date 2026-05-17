@@ -12,6 +12,7 @@ import {
   TvRemoteTimeout,
   TvRemoteUnauthorized,
 } from "./errors.js";
+import { jsonForOutput, writeJsonArtifact } from "./io.js";
 import { getPaths } from "./runtime.js";
 
 const DEFAULT_REMOTE_NAME = "taizn";
@@ -90,16 +91,24 @@ type RemoteKeySequence = {
 };
 
 type PressOptions = {
+  readonly artifact?: string;
   readonly delayMs?: number;
+  readonly dryRun?: boolean;
+  readonly fields?: string;
   readonly json?: boolean;
+  readonly quiet?: boolean;
 };
 
 type TvInfoOptions = {
+  readonly artifact?: string;
+  readonly fields?: string;
   readonly json?: boolean;
 };
 
 type TvDoctorOptions = {
+  readonly artifact?: string;
   readonly connect?: boolean;
+  readonly fields?: string;
   readonly json?: boolean;
 };
 
@@ -206,14 +215,27 @@ type TvRemoteError =
   | TvRemoteTimeout
   | TvRemoteUnauthorized;
 
-export const pairSamsungTvRemote = Effect.fn("pairSamsungTvRemote")(function* (env: TaiznEnv) {
-  const options = yield* resolveRemoteOptions(env, { ignoreToken: true });
+export const pairSamsungTvRemote = Effect.fn("pairSamsungTvRemote")(function* (
+  env: TaiznEnv,
+  pairOptions: { readonly dryRun?: boolean; readonly json?: boolean } = {},
+) {
+  const remoteOptions = yield* resolveRemoteOptions(env, { ignoreToken: true });
 
-  yield* Console.log(`Pairing Samsung TV remote: ${remoteTarget(options)}`);
+  if (pairOptions.dryRun) {
+    yield* Console.log(
+      JSON.stringify({
+        dryRun: true,
+        target: remoteTarget(remoteOptions),
+      }),
+    );
+    return;
+  }
+
+  yield* Console.log(`Pairing Samsung TV remote: ${remoteTarget(remoteOptions)}`);
   yield* Console.log("Accept the remote control prompt on the TV if it appears.");
 
-  const token = yield* connectRemote(options);
-  yield* saveRemoteState({ ...options, token });
+  const token = yield* connectRemote(remoteOptions);
+  yield* saveRemoteState({ ...remoteOptions, token });
   yield* Console.log(`Saved Samsung TV remote token to .taizn/remote.json`);
   yield* Console.log(`TAIZN_TV_TOKEN=${token}`);
 });
@@ -230,41 +252,54 @@ export const sendSamsungTvKeys = Effect.fn("sendSamsungTvKeys")(function* (
   keys: readonly string[],
   pressOptions?: PressOptions,
 ) {
-  const remoteOptions = yield* resolveRemoteOptions(env, { requireToken: true });
+  const remoteOptions = yield* resolveRemoteOptions(env, { requireToken: !pressOptions?.dryRun });
   const token = remoteOptions.token;
   const delayMs = Math.max(0, pressOptions?.delayMs ?? 250);
 
-  if (!token) {
+  if (!pressOptions?.dryRun && !token) {
     return yield* MissingTvRemoteToken.make({});
   }
 
-  yield* connectRemote(remoteOptions, {
+  if (!pressOptions?.dryRun) {
+    yield* connectRemote(remoteOptions, {
+      delayMs,
+      keys,
+    });
+  }
+  const result = {
     delayMs,
+    dryRun: pressOptions?.dryRun === true,
     keys,
-  });
+    keyCount: keys.length,
+    target: {
+      host: remoteOptions.host,
+      port: remoteOptions.port,
+      protocol: remoteOptions.protocol,
+      url: remoteTarget(remoteOptions),
+    },
+  };
+
+  if (pressOptions?.artifact) {
+    yield* writeJsonArtifact(pressOptions.artifact, result);
+  }
 
   if (pressOptions?.json) {
-    yield* Console.log(
-      JSON.stringify({
-        delayMs,
-        keys,
-        keyCount: keys.length,
-        target: {
-          host: remoteOptions.host,
-          port: remoteOptions.port,
-          protocol: remoteOptions.protocol,
-          url: remoteTarget(remoteOptions),
-        },
-      }),
-    );
+    yield* Console.log(yield* jsonForOutput(result, { fields: pressOptions.fields }));
     return;
   }
 
-  yield* Console.log(
-    keys.length === 1
-      ? `Sent Samsung TV remote key: ${keys[0]}`
-      : `Sent Samsung TV remote keys: ${keys.join(", ")}`,
-  );
+  if (!pressOptions?.quiet) {
+    yield* Console.log(
+      pressOptions?.dryRun
+        ? `TV press dry-run: ${keys.join(", ")}`
+        : keys.length === 1
+          ? `Sent Samsung TV remote key: ${keys[0]}`
+          : `Sent Samsung TV remote keys: ${keys.join(", ")}`,
+    );
+  }
+  if (pressOptions?.artifact) {
+    yield* Console.log(`TV press artifact: ${pressOptions.artifact}`);
+  }
 });
 
 export const diagnoseSamsungTvRemote = Effect.fn("diagnoseSamsungTvRemote")(function* (
@@ -310,8 +345,12 @@ export const diagnoseSamsungTvRemote = Effect.fn("diagnoseSamsungTvRemote")(func
     target: env.target,
   };
 
+  if (doctorOptions.artifact) {
+    yield* writeJsonArtifact(doctorOptions.artifact, result);
+  }
+
   if (doctorOptions.json) {
-    yield* Console.log(JSON.stringify(result));
+    yield* Console.log(yield* jsonForOutput(result, { fields: doctorOptions.fields }));
     return;
   }
 
@@ -329,6 +368,9 @@ export const diagnoseSamsungTvRemote = Effect.fn("diagnoseSamsungTvRemote")(func
   } else {
     yield* Console.log(`remote_connect: skipped (${connection.reason})`);
   }
+  if (doctorOptions.artifact) {
+    yield* Console.log(`TV doctor artifact: ${doctorOptions.artifact}`);
+  }
 });
 
 export const showSamsungTvInfo = Effect.fn("showSamsungTvInfo")(function* (
@@ -341,27 +383,30 @@ export const showSamsungTvInfo = Effect.fn("showSamsungTvInfo")(function* (
     timeoutMs: options.timeoutMs,
   });
   const support = info.isSupport ? parseSupport(info.isSupport) : undefined;
+  const result = {
+    developer: {
+      enabled: stringFlag(info.device.developerMode),
+      ip: info.device.developerIP,
+      mode: info.device.developerMode,
+    },
+    host: options.host,
+    infoPort: env.tvInfoPort ?? TV_INFO_PORT,
+    ip: info.device.ip ?? options.host,
+    model: info.device.modelName,
+    name: decodeHtml(info.name),
+    remote: info.remote,
+    remoteAvailable: stringFlag(support?.remote_available),
+    tokenAuth: stringFlag(info.device.TokenAuthSupport),
+    type: info.type,
+    uri: info.uri,
+  };
+
+  if (infoOptions.artifact) {
+    yield* writeJsonArtifact(infoOptions.artifact, result);
+  }
 
   if (infoOptions.json) {
-    yield* Console.log(
-      JSON.stringify({
-        developer: {
-          enabled: stringFlag(info.device.developerMode),
-          ip: info.device.developerIP,
-          mode: info.device.developerMode,
-        },
-        host: options.host,
-        infoPort: env.tvInfoPort ?? TV_INFO_PORT,
-        ip: info.device.ip ?? options.host,
-        model: info.device.modelName,
-        name: decodeHtml(info.name),
-        remote: info.remote,
-        remoteAvailable: stringFlag(support?.remote_available),
-        tokenAuth: stringFlag(info.device.TokenAuthSupport),
-        type: info.type,
-        uri: info.uri,
-      }),
-    );
+    yield* Console.log(yield* jsonForOutput(result, { fields: infoOptions.fields }));
     return;
   }
 
@@ -373,6 +418,9 @@ export const showSamsungTvInfo = Effect.fn("showSamsungTvInfo")(function* (
   yield* Console.log(`token_auth: ${info.device.TokenAuthSupport ?? "unknown"}`);
   yield* Console.log(`developer_ip: ${info.device.developerIP ?? "unknown"}`);
   yield* Console.log(`developer_mode: ${info.device.developerMode ?? "unknown"}`);
+  if (infoOptions.artifact) {
+    yield* Console.log(`TV info artifact: ${infoOptions.artifact}`);
+  }
 });
 
 const resolveRemoteOptions = Effect.fn("resolveRemoteOptions")(function* (
