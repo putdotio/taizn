@@ -15,17 +15,6 @@ class CommandDescription extends Schema.Class<CommandDescription>("CommandDescri
   resultSchema: Schema.String,
 }) {}
 
-class AgentDxAxis extends Schema.Class<AgentDxAxis>("AgentDxAxis")({
-  name: Schema.String,
-  reason: Schema.String,
-  score: Schema.Number,
-}) {}
-
-class AgentDxScore extends Schema.Class<AgentDxScore>("AgentDxScore")({
-  axes: Schema.Array(AgentDxAxis),
-  total: Schema.Number,
-}) {}
-
 const commandDescriptions = [
   CommandDescription.make({
     artifacts: true,
@@ -275,64 +264,12 @@ const commandDescriptions = [
   }),
 ];
 
-const dxScore = AgentDxScore.make({
-  axes: [
-    AgentDxAxis.make({
-      name: "Machine-readable output",
-      reason:
-        "Read/proof/diagnostic surfaces expose JSON, errors are structured in JSON mode, and logs can emit NDJSON.",
-      score: 2,
-    }),
-    AgentDxAxis.make({
-      name: "Raw payload input",
-      reason: "TV scripts accept JSON files; most commands still use focused flags.",
-      score: 1,
-    }),
-    AgentDxAxis.make({
-      name: "Schema introspection",
-      reason:
-        "`describe` emits command arguments, flags, env vars, mutability, dry-run, field-mask, output, and result schema names.",
-      score: 2,
-    }),
-    AgentDxAxis.make({
-      name: "Context window discipline",
-      reason:
-        "Read/proof surfaces support --fields, and log capture can emit one NDJSON object per line.",
-      score: 2,
-    }),
-    AgentDxAxis.make({
-      name: "Input hardening",
-      reason:
-        "Agent-controlled resource IDs are hardened, artifacts are sandboxed, remote URLs use URLSearchParams, and the docs state the agent is untrusted.",
-      score: 3,
-    }),
-    AgentDxAxis.make({
-      name: "Safety rails",
-      reason:
-        "Mutating platform commands expose --dry-run, and proof artifacts avoid terminal-only evidence.",
-      score: 2,
-    }),
-    AgentDxAxis.make({
-      name: "Agent knowledge packaging",
-      reason:
-        "AGENTS.md, docs/AGENT_DX.md, and a repo-shipped Taizn skill encode agent guardrails.",
-      score: 3,
-    }),
-  ],
-  total: 15,
-});
-
 export const describeCli = Effect.fn("describeCli")(function* () {
   yield* Console.log(
     JSON.stringify({
-      agentDx: dxScore,
       commands: commandDescriptions,
       name: "taizn",
-      schemaVersion: 1,
+      schemaVersion: 2,
     }),
   );
-});
-
-export const scoreAgentDx = Effect.fn("scoreAgentDx")(function* () {
-  yield* Console.log(JSON.stringify(dxScore));
 });

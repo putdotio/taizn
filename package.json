@@ -26,9 +26,12 @@
     "taizn": "dist/taizn.mjs"
   },
   "files": [
+    "AGENTS.md",
+    "CONTRIBUTING.md",
     "dist",
     "docs",
     "README.md",
+    "SECURITY.md",
     "skills"
   ],
   "type": "module",

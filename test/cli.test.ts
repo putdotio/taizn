@@ -84,9 +84,11 @@ describe("taizn cli", () => {
 
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
+    const rawDescribed = JSON.parse(result.stdout);
+    assert.deepStrictEqual(Object.keys(rawDescribed).sort(), ["commands", "name", "schemaVersion"]);
     const described = parseDescribeJson(result.stdout);
     assert.strictEqual(described.name, "taizn");
-    assert.isAtLeast(described.agentDx.total, 15);
+    assert.strictEqual(described.schemaVersion, 2);
     assert.isTrue(described.commands.some((command) => command.command === "prove"));
     assert.isTrue(described.commands.some((command) => command.command === "probe hosted-assets"));
     assert.isFalse(described.commands.some((command) => command.command === "targets"));
@@ -1464,9 +1466,6 @@ const TvDoctorJsonSchema = Schema.Struct({
 type TvDoctorJson = typeof TvDoctorJsonSchema.Type;
 
 const DescribeJsonSchema = Schema.Struct({
-  agentDx: Schema.Struct({
-    total: Schema.Number,
-  }),
   commands: Schema.Array(
     Schema.Struct({
       command: Schema.String,
@@ -1476,6 +1475,7 @@ const DescribeJsonSchema = Schema.Struct({
     }),
   ),
   name: Schema.String,
+  schemaVersion: Schema.Literal(2),
 });
 
 type DescribeJson = typeof DescribeJsonSchema.Type;

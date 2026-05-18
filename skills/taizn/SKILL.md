@@ -26,7 +26,6 @@ consumer app repo.
 
 ```bash
 taizn describe
-taizn dx score
 taizn check --json --fields targets,tools.sdb
 taizn apps --json --fields applications
 taizn prove --dry-run --json --fields application.id,target Example.app

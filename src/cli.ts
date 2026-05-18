@@ -8,7 +8,7 @@ import {
   sendSamsungTvKeys,
   showSamsungTvInfo,
 } from "./remote.js";
-import { describeCli, scoreAgentDx } from "./describe.js";
+import { describeCli } from "./describe.js";
 import { inspectWidgetArchive, validateSubmission } from "./inspect.js";
 import { probeHostedAssets } from "./probe.js";
 import { listTargets, showCurrentTarget } from "./targets.js";
@@ -340,16 +340,11 @@ const targets = Command.make("targets", {}).pipe(
 
 const describe = Command.make("describe", {}, () => describeCli());
 
-const dxScore = Command.make("score", {}, () => scoreAgentDx());
-
-const dx = Command.make("dx", {}).pipe(Command.withSubcommands([dxScore]));
-
 export const command = taizn.pipe(
   Command.withSubcommands([
     apps,
     check,
     describe,
-    dx,
     inspect,
     launch,
     logs,

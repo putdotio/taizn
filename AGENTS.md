@@ -50,8 +50,8 @@ consumer apps. Keep it a shell-out tool, not an app framework.
   and `targets` are generic harness surfaces. Keep product-specific checks in
   consumer repos.
 - Agent-facing commands should prefer `--json`, support `--artifact` for proof
-  when useful, use `--fields` for context control, sandbox artifact paths to the
-  app directory, and document their Agent DX posture in `docs/AGENT_DX.md`.
+  when useful, use `--fields` for context control, and sandbox artifact paths to
+  the app directory.
 - Mutating platform commands should expose `--dry-run` unless a dry run would
   be misleading. If a dry run is not real proof, say what it validates.
 - Keep `skills/taizn/SKILL.md` aligned when command-surface guardrails change.

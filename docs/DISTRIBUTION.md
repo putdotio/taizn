@@ -20,6 +20,13 @@ with `[skip ci]`.
 Verify jobs can cancel stale runs; release jobs queue so package publishing is
 not interrupted.
 
+## Package Contents
+
+The npm package includes `dist`, `README.md`, `docs`, `skills`, `AGENTS.md`,
+`CONTRIBUTING.md`, and `SECURITY.md` so package consumers can follow the
+README's support, contribution, and automation links without cloning extra
+context.
+
 ## Release Environment
 
 The release job uses the GitHub Environment named `release`.
