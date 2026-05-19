@@ -21,7 +21,7 @@
 pnpm add -D @putdotio/taizn
 ```
 
-Node `>=24.14 <25`
+Node `>=24.14`
 
 Install the Tizen command-line tools separately and make sure `tizen` and `sdb`
 work locally.
