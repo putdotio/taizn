@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@effect/platform-node':
-        specifier: 4.0.0-beta.68
-        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(ioredis@5.10.1)
+        specifier: 4.0.0-beta.69
+        version: 4.0.0-beta.69(effect@4.0.0-beta.68)(ioredis@5.10.1)
       effect:
         specifier: 4.0.0-beta.68
         version: 4.0.0-beta.68
@@ -39,17 +39,17 @@ importers:
 
 packages:
 
-  '@effect/platform-node-shared@4.0.0-beta.68':
-    resolution: {integrity: sha512-a6q/Rid2CQQBSoTIhBnT2oCozeaEvx5DXreSdT4jbvxPSC0j2l0EqcYdHgvEGDqvhocIAezgmSQbcHNcnyDg8w==}
+  '@effect/platform-node-shared@4.0.0-beta.69':
+    resolution: {integrity: sha512-0IXcDFvKroXrdRpL/KX6uI9OfbipOMtFnTywGIW+5RfcVVVm1MZs4/tDCUqMVndhw4lq5HOajk5m7/OCxBAQNg==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: ^4.0.0-beta.68
+      effect: ^4.0.0-beta.69
 
-  '@effect/platform-node@4.0.0-beta.68':
-    resolution: {integrity: sha512-q2WakGBfZ5wIg9WdL4flbIwxC5TNFq1/qroT4HRT9yOl19dLg0khd2LE9ewOybOPrTQHV3PUyV3Sx6Y3eMYTWQ==}
+  '@effect/platform-node@4.0.0-beta.69':
+    resolution: {integrity: sha512-CkyueiY7/tJjCvyoRUOO8cXy7K5YtKxF6MGeuDyDw2IJRNy5Vf1WewXz15H6CO6Gyz/3Bl7HVs3dqEQYiMMAYA==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: ^4.0.0-beta.68
+      effect: ^4.0.0-beta.69
       ioredis: ^5.7.0
 
   '@effect/vitest@4.0.0-beta.68':
@@ -928,6 +928,10 @@ packages:
     resolution: {integrity: sha512-FfR8sjd4em2T6fb3I2MwAJU7HWVMr9zba+enmQeeWFfCbm+UOC/0X4DS8XtpUTMwWMGbjKYP7xjfNekzyGmB3A==}
     engines: {node: ^10 || ^12 || >=14}
 
+  postcss@8.5.15:
+    resolution: {integrity: sha512-FfR8sjd4em2T6fb3I2MwAJU7HWVMr9zba+enmQeeWFfCbm+UOC/0X4DS8XtpUTMwWMGbjKYP7xjfNekzyGmB3A==}
+    engines: {node: ^10 || ^12 || >=14}
+
   pure-rand@8.4.0:
     resolution: {integrity: sha512-IoM8YF/jY0hiugFo/wOWqfmarlE6J0wc6fDK1PhftMk7MGhVZl88sZimmqBBFomLOCSmcCCpsfj7wXASCpvK9A==}
 
@@ -1123,7 +1127,7 @@ packages:
 
 snapshots:
 
-  '@effect/platform-node-shared@4.0.0-beta.68(effect@4.0.0-beta.68)':
+  '@effect/platform-node-shared@4.0.0-beta.69(effect@4.0.0-beta.68)':
     dependencies:
       '@types/ws': 8.18.1
       effect: 4.0.0-beta.68
@@ -1132,9 +1136,9 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.0.0-beta.68(effect@4.0.0-beta.68)(ioredis@5.10.1)':
+  '@effect/platform-node@4.0.0-beta.69(effect@4.0.0-beta.68)(ioredis@5.10.1)':
     dependencies:
-      '@effect/platform-node-shared': 4.0.0-beta.68(effect@4.0.0-beta.68)
+      '@effect/platform-node-shared': 4.0.0-beta.69(effect@4.0.0-beta.68)
       effect: 4.0.0-beta.68
       ioredis: 5.10.1
       mime: 4.1.0
@@ -1752,6 +1756,12 @@ snapshots:
       pngjs: 7.0.0
 
   pngjs@7.0.0: {}
+
+  postcss@8.5.15:
+    dependencies:
+      nanoid: 3.3.12
+      picocolors: 1.1.1
+      source-map-js: 1.2.1
 
   postcss@8.5.15:
     dependencies:
