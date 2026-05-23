@@ -34,6 +34,15 @@ consumer app repo.
    tooling/config/device issue, then rerun the dry-run before retrying the
    mutation.
 
+## Start Here
+
+Read only the reference needed for the current task:
+
+- packaging, inspection, submission checks, logs, and artifacts:
+  [`references/commands.md`](references/commands.md)
+- Samsung TV remote diagnostics, pairing, key scripts, and safety boundaries:
+  [`references/tv-remote.md`](references/tv-remote.md)
+
 ## Common Commands
 
 ```bash
