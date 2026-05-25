@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@effect/platform-node':
-        specifier: 4.0.0-beta.69
-        version: 4.0.0-beta.69(effect@4.0.0-beta.69)(ioredis@5.10.1)
+        specifier: 4.0.0-beta.70
+        version: 4.0.0-beta.70(effect@4.0.0-beta.69)(ioredis@5.10.1)
       effect:
         specifier: 4.0.0-beta.69
         version: 4.0.0-beta.69
@@ -39,17 +39,17 @@ importers:
 
 packages:
 
-  '@effect/platform-node-shared@4.0.0-beta.69':
-    resolution: {integrity: sha512-0IXcDFvKroXrdRpL/KX6uI9OfbipOMtFnTywGIW+5RfcVVVm1MZs4/tDCUqMVndhw4lq5HOajk5m7/OCxBAQNg==}
+  '@effect/platform-node-shared@4.0.0-beta.70':
+    resolution: {integrity: sha512-3VXuL63IDmq13We+ApRKn2JW3Rb9g5gj1YEmfb8u2b73norur1VsIJ/pRE4qjShevg19dQYi2JsLawSZ6gApug==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: ^4.0.0-beta.69
+      effect: ^4.0.0-beta.70
 
-  '@effect/platform-node@4.0.0-beta.69':
-    resolution: {integrity: sha512-CkyueiY7/tJjCvyoRUOO8cXy7K5YtKxF6MGeuDyDw2IJRNy5Vf1WewXz15H6CO6Gyz/3Bl7HVs3dqEQYiMMAYA==}
+  '@effect/platform-node@4.0.0-beta.70':
+    resolution: {integrity: sha512-Ls1WtLaO2CbcO8jHtZRRi6eZa4YOJZ9KXm6udMvwhjV/XhqdsT6AzmcXbc1hINbKgvRcik6qM/441YEaBMYoqw==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: ^4.0.0-beta.69
+      effect: ^4.0.0-beta.70
       ioredis: ^5.7.0
 
   '@effect/vitest@4.0.0-beta.69':
@@ -1127,7 +1127,7 @@ packages:
 
 snapshots:
 
-  '@effect/platform-node-shared@4.0.0-beta.69(effect@4.0.0-beta.69)':
+  '@effect/platform-node-shared@4.0.0-beta.70(effect@4.0.0-beta.69)':
     dependencies:
       '@types/ws': 8.18.1
       effect: 4.0.0-beta.69
@@ -1136,9 +1136,9 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.0.0-beta.69(effect@4.0.0-beta.69)(ioredis@5.10.1)':
+  '@effect/platform-node@4.0.0-beta.70(effect@4.0.0-beta.69)(ioredis@5.10.1)':
     dependencies:
-      '@effect/platform-node-shared': 4.0.0-beta.69(effect@4.0.0-beta.69)
+      '@effect/platform-node-shared': 4.0.0-beta.70(effect@4.0.0-beta.69)
       effect: 4.0.0-beta.69
       ioredis: 5.10.1
       mime: 4.1.0
