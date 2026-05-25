@@ -10,17 +10,17 @@ importers:
     dependencies:
       '@effect/platform-node':
         specifier: 4.0.0-beta.69
-        version: 4.0.0-beta.69(effect@4.0.0-beta.69)(ioredis@5.10.1)
+        version: 4.0.0-beta.69(effect@4.0.0-beta.70)(ioredis@5.10.1)
       effect:
-        specifier: 4.0.0-beta.69
-        version: 4.0.0-beta.69
+        specifier: 4.0.0-beta.70
+        version: 4.0.0-beta.70
       ws:
         specifier: ^8.20.1
         version: 8.20.1
     devDependencies:
       '@effect/vitest':
         specifier: 4.0.0-beta.69
-        version: 4.0.0-beta.69(effect@4.0.0-beta.69)(vitest@4.1.6(@types/node@25.9.1)(vite@8.0.13(@types/node@25.9.1)(yaml@2.9.0)))
+        version: 4.0.0-beta.69(effect@4.0.0-beta.70)(vitest@4.1.6(@types/node@25.9.1)(vite@8.0.13(@types/node@25.9.1)(yaml@2.9.0)))
       '@types/node':
         specifier: ^25.8.0
         version: 25.9.1
@@ -726,8 +726,8 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
-  effect@4.0.0-beta.69:
-    resolution: {integrity: sha512-o6og4Dkh0/esTnCJq7UwQ5PZhuQQYCxNCrEYPVk5Z2Fo7oPTHj0/AAVi5kF2Dln53+jEVxA7quXMC/+jPnATuw==}
+  effect@4.0.0-beta.70:
+    resolution: {integrity: sha512-8AwGTRiNriirHGEYHrOS0E9fzdhIqCdZjiHP1YXmNo2UyPGS43ILsymsSHT7V0DJS+8dvlKq2RxnrDBUhDNZHg==}
 
   es-module-lexer@1.7.0:
     resolution: {integrity: sha512-jEQoCwk8hyb2AZziIOLhDqpm5+2ww5uIE6lkO/6jcOCusfk6LhMHpXXfBLXTZ7Ydyt0j4VoUQv6uGNYbdW+kBA==}
@@ -1127,19 +1127,19 @@ packages:
 
 snapshots:
 
-  '@effect/platform-node-shared@4.0.0-beta.69(effect@4.0.0-beta.69)':
+  '@effect/platform-node-shared@4.0.0-beta.69(effect@4.0.0-beta.70)':
     dependencies:
       '@types/ws': 8.18.1
-      effect: 4.0.0-beta.69
+      effect: 4.0.0-beta.70
       ws: 8.20.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.0.0-beta.69(effect@4.0.0-beta.69)(ioredis@5.10.1)':
+  '@effect/platform-node@4.0.0-beta.69(effect@4.0.0-beta.70)(ioredis@5.10.1)':
     dependencies:
-      '@effect/platform-node-shared': 4.0.0-beta.69(effect@4.0.0-beta.69)
-      effect: 4.0.0-beta.69
+      '@effect/platform-node-shared': 4.0.0-beta.69(effect@4.0.0-beta.70)
+      effect: 4.0.0-beta.70
       ioredis: 5.10.1
       mime: 4.1.0
       undici: 8.3.0
@@ -1147,9 +1147,9 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/vitest@4.0.0-beta.69(effect@4.0.0-beta.69)(vitest@4.1.6(@types/node@25.9.1)(vite@8.0.13(@types/node@25.9.1)(yaml@2.9.0)))':
+  '@effect/vitest@4.0.0-beta.69(effect@4.0.0-beta.70)(vitest@4.1.6(@types/node@25.9.1)(vite@8.0.13(@types/node@25.9.1)(yaml@2.9.0)))':
     dependencies:
-      effect: 4.0.0-beta.69
+      effect: 4.0.0-beta.70
       vitest: 4.1.6(@types/node@25.9.1)(vite@8.0.13(@types/node@25.9.1)(yaml@2.9.0))
 
   '@emnapi/core@1.10.0':
@@ -1547,7 +1547,7 @@ snapshots:
 
   detect-libc@2.1.2: {}
 
-  effect@4.0.0-beta.69:
+  effect@4.0.0-beta.70:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 4.8.0
