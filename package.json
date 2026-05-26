@@ -64,17 +64,17 @@
     "verify": "vp check . && tsc --noEmit && vp pack src/taizn.ts && vp run test && npm pack --dry-run"
   },
   "dependencies": {
-    "@effect/platform-node": "4.0.0-beta.69",
-    "effect": "4.0.0-beta.69",
-    "ws": "^8.20.1"
+    "@effect/platform-node": "4.0.0-beta.70",
+    "effect": "4.0.0-beta.70",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.0-beta.69",
+    "@effect/vitest": "4.0.0-beta.70",
     "@types/node": "^25.8.0",
     "@types/ws": "^8.18.1",
     "typescript": "^6.0.2",
     "vite-plus": "^0.1.22",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.7"
   },
   "engines": {
     "node": ">=24.14.0"
