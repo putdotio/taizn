@@ -19,8 +19,8 @@ importers:
         version: 8.21.0
     devDependencies:
       '@effect/vitest':
-        specifier: 4.0.0-beta.70
-        version: 4.0.0-beta.70(effect@4.0.0-beta.70)(vitest@4.1.8(@types/node@25.9.1)(vite@8.0.13(@types/node@25.9.1)(yaml@2.9.0)))
+        specifier: 4.0.0-beta.77
+        version: 4.0.0-beta.77(effect@4.0.0-beta.70)(vitest@4.1.8(@types/node@25.9.1)(vite@8.0.13(@types/node@25.9.1)(yaml@2.9.0)))
       '@types/node':
         specifier: ^25.8.0
         version: 25.9.1
@@ -52,10 +52,10 @@ packages:
       effect: ^4.0.0-beta.70
       ioredis: ^5.7.0
 
-  '@effect/vitest@4.0.0-beta.70':
-    resolution: {integrity: sha512-XDteNN0xfOgoMauAVoN5iylxVgEjp7kFsGFq18tZ5XYjek0eOZa0nOoes5s7Bs71VvwjnCeCbFMD7IhxswEt8A==}
+  '@effect/vitest@4.0.0-beta.77':
+    resolution: {integrity: sha512-47zGyckxRD1VqpP+YHpouOjRObK9EtTdO4tsBdQl3GKWv3uYnK2fBqUYmEnBRcVczyMzva96x+fJnd2yOnnhQQ==}
     peerDependencies:
-      effect: ^4.0.0-beta.70
+      effect: ^4.0.0-beta.77
       vitest: ^3.0.0 || ^4.0.0
 
   '@emnapi/core@1.10.0':
@@ -1158,7 +1158,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/vitest@4.0.0-beta.70(effect@4.0.0-beta.70)(vitest@4.1.8(@types/node@25.9.1)(vite@8.0.13(@types/node@25.9.1)(yaml@2.9.0)))':
+  '@effect/vitest@4.0.0-beta.77(effect@4.0.0-beta.70)(vitest@4.1.8(@types/node@25.9.1)(vite@8.0.13(@types/node@25.9.1)(yaml@2.9.0)))':
     dependencies:
       effect: 4.0.0-beta.70
       vitest: 4.1.8(@types/node@25.9.1)(vite@8.0.13(@types/node@25.9.1)(yaml@2.9.0))
