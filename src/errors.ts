@@ -59,7 +59,7 @@ export class FileSystemFailure extends Schema.TaggedErrorClass<FileSystemFailure
   {
     operation: Schema.String,
     path: Schema.String,
-    cause: Schema.Defect,
+    cause: Schema.Unknown,
   },
 ) {
   override get message(): string {
@@ -169,7 +169,7 @@ export class MissingTvRemoteToken extends Schema.TaggedErrorClass<MissingTvRemot
 export class TvRemoteConnectionFailed extends Schema.TaggedErrorClass<TvRemoteConnectionFailed>()(
   "TvRemoteConnectionFailed",
   {
-    cause: Schema.Defect,
+    cause: Schema.Unknown,
     target: Schema.String,
   },
 ) {
