@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@effect/platform-node':
-        specifier: 4.0.0-beta.78
-        version: 4.0.0-beta.78(effect@4.0.0-beta.78)(ioredis@5.10.1)
+        specifier: 4.0.0-beta.83
+        version: 4.0.0-beta.83(effect@4.0.0-beta.78)(ioredis@5.10.1)
       effect:
         specifier: 4.0.0-beta.78
         version: 4.0.0-beta.78
@@ -39,17 +39,17 @@ importers:
 
 packages:
 
-  '@effect/platform-node-shared@4.0.0-beta.78':
-    resolution: {integrity: sha512-mo0ddTPATyCMyqzQasYDL7+NI29vozoMplom+qu9f/onDTd4xG5hvEEfGxfL0Ljygui6keG/YE/E9OZVf2z5WA==}
+  '@effect/platform-node-shared@4.0.0-beta.83':
+    resolution: {integrity: sha512-+yr/+PJmKTgmJq1QOINSBPgLu7Cjc4CZcotBXnGjyDEizOmimFgTkN2B8PBJAKIKUWYWfobjXqC+58/VhhPKAw==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: ^4.0.0-beta.78
+      effect: ^4.0.0-beta.83
 
-  '@effect/platform-node@4.0.0-beta.78':
-    resolution: {integrity: sha512-8ONrIS5/R9dq+0BJ6v3kUXNEkfjU6S3GzIYCH5gmHdiriRvIoBhXYNAITfRvZpfx1JPrKuP70cHyuQDjmJcDkQ==}
+  '@effect/platform-node@4.0.0-beta.83':
+    resolution: {integrity: sha512-RmpVGu/+X/Bif3/g1Rzj8oFzTOknoVB3yHCa0b179vytPpKe+Kj9ZwKNcAnKWqHUDkbSPBq1Ca60mvOHr2/+LQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: ^4.0.0-beta.78
+      effect: ^4.0.0-beta.83
       ioredis: ^5.7.0
 
   '@effect/vitest@4.0.0-beta.78':
@@ -103,8 +103,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@napi-rs/wasm-runtime@1.1.4':
-    resolution: {integrity: sha512-3NQNNgA1YSlJb/kMH1ildASP9HW7/7kYnRI2szWJaofaS1hWmbGI4H+d3+22aGzXXN9IJ+n+GiFVcGipJP18ow==}
+  '@napi-rs/wasm-runtime@1.1.5':
+    resolution: {integrity: sha512-AWPoBRJ9tsnVhor4sjO7rkni+7p+2IAEFj6cx06UgP10jkQHqay/36uRV/bFkgrh18D9vb4cr8Q0Pthskgzy+Q==}
     peerDependencies:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
@@ -1017,8 +1017,8 @@ packages:
   undici-types@7.24.6:
     resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
 
-  undici@8.3.0:
-    resolution: {integrity: sha512-TkUDgb6tl7KOGZ+7e8E3d2FYgUQgF6z5YypqjWmixVQSQERFcVrVg0ySADm2LVLRh5ljAaHTCR5Fmz3Q34rB7Q==}
+  undici@8.4.1:
+    resolution: {integrity: sha512-RNHlB4fxZK0IrkhBsxhlbx7s8kFWwr7rzzOqj5nvZugw3ig3RsB7KW3zVlV0eu8POl+rx5d1hmL7rRg0z1owow==}
     engines: {node: '>=22.19.0'}
 
   uuid@14.0.0:
@@ -1138,7 +1138,7 @@ packages:
 
 snapshots:
 
-  '@effect/platform-node-shared@4.0.0-beta.78(effect@4.0.0-beta.78)':
+  '@effect/platform-node-shared@4.0.0-beta.83(effect@4.0.0-beta.78)':
     dependencies:
       '@types/ws': 8.18.1
       effect: 4.0.0-beta.78
@@ -1147,13 +1147,13 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.0.0-beta.78(effect@4.0.0-beta.78)(ioredis@5.10.1)':
+  '@effect/platform-node@4.0.0-beta.83(effect@4.0.0-beta.78)(ioredis@5.10.1)':
     dependencies:
-      '@effect/platform-node-shared': 4.0.0-beta.78(effect@4.0.0-beta.78)
+      '@effect/platform-node-shared': 4.0.0-beta.83(effect@4.0.0-beta.78)
       effect: 4.0.0-beta.78
       ioredis: 5.10.1
       mime: 4.1.0
-      undici: 8.3.0
+      undici: 8.4.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -1201,7 +1201,7 @@ snapshots:
   '@msgpackr-extract/msgpackr-extract-win32-x64@3.0.4':
     optional: true
 
-  '@napi-rs/wasm-runtime@1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
+  '@napi-rs/wasm-runtime@1.1.5(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
       '@emnapi/core': 1.10.0
       '@emnapi/runtime': 1.10.0
@@ -1390,7 +1390,7 @@ snapshots:
     dependencies:
       '@emnapi/core': 1.10.0
       '@emnapi/runtime': 1.10.0
-      '@napi-rs/wasm-runtime': 1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
+      '@napi-rs/wasm-runtime': 1.1.5(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
     optional: true
 
   '@rolldown/binding-win32-arm64-msvc@1.0.1':
@@ -1847,7 +1847,7 @@ snapshots:
 
   undici-types@7.24.6: {}
 
-  undici@8.3.0: {}
+  undici@8.4.1: {}
 
   uuid@14.0.0: {}
 
