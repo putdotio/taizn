@@ -13,17 +13,17 @@ importers:
     dependencies:
       '@effect/platform-node':
         specifier: 4.0.0-beta.83
-        version: 4.0.0-beta.83(effect@4.0.0-beta.83)(ioredis@5.10.1)
+        version: 4.0.0-beta.83(effect@4.0.0-beta.85)(ioredis@5.10.1)
       effect:
-        specifier: 4.0.0-beta.83
-        version: 4.0.0-beta.83
+        specifier: 4.0.0-beta.85
+        version: 4.0.0-beta.85
       ws:
         specifier: ^8.21.0
         version: 8.21.0
     devDependencies:
       '@effect/vitest':
         specifier: 4.0.0-beta.83
-        version: 4.0.0-beta.83(effect@4.0.0-beta.83)(vitest@4.1.9)
+        version: 4.0.0-beta.83(effect@4.0.0-beta.85)(vitest@4.1.9)
       '@types/node':
         specifier: ^25.9.3
         version: 25.9.3
@@ -638,8 +638,8 @@ packages:
   dom-accessibility-api@0.5.16:
     resolution: {integrity: sha512-X7BJ2yElsnOJ30pZF4uIIDfBEVgF4XEBxL9Bxhy6dnrm5hkzqmsWHGTiHqRiITNhMyFLyAiWndIJP7Z1NTteDg==}
 
-  effect@4.0.0-beta.83:
-    resolution: {integrity: sha512-0wsak8RtgGAr9UWSbVDgJHZcUqMSvicHcvaZv1MbMM7MCGgW4Rn/137J1MHQbwYPcwYGxT/IqehFd+UbYuj78w==}
+  effect@4.0.0-beta.85:
+    resolution: {integrity: sha512-Cjv9YQyv4CiIccmRAQIWAoeESCpCpiuHYY8zb5vqiYs3Ac2yE5RQAnKq7z4Ir/3VJYZb8kxh6rS8czDDnpTdkQ==}
 
   es-module-lexer@2.1.0:
     resolution: {integrity: sha512-n27zTYMjYu1aj4MjCWzSP7G9r75utsaoc8m61weK+W8JMBGGQybd43GstCXZ3WNmSFtGT9wi59qQTW6mhTR5LQ==}
@@ -932,8 +932,8 @@ packages:
     resolution: {integrity: sha512-TkUDgb6tl7KOGZ+7e8E3d2FYgUQgF6z5YypqjWmixVQSQERFcVrVg0ySADm2LVLRh5ljAaHTCR5Fmz3Q34rB7Q==}
     engines: {node: '>=22.19.0'}
 
-  uuid@14.0.0:
-    resolution: {integrity: sha512-Qo+uWgilfSmAhXCMav1uYFynlQO7fMFiMVZsQqZRMIXp0O7rR7qjkj+cPvBHLgBqi960QCoo/PH2/6ZtVqKvrg==}
+  uuid@14.0.1:
+    resolution: {integrity: sha512-6ZxzVpzDXDa3bJWaHilVayA+BH/1zmxCJoVgvmqJnid/gPoKHxUrS/aC/T6LGQtNHT+XHG9fXPJB4d+IrU30Ew==}
     hasBin: true
 
   vite-plus@0.2.1:
@@ -1026,19 +1026,19 @@ snapshots:
 
   '@blazediff/core@1.9.1': {}
 
-  '@effect/platform-node-shared@4.0.0-beta.83(effect@4.0.0-beta.83)':
+  '@effect/platform-node-shared@4.0.0-beta.83(effect@4.0.0-beta.85)':
     dependencies:
       '@types/ws': 8.18.1
-      effect: 4.0.0-beta.83
+      effect: 4.0.0-beta.85
       ws: 8.21.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.0.0-beta.83(effect@4.0.0-beta.83)(ioredis@5.10.1)':
+  '@effect/platform-node@4.0.0-beta.83(effect@4.0.0-beta.85)(ioredis@5.10.1)':
     dependencies:
-      '@effect/platform-node-shared': 4.0.0-beta.83(effect@4.0.0-beta.83)
-      effect: 4.0.0-beta.83
+      '@effect/platform-node-shared': 4.0.0-beta.83(effect@4.0.0-beta.85)
+      effect: 4.0.0-beta.85
       ioredis: 5.10.1
       mime: 4.1.0
       undici: 8.3.0
@@ -1046,9 +1046,9 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/vitest@4.0.0-beta.83(effect@4.0.0-beta.83)(vitest@4.1.9)':
+  '@effect/vitest@4.0.0-beta.83(effect@4.0.0-beta.85)(vitest@4.1.9)':
     dependencies:
-      effect: 4.0.0-beta.83
+      effect: 4.0.0-beta.85
       vitest: 4.1.9(@types/node@25.9.3)(@vitest/browser-preview@4.1.9)(@voidzero-dev/vite-plus-core@0.2.1(@types/node@25.9.3)(typescript@6.0.3)(yaml@2.9.0))
 
   '@ioredis/commands@1.5.1': {}
@@ -1383,7 +1383,7 @@ snapshots:
 
   dom-accessibility-api@0.5.16: {}
 
-  effect@4.0.0-beta.83:
+  effect@4.0.0-beta.85:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 4.8.0
@@ -1393,7 +1393,7 @@ snapshots:
       msgpackr: 2.0.4
       multipasta: 0.2.7
       toml: 4.1.1
-      uuid: 14.0.0
+      uuid: 14.0.1
       yaml: 2.9.0
 
   es-module-lexer@2.1.0: {}
@@ -1656,7 +1656,7 @@ snapshots:
 
   undici@8.3.0: {}
 
-  uuid@14.0.0: {}
+  uuid@14.0.1: {}
 
   vite-plus@0.2.1(@types/node@25.9.3)(@voidzero-dev/vite-plus-core@0.2.1(@types/node@25.9.3)(typescript@6.0.3)(yaml@2.9.0))(typescript@6.0.3)(yaml@2.9.0):
     dependencies:
