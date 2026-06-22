@@ -59,7 +59,7 @@
     "prepack": "vp pack src/taizn.ts",
     "prepare": "./scripts/prepare-effect.sh",
     "smoke": "vp pack src/taizn.ts && node dist/taizn.mjs --version && node dist/taizn.mjs --help >/dev/null",
-    "test": "vitest run --passWithNoTests",
+    "test": "vp test run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "verify": "vp check . && tsc --noEmit && vp pack src/taizn.ts && vp run test && npm pack --dry-run"
   },
@@ -73,8 +73,9 @@
     "@types/node": "^25.9.3",
     "@types/ws": "^8.18.1",
     "typescript": "^6.0.2",
-    "vite-plus": "^0.1.22",
-    "vitest": "^4.1.7"
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.1",
+    "vite-plus": "^0.2.1",
+    "vitest": "4.1.9"
   },
   "engines": {
     "node": ">=24.14.0"
