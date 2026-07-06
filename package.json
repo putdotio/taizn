@@ -70,11 +70,11 @@
   },
   "devDependencies": {
     "@effect/vitest": "4.0.0-beta.93",
-    "@types/node": "^26.0.0",
+    "@types/node": "^26.1.0",
     "@types/ws": "^8.18.1",
     "typescript": "^6.0.2",
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.1",
-    "vite-plus": "^0.2.1",
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.2",
+    "vite-plus": "0.2.2",
     "vitest": "4.1.9"
   },
   "engines": {
