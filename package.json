@@ -74,7 +74,7 @@
     "@types/ws": "^8.18.1",
     "typescript": "^6.0.2",
     "vite": "catalog:",
-    "vite-plus": "catalog:",
+    "vite-plus": "0.2.2",
     "vitest": "catalog:"
   },
   "engines": {
