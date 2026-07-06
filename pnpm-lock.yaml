@@ -4,8 +4,15 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    vite-plus:
+      specifier: 0.2.2
+      version: 0.2.2
+
 overrides:
   vite: npm:@voidzero-dev/vite-plus-core@0.2.2
+  vitest: 4.1.9
 
 importers:
 
@@ -37,7 +44,7 @@ importers:
         specifier: npm:@voidzero-dev/vite-plus-core@0.2.2
         version: '@voidzero-dev/vite-plus-core@0.2.2(@types/node@26.1.0)(typescript@6.0.3)(yaml@2.9.0)'
       vite-plus:
-        specifier: 0.2.2
+        specifier: 'catalog:'
         version: 0.2.2(@types/node@26.1.0)(@voidzero-dev/vite-plus-core@0.2.2(@types/node@26.1.0)(typescript@6.0.3)(yaml@2.9.0))(typescript@6.0.3)(yaml@2.9.0)
       vitest:
         specifier: 4.1.9
@@ -77,7 +84,7 @@ packages:
     resolution: {integrity: sha512-gMAnZ9PiMeJMDED9s0jWgCOhc2JccrTCxowhur/KriImsHnHIRj4VG/vK0xLw0Axe4AkTWzXNdRsFrYOjBTl3A==}
     peerDependencies:
       effect: ^4.0.0-beta.93
-      vitest: ^3.0.0 || ^4.0.0
+      vitest: 4.1.9
 
   '@ioredis/commands@1.5.1':
     resolution: {integrity: sha512-JH8ZL/ywcJyR9MmJ5BNqZllXNZQqQbnVZOqpPQqE1vHiFgAw4NHbvE0FOduNU8IX9babitBT46571OnPTT0Zcw==}
