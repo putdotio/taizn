@@ -69,7 +69,7 @@
     "ws": "^8.21.0"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.0-beta.93",
+    "@effect/vitest": "4.0.0-beta.97",
     "@types/node": "^26.1.0",
     "@types/ws": "^8.18.1",
     "typescript": "^6.0.2",
