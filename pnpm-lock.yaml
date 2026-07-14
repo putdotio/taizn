@@ -23,8 +23,8 @@ importers:
         version: 8.21.0
     devDependencies:
       '@effect/vitest':
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93(effect@4.0.0-beta.97)(vitest@4.1.10)
+        specifier: 4.0.0-beta.97
+        version: 4.0.0-beta.97(effect@4.0.0-beta.97)(vitest@4.1.10)
       '@types/node':
         specifier: ^26.1.0
         version: 26.1.1
@@ -74,10 +74,10 @@ packages:
       effect: ^4.0.0-beta.93
       ioredis: ^5.7.0
 
-  '@effect/vitest@4.0.0-beta.93':
-    resolution: {integrity: sha512-gMAnZ9PiMeJMDED9s0jWgCOhc2JccrTCxowhur/KriImsHnHIRj4VG/vK0xLw0Axe4AkTWzXNdRsFrYOjBTl3A==}
+  '@effect/vitest@4.0.0-beta.97':
+    resolution: {integrity: sha512-1dH6LBWSZyqnTV7ZO+yIpPGPf/xd7RtFfvQ4ZpTy9elzFN+wr1YBFpHSCr8+BfXOml6b8g9Mtj5eDy1qjbizUA==}
     peerDependencies:
-      effect: ^4.0.0-beta.93
+      effect: ^4.0.0-beta.97
       vitest: 4.1.10
 
   '@ioredis/commands@1.5.1':
@@ -1099,7 +1099,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/vitest@4.0.0-beta.93(effect@4.0.0-beta.97)(vitest@4.1.10)':
+  '@effect/vitest@4.0.0-beta.97(effect@4.0.0-beta.97)(vitest@4.1.10)':
     dependencies:
       effect: 4.0.0-beta.97
       vitest: 4.1.10(@types/node@26.1.1)(@vitest/browser-preview@4.1.10)(@voidzero-dev/vite-plus-core@0.2.2(@types/node@26.1.1)(typescript@6.0.3)(yaml@2.9.0))
