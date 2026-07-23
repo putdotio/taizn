@@ -63,6 +63,12 @@ consumer apps. Keep it a shell-out tool, not an app framework.
 - CI/release/publishing changes: update `docs/DISTRIBUTION.md`.
 - Keep `CLAUDE.md` as a symlink to this file.
 
+## Worktrees
+
+`.worktreeinclude` carries env and `.repos` into managed worktrees; Claude
+symlinks `.repos`. Run `vp install` and `vp run verify`. If live-test env is
+missing, run `vp run live:test:setup -- --from <consumer-app> --target <tv-ip>`.
+
 ## Checks
 
 ```bash
