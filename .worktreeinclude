@@ -1,4 +1,4 @@
 /.env
 /.env.local
-/.repos/
+/.repos/effect/
 live-test/app/.taizn/.env

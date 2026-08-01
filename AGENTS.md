@@ -65,14 +65,16 @@ consumer apps. Keep it a shell-out tool, not an app framework.
 
 ## Worktrees
 
-`.worktreeinclude` carries env and `.repos` into managed worktrees; Claude
-symlinks `.repos`. Run `vp install` and `vp run verify`. If live-test env is
-missing, run `vp run live:test:setup -- --from <consumer-app> --target <tv-ip>`.
+`.worktreeinclude` carries env and `.repos/effect` into managed worktrees;
+Claude symlinks `.repos`. Run `vp install`, `vp run hooks:install`, and
+`vp run verify`. If live-test env is missing, run
+`vp run live:test:setup -- --from <consumer-app> --target <tv-ip>`.
 
 ## Checks
 
 ```bash
 vp install
+vp run hooks:install
 vp run verify
 ```
 
