@@ -11,6 +11,10 @@ effect_ref="effect@4.0.0-beta.102"
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_dir="$(dirname "$script_dir")/.repos/effect"
 
+for git_variable in $(git rev-parse --local-env-vars); do
+  unset "$git_variable"
+done
+
 if [ -e "$repo_dir" ] && [ ! -d "$repo_dir/.git" ]; then
   echo "Effect source path exists but is not a Git checkout: $repo_dir" >&2
   exit 1
