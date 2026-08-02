@@ -37,6 +37,9 @@ taizn probe hosted-assets --dry-run --json
 ## Inspection And Submission
 
 - `inspect wgt` reads widget metadata and archive contents.
+- `prepare submission` creates a deterministic manifest containing widget
+  identity and compatibility metadata, signature presence, package size, and
+  SHA-256 from an existing `.wgt`. It does not need Seller Office credentials.
 - `validate submission` checks generic metadata and archive consistency. It does
   not automate Seller Office.
 - Keep submission metadata generic in Taizn. App-specific store decisions belong
@@ -46,6 +49,7 @@ Useful shapes:
 
 ```bash
 taizn inspect wgt --json --fields config,entryCount .taizn/build/output/example.wgt
+taizn prepare submission --json --artifact .taizn/submission.json package.wgt
 taizn validate submission --json --fields ok,problems
 ```
 

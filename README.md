@@ -102,6 +102,7 @@ pnpm exec taizn describe
 pnpm exec taizn check --json --fields targets,tools.sdb
 pnpm exec taizn prove --dry-run --json --fields application.id,target Example.app
 pnpm exec taizn prove --json --artifact .taizn/proof.json Example.app
+pnpm exec taizn prepare submission --json --artifact .taizn/submission.json package.wgt
 pnpm exec taizn validate submission --json --fields ok,problems
 pnpm exec taizn tv doctor --connect --json --artifact .taizn/tv-doctor.json
 ```
@@ -120,6 +121,7 @@ home for local proof state.
 | `launch`                             | Start an already-installed app                     |
 | `prove`                              | Resolve, launch, and record installed-app proof    |
 | `inspect wgt`                        | Read neutral `.wgt` archive metadata               |
+| `prepare submission`                 | Create a deterministic signed-WGT manifest         |
 | `validate submission`                | Check generic package metadata                     |
 | `probe hosted-assets`                | Discover or probe hosted asset URLs                |
 | `logs capture`                       | Record a bounded `sdb dlog -d` snapshot            |
@@ -158,11 +160,11 @@ host is set. `taizn tv pair` writes the paired remote token to
 
 ## Boundaries
 
-`taizn` owns platform mechanics: Tizen CLI, `sdb`, widget archives, Samsung
-remote keys, target inventory, logs, hosted-asset probes, and proof artifacts.
-Consumer apps own product journeys, credentials, app IDs, content IDs, account
-state, visual assertions, release decisions, and Samsung TV Seller Office
-submissions.
+`taizn` owns platform mechanics: Tizen CLI, `sdb`, widget archives, local
+submission preparation, Samsung remote keys, target inventory, logs,
+hosted-asset probes, and proof artifacts. Consumer apps own product journeys,
+credentials, app IDs, content IDs, account state, visual assertions, release
+decisions, and Samsung TV Seller Office portal mutations.
 
 ## Docs
 

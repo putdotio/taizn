@@ -10,6 +10,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 import { WebSocketServer } from "ws";
@@ -65,6 +66,7 @@ describe("taizn cli", () => {
     assert.include(result.stdout, "check");
     assert.include(result.stdout, "launch");
     assert.include(result.stdout, "package");
+    assert.include(result.stdout, "prepare");
     assert.include(result.stdout, "prove");
     assert.include(result.stdout, "run");
     assert.include(result.stdout, "tv");
@@ -91,6 +93,7 @@ describe("taizn cli", () => {
     assert.strictEqual(described.schemaVersion, 2);
     assert.isTrue(described.commands.some((command) => command.command === "prove"));
     assert.isTrue(described.commands.some((command) => command.command === "probe hosted-assets"));
+    assert.isTrue(described.commands.some((command) => command.command === "prepare submission"));
     assert.isFalse(described.commands.some((command) => command.command === "targets"));
     assert.isFalse(described.commands.some((command) => command.command === "tv"));
     assert.isTrue(described.commands.some((command) => command.command === "targets list"));
@@ -1139,7 +1142,7 @@ describe("taizn cli", () => {
       makeStoredZip([
         {
           content:
-            '<widget><tizen:application id="Other.app" package="Other"/><name>Other</name></widget>',
+            '<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets"><tizen:application id="Other.app" package="Other"/><name>Other</name></widget>',
           name: "config.xml",
         },
       ]),
@@ -1156,6 +1159,243 @@ describe("taizn cli", () => {
     assert.include(validation.problems.join("\n"), "archive packageId");
   });
 
+  it("validates the locally provable Samsung submission checklist for a WGT", () => {
+    const dir = createPackageFixture();
+    const path = join(dir, "example.wgt");
+    writeFileSync(path, makeValidSubmissionWgt());
+
+    const result = runTaizn(["validate", "submission", "--json", path], dir, {
+      TAIZN_VARIANT: "production",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    const validation = JSON.parse(result.stdout);
+    assert.strictEqual(validation.ok, true);
+    assert.deepStrictEqual(validation.problems, []);
+  });
+
+  it("rejects WGT archives without a complete ZIP directory", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-wgt-zip-"));
+    const path = join(dir, "fixture.wgt");
+    const archive = makeValidSubmissionWgt();
+    writeFileSync(path, archive.subarray(0, archive.byteLength - 22));
+
+    const result = runTaizn(["prepare", "submission", "--json", path], dir);
+
+    assert.strictEqual(result.status, 1);
+    assert.include(result.stderr, "ZIP end-of-central-directory record is missing");
+  });
+
+  it("rejects inconsistent ZIP local headers and missing data descriptors", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-wgt-entries-"));
+    const archive = makeValidSubmissionWgt();
+    const badLocalHeader = Buffer.from(archive);
+    badLocalHeader.writeUInt32LE(0, 14);
+    const badLocalPath = join(dir, "bad_local.wgt");
+    writeFileSync(badLocalPath, badLocalHeader);
+
+    const missingDescriptor = Buffer.from(archive);
+    const endOffset = missingDescriptor.byteLength - 22;
+    const centralOffset = missingDescriptor.readUInt32LE(endOffset + 16);
+    missingDescriptor.writeUInt16LE(missingDescriptor.readUInt16LE(6) | 0x08, 6);
+    missingDescriptor.writeUInt16LE(
+      missingDescriptor.readUInt16LE(centralOffset + 8) | 0x08,
+      centralOffset + 8,
+    );
+    const missingDescriptorPath = join(dir, "missing_descriptor.wgt");
+    writeFileSync(missingDescriptorPath, missingDescriptor);
+
+    const localResult = runTaizn(["prepare", "submission", "--json", badLocalPath], dir);
+    const descriptorResult = runTaizn(
+      ["prepare", "submission", "--json", missingDescriptorPath],
+      dir,
+    );
+
+    assert.strictEqual(localResult.status, 1);
+    assert.include(localResult.stderr, "local header sizes or CRC");
+    assert.strictEqual(descriptorResult.status, 1);
+    assert.include(descriptorResult.stderr, "data descriptor");
+  });
+
+  it("rejects malformed or namespace-invalid config XML", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-wgt-xml-"));
+    const path = join(dir, "fixture.wgt");
+    writeFileSync(
+      path,
+      makeValidSubmissionWgt(
+        '<widget xmlns="http://www.w3.org/ns/widgets"><tizen:application id="Example.app" package="Example"/></widget>',
+      ),
+    );
+
+    const result = runTaizn(["prepare", "submission", "--json", path], dir);
+
+    assert.strictEqual(result.status, 1);
+    assert.include(result.stderr, "Invalid archive config.xml");
+    assert.include(result.stderr, "unbound namespace prefix");
+  });
+
+  it("validates Seller Office WGT file-name characters and byte length", () => {
+    const dir = createPackageFixture();
+    const specialPath = join(dir, "bad#.wgt");
+    const longPath = join(dir, `${"a".repeat(97)}.wgt`);
+    const archive = makeValidSubmissionWgt();
+    writeFileSync(specialPath, archive);
+    writeFileSync(longPath, archive);
+
+    const special = runTaizn(["validate", "submission", "--json", specialPath], dir, {
+      TAIZN_VARIANT: "production",
+    });
+    const long = runTaizn(["validate", "submission", "--json", longPath], dir, {
+      TAIZN_VARIANT: "production",
+    });
+
+    assert.strictEqual(special.status, 1);
+    assert.include(JSON.parse(special.stdout).problems.join("\n"), "letters, numbers");
+    assert.strictEqual(long.status, 1);
+    assert.include(JSON.parse(long.stdout).problems.join("\n"), "100 bytes");
+  });
+
+  it("reports actionable signed WGT submission problems", () => {
+    const dir = createPackageFixture();
+    const path = join(dir, "example.WGT");
+    writeFileSync(
+      path,
+      makeStoredZip([
+        {
+          content:
+            '<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" version="1.2.3.4"><tizen:application id="Example.app" package="Example" required_version="5"/><name>Example</name><feature name="https://example.invalid/feature/screen.size.nope"/><tizen:privilege name="http://developer.samsung.com/privilege/keymanager"/><tizen:service auto-restart="true" on-boot="true"/><ticker/></widget>',
+          name: "config.xml",
+        },
+        { content: "author", name: "author-signature.xml" },
+      ]),
+    );
+
+    const result = runTaizn(["validate", "submission", "--json", path], dir, {
+      TAIZN_VARIANT: "production",
+    });
+
+    assert.strictEqual(result.status, 1);
+    const validation = JSON.parse(result.stdout);
+    assert.include(validation.problems.join("\n"), "lowercase .wgt");
+    assert.include(validation.problems.join("\n"), "widget version");
+    assert.include(validation.problems.join("\n"), "required Tizen version");
+    assert.include(validation.problems.join("\n"), "screen-size feature");
+    assert.include(validation.problems.join("\n"), "keymanager");
+    assert.include(validation.problems.join("\n"), "auto-restart");
+    assert.include(validation.problems.join("\n"), "on-boot");
+    assert.include(validation.problems.join("\n"), "ticker");
+    assert.include(validation.problems.join("\n"), "signature1.xml");
+  });
+
+  it("decodes the default application name from config XML", () => {
+    const dir = createPackageFixture();
+    const config = JSON.parse(readFileSync(join(dir, "taizn.json"), "utf8"));
+    config.widget.variants.production.name = "Rock & Roll";
+    writeFileSync(join(dir, "taizn.json"), JSON.stringify(config, null, 2));
+    const path = join(dir, "example.wgt");
+    writeFileSync(
+      path,
+      makeValidSubmissionWgt(
+        '<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" xml:lang="tr" version="1.2.3"><tizen:application id="Example.app" package="Example" required_version="5.5"/><name>Yerel</name><!-- <name>Wrong</name> --><name xml:lang="">\n  Rock &amp; Roll\n</name><feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/></widget>',
+      ),
+    );
+
+    const prepared = runTaizn(["prepare", "submission", "--json", path], dir);
+    const validated = runTaizn(["validate", "submission", "--json", path], dir, {
+      TAIZN_VARIANT: "production",
+    });
+
+    assert.strictEqual(prepared.status, 0);
+    assert.strictEqual(JSON.parse(prepared.stdout).widget.name, "Rock & Roll");
+    assert.strictEqual(validated.status, 0);
+  });
+
+  it("honors defaultlocale and Unicode name whitespace", () => {
+    const dir = createPackageFixture();
+    const config = JSON.parse(readFileSync(join(dir, "taizn.json"), "utf8"));
+    config.widget.variants.production.name = "Rock & Roll";
+    writeFileSync(join(dir, "taizn.json"), JSON.stringify(config, null, 2));
+    const path = join(dir, "example.wgt");
+    writeFileSync(
+      path,
+      makeValidSubmissionWgt(
+        '<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" defaultlocale="en" version="1.2.3"><tizen:application id="Example.app" package="Example" required_version="5.5"/><name xml:lang="tr">Yerel</name><name xml:lang="en"> Rock\u00a0\u00a0&amp;\u3000Roll </name><feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/></widget>',
+      ),
+    );
+
+    const prepared = runTaizn(["prepare", "submission", "--json", path], dir);
+    const validated = runTaizn(["validate", "submission", "--json", path], dir, {
+      TAIZN_VARIANT: "production",
+    });
+
+    assert.strictEqual(prepared.status, 0);
+    assert.strictEqual(JSON.parse(prepared.stdout).widget.name, "Rock & Roll");
+    assert.strictEqual(validated.status, 0);
+  });
+
+  it("accepts a ZIP comment containing an EOCD signature sequence", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-wgt-comment-"));
+    const path = join(dir, "fixture.wgt");
+    writeFileSync(
+      path,
+      makeValidSubmissionWgt(undefined, Buffer.from([0x50, 0x4b, 0x05, 0x06, 0, 0, 0])),
+    );
+
+    const result = runTaizn(["prepare", "submission", "--json", path], dir);
+
+    assert.strictEqual(result.status, 0);
+  });
+
+  it("prepares a deterministic signed WGT submission manifest", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-prepare-submission-"));
+    const path = join(dir, "fixture.wgt");
+    const archive = makeValidSubmissionWgt();
+    writeFileSync(path, archive);
+
+    const first = runTaizn(
+      ["prepare", "submission", "--json", "--artifact", ".taizn/submission.json", path],
+      dir,
+    );
+    const second = runTaizn(["prepare", "submission", "--json", path], dir);
+
+    assert.strictEqual(first.status, 0);
+    assert.strictEqual(first.stderr, "");
+    assert.strictEqual(second.status, 0);
+    const manifest = parseSubmissionManifestJson(first.stdout);
+    assert.deepStrictEqual(JSON.parse(second.stdout), JSON.parse(first.stdout));
+    assert.deepStrictEqual(
+      JSON.parse(readFileSync(join(dir, ".taizn/submission.json"), "utf8")),
+      JSON.parse(first.stdout),
+    );
+    assert.deepStrictEqual(manifest, {
+      file: {
+        name: "fixture.wgt",
+        sha256: createHash("sha256").update(archive).digest("hex"),
+        size: archive.byteLength,
+      },
+      schemaVersion: 1,
+      signatures: {
+        authorPresent: true,
+        distributorPresent: true,
+      },
+      widget: {
+        applicationId: "Example.app",
+        declarations: {
+          autoRestart: false,
+          onBoot: false,
+          ticker: false,
+        },
+        features: ["http://tizen.org/feature/screen.size.normal.1080.1920"],
+        name: "Example",
+        packageId: "Example",
+        privileges: ["http://tizen.org/privilege/tv.inputdevice"],
+        requiredTizenVersion: "5.5",
+        version: "1.2.3",
+      },
+    });
+  });
+
   it("inspects Tizen widget archive metadata as JSON", () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-inspect-wgt-"));
     const path = join(dir, "fixture.wgt");
@@ -1164,7 +1404,7 @@ describe("taizn cli", () => {
       makeStoredZip([
         {
           content:
-            '<widget><tizen:application id="Example.app" package="Example"/><name>Example</name><tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/></widget>',
+            '<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets"><tizen:application id="Example.app" package="Example"/><name>Example</name><tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/></widget>',
           name: "config.xml",
         },
         { content: "<html></html>", name: "index.html" },
@@ -1546,6 +1786,35 @@ const InspectJsonSchema = Schema.Struct({
 
 type InspectJson = typeof InspectJsonSchema.Type;
 
+const SubmissionManifestJsonSchema = Schema.Struct({
+  file: Schema.Struct({
+    name: Schema.String,
+    sha256: Schema.String,
+    size: Schema.Number,
+  }),
+  schemaVersion: Schema.Literal(1),
+  signatures: Schema.Struct({
+    authorPresent: Schema.Boolean,
+    distributorPresent: Schema.Boolean,
+  }),
+  widget: Schema.Struct({
+    applicationId: Schema.String,
+    declarations: Schema.Struct({
+      autoRestart: Schema.Boolean,
+      onBoot: Schema.Boolean,
+      ticker: Schema.Boolean,
+    }),
+    features: Schema.Array(Schema.String),
+    name: Schema.String,
+    packageId: Schema.String,
+    privileges: Schema.Array(Schema.String),
+    requiredTizenVersion: Schema.String,
+    version: Schema.String,
+  }),
+});
+
+type SubmissionManifestJson = typeof SubmissionManifestJsonSchema.Type;
+
 const parseDescribeJson = (text: string): DescribeJson => {
   const described: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(DescribeJsonSchema)(described);
@@ -1609,6 +1878,11 @@ const parseSubmissionJson = (text: string): SubmissionJson => {
 const parseInspectJson = (text: string): InspectJson => {
   const inspected: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(InspectJsonSchema)(inspected);
+};
+
+const parseSubmissionManifestJson = (text: string): SubmissionManifestJson => {
+  const manifest: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(SubmissionManifestJsonSchema)(manifest);
 };
 
 const createToolingFixture = () => {
@@ -1680,8 +1954,55 @@ const waitForHttpServer = (server: ReturnType<typeof createServer>) =>
     server.once("error", reject);
   });
 
-const makeStoredZip = (entries: readonly { readonly content: string; readonly name: string }[]) =>
-  Buffer.concat(entries.map(makeStoredZipEntry));
+const makeStoredZip = (
+  entries: readonly { readonly content: string; readonly name: string }[],
+  comment = Buffer.alloc(0),
+) => {
+  const localEntries: Buffer[] = [];
+  const directoryEntries: Buffer[] = [];
+  let localOffset = 0;
+
+  for (const entry of entries) {
+    const localEntry = makeStoredZipEntry(entry);
+    localEntries.push(localEntry);
+    directoryEntries.push(makeStoredZipDirectoryEntry(entry, localOffset));
+    localOffset += localEntry.byteLength;
+  }
+
+  const directory = Buffer.concat(directoryEntries);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(directory.byteLength, 12);
+  end.writeUInt32LE(localOffset, 16);
+  end.writeUInt16LE(comment.byteLength, 20);
+
+  return Buffer.concat([...localEntries, directory, end, comment]);
+};
+
+const makeValidSubmissionWgt = (
+  configXml = '<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" xmlns:vendor="https://example.com/widgets" version="1.2.3"><tizen:application id="Example.app" package="Example" required_version="5.5"/><name>Example</name><feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/><tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/><vendor:component auto-restart="true" on-boot="true"/></widget>',
+  comment = Buffer.alloc(0),
+) =>
+  makeStoredZip(
+    [
+      {
+        content: configXml,
+        name: "config.xml",
+      },
+      {
+        content: '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"/>',
+        name: "author-signature.xml",
+      },
+      {
+        content: '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"/>',
+        name: "signature1.xml",
+      },
+      { content: "<html></html>", name: "index.html" },
+    ],
+    comment,
+  );
 
 const makeStoredZipEntry = (entry: { readonly content: string; readonly name: string }) => {
   const name = Buffer.from(entry.name);
@@ -1693,11 +2014,51 @@ const makeStoredZipEntry = (entry: { readonly content: string; readonly name: st
   header.writeUInt16LE(0, 6);
   header.writeUInt16LE(0, 8);
   header.writeUInt32LE(0, 10);
-  header.writeUInt32LE(0, 14);
+  header.writeUInt32LE(testCrc32(content), 14);
   header.writeUInt32LE(content.length, 18);
   header.writeUInt32LE(content.length, 22);
   header.writeUInt16LE(name.length, 26);
   header.writeUInt16LE(0, 28);
 
   return Buffer.concat([header, name, content]);
+};
+
+const makeStoredZipDirectoryEntry = (
+  entry: { readonly content: string; readonly name: string },
+  localOffset: number,
+) => {
+  const name = Buffer.from(entry.name);
+  const content = Buffer.from(entry.content);
+  const header = Buffer.alloc(46);
+
+  header.writeUInt32LE(0x02014b50, 0);
+  header.writeUInt16LE(20, 4);
+  header.writeUInt16LE(20, 6);
+  header.writeUInt32LE(testCrc32(content), 16);
+  header.writeUInt32LE(content.byteLength, 20);
+  header.writeUInt32LE(content.byteLength, 24);
+  header.writeUInt16LE(name.byteLength, 28);
+  header.writeUInt32LE(localOffset, 42);
+
+  return Buffer.concat([header, name]);
+};
+
+const testCrc32Table = Array.from({ length: 256 }, (_, index) => {
+  let value = index;
+  for (let bit = 0; bit < 8; bit += 1) {
+    value = (value & 1) !== 0 ? 0xedb8_8320 ^ (value >>> 1) : value >>> 1;
+  }
+  return value >>> 0;
+});
+
+const testCrc32 = (buffer: Buffer) => {
+  let value = 0xffff_ffff;
+  for (const byte of buffer) {
+    const tableValue = testCrc32Table[(value ^ byte) & 0xff];
+    if (tableValue === undefined) {
+      throw new Error("CRC-32 table lookup failed");
+    }
+    value = tableValue ^ (value >>> 8);
+  }
+  return (value ^ 0xffff_ffff) >>> 0;
 };

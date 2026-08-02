@@ -9,7 +9,7 @@ import {
   showSamsungTvInfo,
 } from "./remote.js";
 import { describeCli } from "./describe.js";
-import { inspectWidgetArchive, validateSubmission } from "./inspect.js";
+import { inspectWidgetArchive, prepareSubmission, validateSubmission } from "./inspect.js";
 import { probeHostedAssets } from "./probe.js";
 import { listTargets, showCurrentTarget } from "./targets.js";
 import {
@@ -250,6 +250,26 @@ const inspectWgt = Command.make(
 
 const inspect = Command.make("inspect", {}).pipe(Command.withSubcommands([inspectWgt]));
 
+const prepareSubmissionCommand = Command.make(
+  "submission",
+  {
+    artifact: Flag.string("artifact").pipe(Flag.optional),
+    fields: Flag.string("fields").pipe(Flag.optional),
+    json: Flag.boolean("json"),
+    path: Argument.string("path"),
+  },
+  ({ artifact, fields, json, path }) =>
+    prepareSubmission(path, {
+      artifact: Option.getOrUndefined(artifact),
+      fields: Option.getOrUndefined(fields),
+      json,
+    }),
+);
+
+const prepare = Command.make("prepare", {}).pipe(
+  Command.withSubcommands([prepareSubmissionCommand]),
+);
+
 const validateSubmissionCommand = Command.make(
   "submission",
   {
@@ -348,6 +368,7 @@ export const command = taizn.pipe(
     inspect,
     launch,
     logs,
+    prepare,
     probe,
     prove,
     profile,

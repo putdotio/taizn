@@ -1,6 +1,6 @@
 ---
 name: taizn
-description: Operate Taizn as an agent-first generic Tizen TV packaging, device, remote, logs, artifact, and proof harness. Use when packaging or proving a Tizen widget, inspecting a .wgt, validating generic submission metadata, collecting Samsung TV diagnostics, driving Samsung remote keys, or using Taizn's agent-facing JSON/artifact surfaces.
+description: Operate Taizn as an agent-first generic Tizen TV packaging, device, remote, logs, artifact, and proof harness. Use when packaging or proving a Tizen widget, inspecting a .wgt, preparing or validating generic submission metadata, collecting Samsung TV diagnostics, driving Samsung remote keys, or using Taizn's agent-facing JSON/artifact surfaces.
 ---
 
 # Taizn
@@ -52,6 +52,7 @@ taizn apps --json --fields applications
 taizn prove --dry-run --json --fields application.id,target Example.app
 taizn prove --json --artifact .taizn/proof.json Example.app
 taizn inspect wgt --json --fields config,entryCount .taizn/build/output/example.wgt
+taizn prepare submission --json --artifact .taizn/submission.json package.wgt
 taizn validate submission --json --fields ok,problems
 taizn logs capture --output ndjson --app Example
 taizn tv doctor --connect --json --artifact .taizn/tv-doctor.json
