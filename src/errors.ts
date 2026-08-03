@@ -208,6 +208,71 @@ export class TvRemoteUnauthorized extends Schema.TaggedError<TvRemoteUnauthorize
   }
 }
 
+export class SellerBrowserNotFound extends Schema.TaggedError<SellerBrowserNotFound>()(
+  "SellerBrowserNotFound",
+  {
+    path: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `Seller Office browser not found: ${this.path}. Set TAIZN_SELLER_BROWSER explicitly.`;
+  }
+}
+
+export class SellerSessionNotFound extends Schema.TaggedError<SellerSessionNotFound>()(
+  "SellerSessionNotFound",
+  {
+    path: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `Seller Office browser session not found: ${this.path}. Run \`taizn seller login\` first.`;
+  }
+}
+
+export class SellerBrowserConnectionFailed extends Schema.TaggedError<SellerBrowserConnectionFailed>()(
+  "SellerBrowserConnectionFailed",
+  {
+    cause: Schema.Unknown,
+    target: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `Seller Office browser connection failed: ${this.target}. Run \`taizn seller login\` again.`;
+  }
+}
+
+export class SellerAuthenticationRequired extends Schema.TaggedError<SellerAuthenticationRequired>()(
+  "SellerAuthenticationRequired",
+  {},
+) {
+  override get message(): string {
+    return "Seller Office is signed out. Run `taizn seller login` and finish Samsung login in the visible browser.";
+  }
+}
+
+export class SellerPortalDrift extends Schema.TaggedError<SellerPortalDrift>()(
+  "SellerPortalDrift",
+  {
+    details: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `Seller Office portal layout changed: ${this.details}`;
+  }
+}
+
+export class SellerPortalProtocolError extends Schema.TaggedError<SellerPortalProtocolError>()(
+  "SellerPortalProtocolError",
+  {
+    details: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `Seller Office browser protocol failed: ${this.details}`;
+  }
+}
+
 export type TaiznError =
   | ApplicationNotFound
   | CommandFailed
@@ -226,6 +291,12 @@ export type TaiznError =
   | MultipleTargetsConnected
   | PackageNotProduced
   | SecretReadInterrupted
+  | SellerAuthenticationRequired
+  | SellerBrowserConnectionFailed
+  | SellerBrowserNotFound
+  | SellerPortalDrift
+  | SellerPortalProtocolError
+  | SellerSessionNotFound
   | TvRemoteConnectionFailed
   | TvRemoteProtocolError
   | TvRemoteTimeout

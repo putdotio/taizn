@@ -11,6 +11,7 @@ import {
 import { describeCli } from "./describe.js";
 import { inspectWidgetArchive, prepareSubmission, validateSubmission } from "./inspect.js";
 import { probeHostedAssets } from "./probe.js";
+import { listSellerApplications, loginSeller } from "./seller.js";
 import { listTargets, showCurrentTarget } from "./targets.js";
 import {
   captureTizenLogs,
@@ -358,6 +359,38 @@ const targets = Command.make("targets", {}).pipe(
   Command.withSubcommands([targetsList, targetsCurrent]),
 );
 
+const sellerLogin = Command.make(
+  "login",
+  {
+    dryRun: Flag.boolean("dry-run"),
+    json: Flag.boolean("json"),
+  },
+  ({ dryRun, json }) =>
+    Effect.gen(function* () {
+      const env = yield* loadEnv();
+      yield* loginSeller(env, { dryRun, json });
+    }),
+);
+
+const sellerAppsList = Command.make(
+  "list",
+  {
+    artifact: Flag.string("artifact").pipe(Flag.optional),
+    fields: Flag.string("fields").pipe(Flag.optional),
+    json: Flag.boolean("json"),
+  },
+  ({ artifact, fields, json }) =>
+    listSellerApplications({
+      artifact: Option.getOrUndefined(artifact),
+      fields: Option.getOrUndefined(fields),
+      json,
+    }),
+);
+
+const sellerApps = Command.make("apps", {}).pipe(Command.withSubcommands([sellerAppsList]));
+
+const seller = Command.make("seller", {}).pipe(Command.withSubcommands([sellerLogin, sellerApps]));
+
 const describe = Command.make("describe", {}, () => describeCli());
 
 export const command = taizn.pipe(
@@ -375,6 +408,7 @@ export const command = taizn.pipe(
     pack,
     install,
     run,
+    seller,
     targets,
     tv,
     validate,

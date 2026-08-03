@@ -21,12 +21,15 @@ Useful reports usually include issues involving:
 - unsafe command execution through project config
 - Tizen signing material committed or exposed through generated files
 - paired Samsung TV remote tokens committed or exposed through generated files
+- Seller Office Chrome profiles, cookies, or browser session material committed or exposed
 - GitHub Actions release or publish risk
 
 ## Guidelines
 
 - test only against accounts, environments, and data you control
 - avoid destructive behavior, service disruption, or automated high-volume testing
+- keep `.taizn/seller/` local; never copy its Chrome profile or enable remote DevTools access
+- keep Seller Office browser automation bound to `127.0.0.1`
 - do not open public issues for suspected vulnerabilities
 
 ## Supported Versions

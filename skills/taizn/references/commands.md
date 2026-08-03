@@ -53,6 +53,12 @@ taizn prepare submission --json --artifact .taizn/submission.json package.wgt
 taizn validate submission --json --fields ok,problems
 ```
 
+## Seller Office
+
+Use [`seller-office.md`](seller-office.md) for the human-owned browser workflow.
+`seller apps list` is read-only and emits sanitized application identity and
+status. Upload, pre-test, release, and submission remain outside this surface.
+
 ## Logs And Targets
 
 - `logs capture` can emit JSON or NDJSON and should be bounded by app name or
