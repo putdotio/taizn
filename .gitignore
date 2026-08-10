@@ -5,7 +5,6 @@
 !.env.example
 .codex-review.out
 .taizn/
-/.repos
 .turbo
 coverage
 dist

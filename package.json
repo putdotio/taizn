@@ -58,7 +58,6 @@
     "live:test:tv-assets": "vp pack src/taizn.ts && node live-test/run-live-test.ts --roundtrip --tv-assets",
     "live:test:tv-assets:production": "vp pack src/taizn.ts && node live-test/run-live-test.ts --roundtrip --tv-assets --production",
     "prepack": "vp pack src/taizn.ts",
-    "prepare": "./scripts/prepare-effect.sh",
     "smoke": "vp pack src/taizn.ts && node dist/taizn.mjs --version && node dist/taizn.mjs --help >/dev/null",
     "test": "vp test run --passWithNoTests",
     "typecheck": "tsc --noEmit",

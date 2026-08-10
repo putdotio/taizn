@@ -14,8 +14,8 @@ vp run hooks:install
 ```
 
 Use the Node.js version in [`.node-version`](./.node-version).
-Install runs `scripts/prepare-effect.sh` outside CI to clone the local Effect
-source into ignored `.repos/effect` for API research.
+Use `node_modules/effect/AGENTS.md` and `node_modules/effect/src` for Effect API
+guidance and source research.
 The hook setup makes the full verification gate run before pushes.
 
 ## Run Locally
