@@ -19,6 +19,7 @@ import { probeAssetUrls } from "../src/assets.js";
 import { TaiznEnv } from "../src/env.js";
 import { fetchSamsungTvInfo, sendSamsungTvKeys } from "../src/remote.js";
 import { appBuildEnv, redactCommandArgs, TaiznSystem } from "../src/runtime.js";
+import { captureForDuration } from "../src/tizen.js";
 
 const cliPath = resolve("dist/taizn.mjs");
 
@@ -1047,6 +1048,36 @@ describe("taizn cli", () => {
     assert.strictEqual(result.status, 1);
     assert.include(result.stderr, "Command failed");
     assert.isBelow(Date.now() - startedAt, 2_000);
+  });
+
+  it("force-closes interrupted log processes that ignore SIGTERM", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-stubborn-log-"));
+    const command = join(dir, "stubborn-log.mjs");
+    const pidPath = join(dir, "child.pid");
+    writeFileSync(
+      command,
+      `#!/usr/bin/env node
+        import { writeFileSync } from "node:fs";
+        process.on("SIGTERM", () => {});
+        writeFileSync(process.argv[2], String(process.pid));
+        setInterval(() => {}, 1_000);
+        await new Promise(() => {});
+      `,
+    );
+    chmodSync(command, 0o755);
+    const fiber = Effect.runFork(
+      captureForDuration(command, [pidPath], 30_000).pipe(
+        Effect.provide(Layer.mergeAll(NodeServices.layer, TaiznSystem.Live)),
+      ),
+    );
+    const pid = Number(await waitForFile(pidPath));
+    const startedAt = Date.now();
+
+    await Effect.runPromise(Fiber.interrupt(fiber));
+
+    assert.isAtLeast(Date.now() - startedAt, 900);
+    assert.isBelow(Date.now() - startedAt, 3_000);
+    assert.throws(() => process.kill(pid, 0));
   });
 
   it("streams target logs as NDJSON", () => {
@@ -2098,6 +2129,20 @@ const waitForHttpServer = (server: ReturnType<typeof createServer>) =>
     server.once("listening", () => resolve());
     server.once("error", reject);
   });
+
+const waitForFile = async (path: string) => {
+  const deadline = Date.now() + 2_000;
+
+  while (Date.now() < deadline) {
+    try {
+      return readFileSync(path, "utf8");
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+
+  throw new Error(`Timed out waiting for ${path}`);
+};
 
 const makeStoredZip = (
   entries: readonly { readonly content: string; readonly name: string }[],

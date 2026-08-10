@@ -1043,7 +1043,7 @@ const capture = Effect.fn("capture")(function* (command: string, args: ReadonlyA
   return output.output;
 });
 
-const captureForDuration = Effect.fn("captureForDuration")(function* (
+export const captureForDuration = Effect.fn("captureForDuration")(function* (
   command: string,
   args: ReadonlyArray<string>,
   durationMs: number,
@@ -1051,74 +1051,85 @@ const captureForDuration = Effect.fn("captureForDuration")(function* (
   const paths = yield* getPaths();
   const env = yield* withTizenPath(yield* baseChildEnv());
 
-  return yield* Effect.tryPromise({
-    try: (signal) =>
-      new Promise<string>((resolve, reject) => {
-        const child = spawn(command, args, {
-          cwd: paths.appDir,
-          env,
-          stdio: ["ignore", "pipe", "pipe"],
-        });
-        let stderr = "";
-        let settled = false;
-        let stdout = "";
-        let timedOut = false;
+  return yield* Effect.callback<string, unknown>((resume) => {
+    const child = spawn(command, args, {
+      cwd: paths.appDir,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
+    let stderr = "";
+    let settled = false;
+    let stdout = "";
+    let timedOut = false;
 
-        child.stdout.setEncoding("utf8");
-        child.stderr.setEncoding("utf8");
-        child.stdout.on("data", (chunk: string) => {
-          stdout += chunk;
-        });
-        child.stderr.on("data", (chunk: string) => {
-          stderr += chunk;
-        });
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
 
-        const cleanup = () => {
-          clearTimeout(timer);
-          signal.removeEventListener("abort", abort);
-        };
+    const cleanup = () => {
+      clearTimeout(timer);
+      clearTimeout(forceKillTimer);
+    };
 
-        const fail = (cause: unknown) => {
-          if (settled) {
+    const finish = (effect: Effect.Effect<string, unknown>) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      resume(effect);
+    };
+
+    const stopChild = () => {
+      child.kill("SIGTERM");
+      forceKillTimer ??= setTimeout(() => child.kill("SIGKILL"), 1_000);
+    };
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      stopChild();
+    }, durationMs);
+
+    child.on("error", (cause) => finish(Effect.fail(cause)));
+    child.on("close", (code, signal) => {
+      if (timedOut || code === 0 || signal === "SIGTERM") {
+        finish(Effect.succeed(stdout));
+        return;
+      }
+
+      finish(Effect.fail(new Error(stderr.trim() || `exit ${code ?? signal ?? "unknown"}`)));
+    });
+
+    return Effect.promise(
+      () =>
+        new Promise<void>((resolve) => {
+          if (
+            settled ||
+            child.exitCode !== null ||
+            child.signalCode !== null ||
+            child.pid === undefined
+          ) {
+            cleanup();
+            resolve();
             return;
           }
 
           settled = true;
           cleanup();
-          reject(cause);
-        };
-
-        const abort = () => {
+          const forceKill = setTimeout(() => child.kill("SIGKILL"), 1_000);
+          child.once("close", () => {
+            clearTimeout(forceKill);
+            resolve();
+          });
           child.kill("SIGTERM");
-          fail(signal.reason);
-        };
-
-        const timer = setTimeout(() => {
-          timedOut = true;
-          child.kill("SIGTERM");
-        }, durationMs);
-
-        child.on("error", fail);
-        child.on("close", (code, signal) => {
-          if (settled) {
-            return;
-          }
-
-          settled = true;
-          cleanup();
-
-          if (timedOut || code === 0 || signal === "SIGTERM") {
-            resolve(stdout);
-            return;
-          }
-
-          reject(new Error(stderr.trim() || `exit ${code ?? signal ?? "unknown"}`));
-        });
-        signal.addEventListener("abort", abort, { once: true });
-        if (signal.aborted) {
-          abort();
-        }
-      }),
-    catch: () => new CommandFailed({ args: redactCommandArgs(args), command }),
-  });
+        }),
+    );
+  }).pipe(Effect.mapError(() => new CommandFailed({ args: redactCommandArgs(args), command })));
 });
