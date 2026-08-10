@@ -1034,6 +1034,21 @@ describe("taizn cli", () => {
     assert.include(logs.lines[0] ?? "", "streamed");
   });
 
+  it("cleans up bounded log capture after a spawn error", () => {
+    const dir = createToolingFixture();
+    const brokenSdb = join(dir, "non-executable-sdb");
+    writeFileSync(brokenSdb, "not executable\n");
+    const startedAt = Date.now();
+    const result = runTaizn(["logs", "capture", "--json", "--duration-ms", "10000"], dir, {
+      TAIZN_SDB: brokenSdb,
+      TAIZN_TARGET: "127.0.0.1:26101",
+    });
+
+    assert.strictEqual(result.status, 1);
+    assert.include(result.stderr, "Command failed");
+    assert.isBelow(Date.now() - startedAt, 2_000);
+  });
+
   it("streams target logs as NDJSON", () => {
     const dir = createToolingFixture();
     const result = runTaizn(["logs", "capture", "--output", "ndjson", "--app", "Example"], dir, {

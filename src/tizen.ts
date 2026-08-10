@@ -1060,6 +1060,7 @@ const captureForDuration = Effect.fn("captureForDuration")(function* (
           stdio: ["ignore", "pipe", "pipe"],
         });
         let stderr = "";
+        let settled = false;
         let stdout = "";
         let timedOut = false;
 
@@ -1077,10 +1078,19 @@ const captureForDuration = Effect.fn("captureForDuration")(function* (
           signal.removeEventListener("abort", abort);
         };
 
-        const abort = () => {
+        const fail = (cause: unknown) => {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
           cleanup();
+          reject(cause);
+        };
+
+        const abort = () => {
           child.kill("SIGTERM");
-          reject(signal.reason);
+          fail(signal.reason);
         };
 
         const timer = setTimeout(() => {
@@ -1088,8 +1098,13 @@ const captureForDuration = Effect.fn("captureForDuration")(function* (
           child.kill("SIGTERM");
         }, durationMs);
 
-        child.on("error", reject);
+        child.on("error", fail);
         child.on("close", (code, signal) => {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
           cleanup();
 
           if (timedOut || code === 0 || signal === "SIGTERM") {
