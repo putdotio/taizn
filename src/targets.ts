@@ -102,7 +102,7 @@ const readTargetsFile = Effect.fn("readTargetsFile")(function* () {
   const path = `${paths.taiznDir}/targets.json`;
   const exists = yield* fs
     .exists(path)
-    .pipe(Effect.mapError((cause) => FileSystemFailure.make({ cause, operation: "exists", path })));
+    .pipe(Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "exists", path })));
 
   if (!exists) {
     return [];
@@ -110,7 +110,7 @@ const readTargetsFile = Effect.fn("readTargetsFile")(function* () {
 
   const json = yield* readJsonFile(path);
   const decoded = yield* Schema.decodeUnknownEffect(TargetsFile)(json, { errors: "all" }).pipe(
-    Effect.mapError((error) => InvalidJson.make({ details: error.message, file: path })),
+    Effect.mapError((error) => new InvalidJson({ details: error.message, file: path })),
   );
 
   return decoded.targets;

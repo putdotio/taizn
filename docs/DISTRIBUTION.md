@@ -10,9 +10,6 @@ CI runs:
 2. `vp run verify`
 3. `semantic-release` on `main`
 
-The Effect source helper exits when `CI` is set, so install, pack, publish, and
-release automation do not clone the ignored Effect source checkout.
-
 The release workflow publishes the scoped `@putdotio/taizn` package to npm, creates a
 GitHub release, and commits the released `package.json` version back to `main`
 with `[skip ci]`.

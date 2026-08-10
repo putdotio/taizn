@@ -51,20 +51,20 @@ export const loadConfig = Effect.fn("loadConfig")(function* () {
   const exists = yield* fs
     .exists(paths.configPath)
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "exists", path: paths.configPath }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "exists", path: paths.configPath }),
       ),
     );
 
   if (!exists) {
-    return yield* ConfigNotFound.make({ path: paths.configPath });
+    return yield* new ConfigNotFound({ path: paths.configPath });
   }
 
   const source = yield* fs
     .readFileString(paths.configPath)
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "read", path: paths.configPath }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "read", path: paths.configPath }),
       ),
     );
 
@@ -74,11 +74,11 @@ export const loadConfig = Effect.fn("loadConfig")(function* () {
 const decodeConfig = Effect.fn("decodeConfig")(function* (source: string) {
   const json = yield* Effect.try({
     try: () => JSON.parse(source),
-    catch: (cause) => InvalidJson.make({ details: causeToMessage(cause), file: "taizn.json" }),
+    catch: (cause) => new InvalidJson({ details: causeToMessage(cause), file: "taizn.json" }),
   });
 
   return yield* Schema.decodeUnknownEffect(TizenConfig)(json, { errors: "all" }).pipe(
-    Effect.mapError((error) => InvalidConfig.make({ details: error.message })),
+    Effect.mapError((error) => new InvalidConfig({ details: error.message })),
   );
 });
 

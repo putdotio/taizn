@@ -11,11 +11,15 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { assert, describe, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import { NodeServices } from "@effect/platform-node";
+import { assert, describe, it, vi } from "@effect/vitest";
+import { Effect, Fiber, Layer, Schema } from "effect";
 import { WebSocketServer } from "ws";
-import { fetchSamsungTvInfo } from "../src/remote.js";
+import { probeAssetUrls } from "../src/assets.js";
+import { TaiznEnv } from "../src/env.js";
+import { fetchSamsungTvInfo, sendSamsungTvKeys } from "../src/remote.js";
 import { appBuildEnv, redactCommandArgs, TaiznSystem } from "../src/runtime.js";
+import { captureForDuration } from "../src/tizen.js";
 
 const cliPath = resolve("dist/taizn.mjs");
 
@@ -200,6 +204,20 @@ describe("taizn cli", () => {
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
     assert.deepStrictEqual(JSON.parse(result.stdout), { target: "127.0.0.1:26101" });
+  });
+
+  it("applies field masks through array entries", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["apps", "--json", "--fields", "applications.0.id", "example"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    assert.deepStrictEqual(JSON.parse(result.stdout), {
+      applications: { 0: { id: "Example.app" } },
+    });
   });
 
   it("prints only JSON for installed applications when auto-picking one target", () => {
@@ -811,6 +829,52 @@ describe("taizn cli", () => {
     }
   });
 
+  it("closes Samsung TV remote sockets when the Effect is interrupted", async () => {
+    const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+    await waitForServer(server);
+
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      server.close();
+      throw new Error("Expected TCP websocket test server address.");
+    }
+
+    const connected = Promise.withResolvers<void>();
+    const closed = Promise.withResolvers<void>();
+    server.once("connection", (socket) => {
+      connected.resolve();
+      socket.once("close", () => closed.resolve());
+    });
+
+    const env = TaiznEnv.make({
+      tvHost: "127.0.0.1",
+      tvPort: address.port,
+      tvProtocol: "ws",
+      tvTimeoutMs: 30_000,
+      tvToken: "test-token",
+      variant: "development",
+    });
+    const fiber = Effect.runFork(
+      sendSamsungTvKeys(env, ["KEY_ENTER"]).pipe(
+        Effect.provide(Layer.mergeAll(NodeServices.layer, TaiznSystem.Live)),
+      ),
+    );
+
+    try {
+      await connected.promise;
+      await Effect.runPromise(Fiber.interrupt(fiber));
+      await Promise.race([
+        closed.promise,
+        new Promise<never>((_resolve, reject) =>
+          setTimeout(() => reject(new Error("Interrupted websocket did not close")), 1_000),
+        ),
+      ]);
+      assert.strictEqual(server.clients.size, 0);
+    } finally {
+      server.close();
+    }
+  });
+
   it("dry-runs Samsung TV remote scripts from JSON", () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-tv-script-"));
     writeFileSync(
@@ -971,6 +1035,51 @@ describe("taizn cli", () => {
     assert.include(logs.lines[0] ?? "", "streamed");
   });
 
+  it("cleans up bounded log capture after a spawn error", () => {
+    const dir = createToolingFixture();
+    const brokenSdb = join(dir, "non-executable-sdb");
+    writeFileSync(brokenSdb, "not executable\n");
+    const startedAt = Date.now();
+    const result = runTaizn(["logs", "capture", "--json", "--duration-ms", "10000"], dir, {
+      TAIZN_SDB: brokenSdb,
+      TAIZN_TARGET: "127.0.0.1:26101",
+    });
+
+    assert.strictEqual(result.status, 1);
+    assert.include(result.stderr, "Command failed");
+    assert.isBelow(Date.now() - startedAt, 2_000);
+  });
+
+  it("force-closes interrupted log processes that ignore SIGTERM", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-stubborn-log-"));
+    const command = join(dir, "stubborn-log.mjs");
+    const pidPath = join(dir, "child.pid");
+    writeFileSync(
+      command,
+      `#!/usr/bin/env node
+        import { writeFileSync } from "node:fs";
+        process.on("SIGTERM", () => {});
+        writeFileSync(process.argv[2], String(process.pid));
+        setInterval(() => {}, 1_000);
+        await new Promise(() => {});
+      `,
+    );
+    chmodSync(command, 0o755);
+    const fiber = Effect.runFork(
+      captureForDuration(command, [pidPath], 30_000).pipe(
+        Effect.provide(Layer.mergeAll(NodeServices.layer, TaiznSystem.Live)),
+      ),
+    );
+    const pid = Number(await waitForFile(pidPath));
+    const startedAt = Date.now();
+
+    await Effect.runPromise(Fiber.interrupt(fiber));
+
+    assert.isAtLeast(Date.now() - startedAt, 900);
+    assert.isBelow(Date.now() - startedAt, 3_000);
+    assert.throws(() => process.kill(pid, 0));
+  });
+
   it("streams target logs as NDJSON", () => {
     const dir = createToolingFixture();
     const result = runTaizn(["logs", "capture", "--output", "ndjson", "--app", "Example"], dir, {
@@ -1082,6 +1191,73 @@ describe("taizn cli", () => {
       assert.include(result.stderr, "hosted asset probe");
     } finally {
       server.close();
+    }
+  });
+
+  it("closes successful hosted asset response bodies", async () => {
+    let resolveClosed: (() => void) | undefined;
+    const responseClosed = new Promise<void>((resolve) => {
+      resolveClosed = resolve;
+    });
+    const server = createServer((_request, response) => {
+      response.once("close", () => resolveClosed?.());
+      response.writeHead(200, { "content-type": "application/javascript" });
+      response.write("export const ready = true;\n");
+    });
+
+    try {
+      await waitForHttpServer(server);
+      const address = server.address();
+
+      if (!address || typeof address === "string") {
+        throw new Error("Expected TCP HTTP test server address.");
+      }
+
+      const probes = await Effect.runPromise(
+        probeAssetUrls([`http://127.0.0.1:${address.port}/stream.js`]),
+      );
+      assert.deepStrictEqual(probes, [
+        {
+          ok: true,
+          status: 200,
+          type: "script",
+          url: `http://127.0.0.1:${address.port}/stream.js`,
+        },
+      ]);
+
+      await Promise.race([
+        responseClosed,
+        new Promise<never>((_resolve, reject) => {
+          setTimeout(() => reject(new Error("Expected asset response body to close.")), 1_000);
+        }),
+      ]);
+    } finally {
+      server.closeAllConnections();
+      server.close();
+    }
+  });
+
+  it("preserves successful probes when response cleanup fails", async () => {
+    const body = new ReadableStream({
+      cancel: () => Promise.reject(new Error("stream cleanup failed")),
+    });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(body, { status: 200 }));
+
+    try {
+      const probes = await Effect.runPromise(probeAssetUrls(["https://example.com/stream.js"]));
+
+      assert.deepStrictEqual(probes, [
+        {
+          ok: true,
+          status: 200,
+          type: "script",
+          url: "https://example.com/stream.js",
+        },
+      ]);
+    } finally {
+      fetchMock.mockRestore();
     }
   });
 
@@ -1953,6 +2129,20 @@ const waitForHttpServer = (server: ReturnType<typeof createServer>) =>
     server.once("listening", () => resolve());
     server.once("error", reject);
   });
+
+const waitForFile = async (path: string) => {
+  const deadline = Date.now() + 2_000;
+
+  while (Date.now() < deadline) {
+    try {
+      return readFileSync(path, "utf8");
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+
+  throw new Error(`Timed out waiting for ${path}`);
+};
 
 const makeStoredZip = (
   entries: readonly { readonly content: string; readonly name: string }[],

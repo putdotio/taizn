@@ -38,8 +38,8 @@ export class TaiznSystem extends Context.Service<
       }),
     readSecret: (prompt) =>
       Effect.tryPromise({
-        try: () => readSecret(prompt),
-        catch: () => SecretReadInterrupted.make({}),
+        try: (signal) => readSecret(prompt, signal),
+        catch: () => new SecretReadInterrupted({}),
       }),
   });
 }
@@ -77,10 +77,10 @@ export const requireFile = Effect.fn("requireFile")(function* (path: string, lab
   const fs = yield* FileSystem.FileSystem;
   const exists = yield* fs
     .exists(path)
-    .pipe(Effect.mapError((cause) => FileSystemFailure.make({ cause, operation: "exists", path })));
+    .pipe(Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "exists", path })));
 
   if (!exists) {
-    return yield* MissingFile.make({ label, path });
+    return yield* new MissingFile({ label, path });
   }
 
   return path;
@@ -156,7 +156,7 @@ export const redactCommandArgs = (args: ReadonlyArray<string>) => {
   });
 };
 
-const readSecret = (prompt: string) =>
+const readSecret = (prompt: string, signal: AbortSignal) =>
   new Promise<string>((resolve, reject) => {
     if (!process.stdin.isTTY) {
       resolve("");
@@ -174,6 +174,12 @@ const readSecret = (prompt: string) =>
       process.stdin.setRawMode(false);
       process.stdin.pause();
       process.stdin.off("data", onData);
+      signal.removeEventListener("abort", onAbort);
+    };
+
+    const onAbort = () => {
+      cleanup();
+      reject(signal.reason);
     };
 
     const onData = (char: string) => {
@@ -199,5 +205,10 @@ const readSecret = (prompt: string) =>
       value += char;
     };
 
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
     process.stdin.on("data", onData);
   });

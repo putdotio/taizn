@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { basename } from "node:path";
 import { inflateRawSync } from "node:zlib";
-import { Console, Effect, FileSystem } from "effect";
+import { Console, DateTime, Effect, FileSystem } from "effect";
 import { SaxesParser, type SaxesTagNS } from "saxes";
 import type { TaiznContext } from "./context.js";
 import { extractAssetUrls, readConfiguredIndexHtml } from "./assets.js";
@@ -63,6 +63,7 @@ export const inspectWidgetArchive = Effect.fn("inspectWidgetArchive")(function* 
   options: InspectOptions = {},
 ) {
   const { entries, payload } = yield* readWidgetArchive(path);
+  const now = yield* DateTime.now;
   const result = {
     config: payload.config,
     entryCount: entries.length,
@@ -72,7 +73,7 @@ export const inspectWidgetArchive = Effect.fn("inspectWidgetArchive")(function* 
       uncompressedSize: entry.uncompressedSize,
     })),
     file: path,
-    inspectedAt: new Date().toISOString(),
+    inspectedAt: DateTime.formatIso(now),
     manifest: payload.manifest,
   };
 
@@ -137,6 +138,7 @@ export const validateSubmission = Effect.fn("validateSubmission")(function* (
   const indexHtml = yield* readConfiguredIndexHtml(config, variant);
   const hostedAssets = extractAssetUrls(indexHtml);
   const archive = path ? yield* inspectArchivePayload(path) : undefined;
+  const now = yield* DateTime.now;
   const problems = [
     ...validateIdentifier("applicationId", variant.applicationId),
     ...validateIdentifier("packageId", variant.packageId),
@@ -153,7 +155,7 @@ export const validateSubmission = Effect.fn("validateSubmission")(function* (
       packageId: variant.packageId,
       selected: env.variant,
     },
-    validatedAt: new Date().toISOString(),
+    validatedAt: DateTime.formatIso(now),
   };
 
   if (options.artifact) {
@@ -163,7 +165,7 @@ export const validateSubmission = Effect.fn("validateSubmission")(function* (
   if (options.json) {
     yield* Console.log(yield* jsonForOutput(result, { fields: options.fields }));
     if (!result.ok) {
-      return yield* InvalidInput.make({
+      return yield* new InvalidInput({
         details: problems.join("; "),
         label: "submission validation",
       });
@@ -178,7 +180,7 @@ export const validateSubmission = Effect.fn("validateSubmission")(function* (
     yield* Console.log(`- ${problem}`);
   }
   if (!result.ok) {
-    return yield* InvalidInput.make({
+    return yield* new InvalidInput({
       details: problems.join("; "),
       label: "submission validation",
     });
@@ -229,13 +231,13 @@ const readZipArchive = Effect.fn("readZipArchive")(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
   const bytes = yield* fs
     .readFile(path)
-    .pipe(Effect.mapError((cause) => FileSystemFailure.make({ cause, operation: "read", path })));
+    .pipe(Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "read", path })));
   const buffer = Buffer.from(bytes);
 
   const entries = yield* Effect.try({
     try: () => parseZipEntries(buffer),
     catch: (cause) =>
-      InvalidInput.make({
+      new InvalidInput({
         details: cause instanceof Error ? cause.message : String(cause),
         label: "Tizen widget archive",
       }),
@@ -453,7 +455,7 @@ const inspectConfigXml = Effect.fn("inspectConfigXml")(function* (source: string
   return yield* Effect.try({
     try: () => parseConfigXml(source),
     catch: (cause) =>
-      InvalidInput.make({
+      new InvalidInput({
         details: cause instanceof Error ? cause.message : String(cause),
         label: "archive config.xml",
       }),

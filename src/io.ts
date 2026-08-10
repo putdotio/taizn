@@ -1,5 +1,5 @@
 import { dirname, isAbsolute, relative, resolve } from "node:path";
-import { Effect, FileSystem } from "effect";
+import { Effect, FileSystem, Predicate } from "effect";
 import { FileSystemFailure, InvalidInput, InvalidJson } from "./errors.js";
 import { getPaths } from "./runtime.js";
 
@@ -11,7 +11,7 @@ export const readJsonFile = Effect.fn("readJsonFile")(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
   const source = yield* fs
     .readFileString(path)
-    .pipe(Effect.mapError((cause) => FileSystemFailure.make({ cause, operation: "read", path })));
+    .pipe(Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "read", path })));
 
   return yield* parseJson(source, path);
 });
@@ -22,7 +22,7 @@ export const parseJson = Effect.fn("parseJson")(function* (source: string, file:
       const parsed: unknown = JSON.parse(source);
       return parsed;
     },
-    catch: (cause) => InvalidJson.make({ details: causeToMessage(cause), file }),
+    catch: (cause) => new InvalidJson({ details: causeToMessage(cause), file }),
   });
 });
 
@@ -34,7 +34,7 @@ export const resolveOutputPath = Effect.fn("resolveOutputPath")(function* (reque
   const rel = relative(paths.appDir, resolved);
 
   if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
-    return yield* InvalidInput.make({
+    return yield* new InvalidInput({
       details: `output path must stay inside the app directory. Received: ${requestedPath}`,
       label: "output path",
     });
@@ -52,10 +52,10 @@ export const writeJsonArtifact = Effect.fn("writeJsonArtifact")(function* (
 
   yield* fs
     .makeDirectory(dirname(path), { recursive: true })
-    .pipe(Effect.mapError((cause) => FileSystemFailure.make({ cause, operation: "mkdir", path })));
+    .pipe(Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "mkdir", path })));
   yield* fs
     .writeFileString(path, `${JSON.stringify(value, null, 2)}\n`)
-    .pipe(Effect.mapError((cause) => FileSystemFailure.make({ cause, operation: "write", path })));
+    .pipe(Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "write", path })));
 
   return path;
 });
@@ -97,21 +97,21 @@ export const validateAgentResourceInput = Effect.fn("validateAgentResourceInput"
   value: string,
 ) {
   if (hasControlCharacter(value)) {
-    return yield* InvalidInput.make({
+    return yield* new InvalidInput({
       details: "control characters are not allowed",
       label,
     });
   }
 
   if (value.includes("?") || value.includes("#")) {
-    return yield* InvalidInput.make({
+    return yield* new InvalidInput({
       details: "embedded query strings and fragments are not allowed",
       label,
     });
   }
 
   if (value.split(/[\\/]+/u).includes("..") || /%2e/iu.test(value)) {
-    return yield* InvalidInput.make({
+    return yield* new InvalidInput({
       details: "path traversal segments are not allowed",
       label,
     });
@@ -141,11 +141,11 @@ const readPath = (source: unknown, segments: readonly string[]) => {
   let current = source;
 
   for (const segment of segments) {
-    if (!isRecord(current)) {
+    if (!Predicate.isObjectOrArray(current)) {
       return undefined;
     }
 
-    current = current[segment];
+    current = Reflect.get(current, segment);
   }
 
   return current;
@@ -161,16 +161,13 @@ const setPath = (target: Record<string, unknown>, segments: readonly string[], v
     }
 
     const existing = current[segment];
-    const next: Record<string, unknown> = isRecord(existing) ? existing : {};
+    const next: Record<string, unknown> = Predicate.isObject(existing) ? existing : {};
     current[segment] = next;
     current = next;
   }
 };
 
 const causeToMessage = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
 
 const hasControlCharacter = (value: string) => {
   for (const character of value) {

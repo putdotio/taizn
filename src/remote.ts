@@ -257,7 +257,7 @@ export const sendSamsungTvKeys = Effect.fn("sendSamsungTvKeys")(function* (
   const delayMs = Math.max(0, pressOptions?.delayMs ?? 250);
 
   if (!pressOptions?.dryRun && !token) {
-    return yield* MissingTvRemoteToken.make({});
+    return yield* new MissingTvRemoteToken({});
   }
 
   if (!pressOptions?.dryRun) {
@@ -435,13 +435,13 @@ const resolveRemoteOptions = Effect.fn("resolveRemoteOptions")(function* (
   const host = env.tvHost ?? state?.host ?? targetHost;
 
   if (!host) {
-    return yield* MissingTvRemoteHost.make({});
+    return yield* new MissingTvRemoteHost({});
   }
 
   const token = options?.ignoreToken ? undefined : (env.tvToken ?? state?.token);
 
   if (options?.requireToken && !token) {
-    return yield* MissingTvRemoteToken.make({});
+    return yield* new MissingTvRemoteToken({});
   }
 
   return {
@@ -460,8 +460,9 @@ const readRemoteState = Effect.fn("readRemoteState")(function* () {
   const exists = yield* fs
     .exists(paths.remoteStatePath)
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "exists", path: paths.remoteStatePath }),
+      Effect.mapError(
+        (cause) =>
+          new FileSystemFailure({ cause, operation: "exists", path: paths.remoteStatePath }),
       ),
     );
 
@@ -472,19 +473,19 @@ const readRemoteState = Effect.fn("readRemoteState")(function* () {
   const source = yield* fs
     .readFileString(paths.remoteStatePath)
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "read", path: paths.remoteStatePath }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "read", path: paths.remoteStatePath }),
       ),
     );
   const json = yield* Effect.try({
     try: () => JSON.parse(source),
     catch: (cause) =>
-      InvalidJson.make({ details: causeToMessage(cause), file: paths.remoteStatePath }),
+      new InvalidJson({ details: causeToMessage(cause), file: paths.remoteStatePath }),
   });
 
   return yield* Schema.decodeUnknownEffect(TvRemoteState)(json, { errors: "all" }).pipe(
-    Effect.mapError((error) =>
-      InvalidJson.make({ details: error.message, file: paths.remoteStatePath }),
+    Effect.mapError(
+      (error) => new InvalidJson({ details: error.message, file: paths.remoteStatePath }),
     ),
   );
 });
@@ -500,18 +501,22 @@ const saveRemoteState = Effect.fn("saveRemoteState")(function* (options: SavedRe
     token: options.token,
   });
 
-  yield* fs
-    .makeDirectory(dirname(paths.remoteStatePath), { recursive: true })
-    .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "mkdir", path: dirname(paths.remoteStatePath) }),
-      ),
-    );
+  yield* fs.makeDirectory(dirname(paths.remoteStatePath), { recursive: true }).pipe(
+    Effect.mapError(
+      (cause) =>
+        new FileSystemFailure({
+          cause,
+          operation: "mkdir",
+          path: dirname(paths.remoteStatePath),
+        }),
+    ),
+  );
   yield* fs
     .writeFileString(paths.remoteStatePath, `${JSON.stringify(state, null, 2)}\n`)
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "write", path: paths.remoteStatePath }),
+      Effect.mapError(
+        (cause) =>
+          new FileSystemFailure({ cause, operation: "write", path: paths.remoteStatePath }),
       ),
     );
 });
@@ -559,23 +564,39 @@ const connectRemote = Effect.fn("connectRemote")(function* (
   sequence?: RemoteKeySequence,
 ) {
   return yield* Effect.tryPromise({
-    try: () => connectRemotePromise(options, sequence),
+    try: (signal) => connectRemotePromise(options, sequence, signal),
     catch: (cause) => normalizeRemoteError(cause, options),
   });
 });
 
-const connectRemotePromise = (options: RemoteOptions, sequence?: RemoteKeySequence) =>
+const connectRemotePromise = (
+  options: RemoteOptions,
+  sequence: RemoteKeySequence | undefined,
+  signal: AbortSignal,
+) =>
   new Promise<string>((resolve, reject) => {
     const url = remoteUrl(options);
     const ws = new WebSocket(url, {
       handshakeTimeout: options.timeoutMs,
       rejectUnauthorized: false,
     });
-    const timer = setTimeout(() => {
-      reject(TvRemoteTimeout.make({ target: remoteTarget(options) }));
-      ws.terminate();
-    }, options.timeoutMs);
+    const sequenceTimers = new Set<NodeJS.Timeout>();
     let settled = false;
+
+    const cleanup = (terminate = false) => {
+      clearTimeout(timer);
+      for (const sequenceTimer of sequenceTimers) {
+        clearTimeout(sequenceTimer);
+      }
+      sequenceTimers.clear();
+      signal.removeEventListener("abort", abort);
+
+      if (terminate) {
+        ws.terminate();
+      } else {
+        ws.close();
+      }
+    };
 
     const succeed = (token: string) => {
       if (settled) {
@@ -583,21 +604,40 @@ const connectRemotePromise = (options: RemoteOptions, sequence?: RemoteKeySequen
       }
 
       settled = true;
-      clearTimeout(timer);
+      cleanup();
       resolve(token);
-      ws.close();
     };
 
-    const fail = (error: TvRemoteError) => {
+    const fail = (error: TvRemoteError, terminate = false) => {
       if (settled) {
         return;
       }
 
       settled = true;
-      clearTimeout(timer);
+      cleanup(terminate);
       reject(error);
-      ws.close();
     };
+
+    function abort() {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup(true);
+      reject(signal.reason);
+    }
+
+    const timer = setTimeout(
+      () => fail(new TvRemoteTimeout({ target: remoteTarget(options) }), true),
+      options.timeoutMs,
+    );
+
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) {
+      abort();
+      return;
+    }
 
     const sendSequence = (token: string) => {
       const keys = sequence?.keys ?? [];
@@ -616,15 +656,32 @@ const connectRemotePromise = (options: RemoteOptions, sequence?: RemoteKeySequen
           return;
         }
 
-        ws.send(JSON.stringify(remoteKeyPayload(key)));
+        try {
+          ws.send(JSON.stringify(remoteKeyPayload(key)), (cause) => {
+            if (cause) {
+              fail(new TvRemoteConnectionFailed({ cause, target: remoteTarget(options) }), true);
+            }
+          });
+        } catch (cause) {
+          fail(new TvRemoteConnectionFailed({ cause, target: remoteTarget(options) }), true);
+          return;
+        }
         index += 1;
 
         if (index >= keys.length) {
-          setTimeout(() => succeed(token), 500);
+          const sequenceTimer = setTimeout(() => {
+            sequenceTimers.delete(sequenceTimer);
+            succeed(token);
+          }, 500);
+          sequenceTimers.add(sequenceTimer);
           return;
         }
 
-        setTimeout(sendNext, sequence?.delayMs ?? 250);
+        const sequenceTimer = setTimeout(() => {
+          sequenceTimers.delete(sequenceTimer);
+          sendNext();
+        }, sequence?.delayMs ?? 250);
+        sequenceTimers.add(sequenceTimer);
       };
 
       sendNext();
@@ -641,7 +698,7 @@ const connectRemotePromise = (options: RemoteOptions, sequence?: RemoteKeySequen
       }
 
       if (event.event === "ms.channel.unauthorized") {
-        fail(TvRemoteUnauthorized.make({ target: remoteTarget(options) }));
+        fail(new TvRemoteUnauthorized({ target: remoteTarget(options) }));
         return;
       }
 
@@ -653,7 +710,7 @@ const connectRemotePromise = (options: RemoteOptions, sequence?: RemoteKeySequen
 
       if (!token) {
         fail(
-          TvRemoteProtocolError.make({
+          new TvRemoteProtocolError({
             details: "connect event did not include a token",
           }),
         );
@@ -664,13 +721,13 @@ const connectRemotePromise = (options: RemoteOptions, sequence?: RemoteKeySequen
     });
 
     ws.on("error", (cause) => {
-      fail(TvRemoteConnectionFailed.make({ cause, target: remoteTarget(options) }));
+      fail(new TvRemoteConnectionFailed({ cause, target: remoteTarget(options) }));
     });
 
     ws.on("close", () => {
       if (!settled) {
         fail(
-          TvRemoteConnectionFailed.make({
+          new TvRemoteConnectionFailed({
             cause: new Error("remote websocket closed before connecting"),
             target: remoteTarget(options),
           }),
@@ -685,9 +742,12 @@ export const fetchSamsungTvInfo = Effect.fn("fetchSamsungTvInfo")(function* (
 ) {
   const url = `http://${host}:${options?.port ?? TV_INFO_PORT}/api/v2/`;
   const json = yield* Effect.tryPromise({
-    try: async () => {
+    try: async (signal) => {
       const response = await fetch(url, {
-        signal: AbortSignal.timeout(options?.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+        signal: AbortSignal.any([
+          signal,
+          AbortSignal.timeout(options?.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+        ]),
       });
 
       if (!response.ok) {
@@ -698,12 +758,12 @@ export const fetchSamsungTvInfo = Effect.fn("fetchSamsungTvInfo")(function* (
     },
     catch: (cause) =>
       isAbortError(cause)
-        ? TvRemoteTimeout.make({ target: url })
-        : TvRemoteConnectionFailed.make({ cause, target: url }),
+        ? new TvRemoteTimeout({ target: url })
+        : new TvRemoteConnectionFailed({ cause, target: url }),
   });
 
   return yield* Schema.decodeUnknownEffect(TvInfo)(json, { errors: "all" }).pipe(
-    Effect.mapError((error) => TvRemoteProtocolError.make({ details: error.message })),
+    Effect.mapError((error) => new TvRemoteProtocolError({ details: error.message })),
   );
 });
 
@@ -714,7 +774,7 @@ const readInfoDiagnostic = Effect.fn("readInfoDiagnostic")(function* (
 ) {
   if (!host) {
     return {
-      error: diagnosticError(MissingTvRemoteHost.make({})),
+      error: diagnosticError(new MissingTvRemoteHost({})),
       ok: false,
       port,
     } satisfies TvInfoDiagnostic;
@@ -765,7 +825,7 @@ const readRemoteConnectionDiagnostic = Effect.fn("readRemoteConnectionDiagnostic
 
   if (!options) {
     return {
-      error: diagnosticError(MissingTvRemoteHost.make({})),
+      error: diagnosticError(new MissingTvRemoteHost({})),
       ok: false,
       tested: true,
     } satisfies TvRemoteConnectionDiagnostic;
@@ -794,7 +854,7 @@ const parseRemoteEvent = (source: string, options: RemoteOptions) => {
   try {
     return Schema.decodeUnknownSync(RemoteEvent)(JSON.parse(source));
   } catch (cause) {
-    throw TvRemoteProtocolError.make({
+    throw new TvRemoteProtocolError({
       details: `${remoteTarget(options)} sent an unexpected message: ${causeToMessage(cause)}`,
     });
   }
@@ -865,7 +925,7 @@ const normalizeRemoteError = (cause: unknown, options: RemoteOptions): TvRemoteE
     return cause;
   }
 
-  return TvRemoteConnectionFailed.make({ cause, target: remoteTarget(options) });
+  return new TvRemoteConnectionFailed({ cause, target: remoteTarget(options) });
 };
 
 const diagnosticError = (

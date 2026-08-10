@@ -41,7 +41,7 @@ export const probeHostedAssets = Effect.fn("probeHostedAssets")(function* (
   if (options.json) {
     yield* Console.log(yield* jsonForOutput(result, { fields: options.fields }));
     if (probes.some((probe) => !probe.ok)) {
-      return yield* InvalidInput.make({
+      return yield* new InvalidInput({
         details: `${probes.filter((probe) => !probe.ok).length}/${probes.length} probes failed`,
         label: "hosted asset probe",
       });
@@ -58,7 +58,7 @@ export const probeHostedAssets = Effect.fn("probeHostedAssets")(function* (
     yield* Console.log(`Hosted asset artifact: ${options.artifact}`);
   }
   if (probes.some((probe) => !probe.ok)) {
-    return yield* InvalidInput.make({
+    return yield* new InvalidInput({
       details: `${probes.filter((probe) => !probe.ok).length}/${probes.length} probes failed`,
       label: "hosted asset probe",
     });

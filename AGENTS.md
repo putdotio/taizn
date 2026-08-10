@@ -26,6 +26,16 @@ consumer apps. Keep it a shell-out tool, not an app framework.
 - Keep file/process side effects explicit: copy, stage, clean, run Tizen, fail clearly.
 - Prefer small helpers over new framework layers or compatibility modes.
 
+## Learning more about the Effect
+
+This repository uses the Effect Typescript library.
+
+Before writing any Effect code, first read `node_modules/effect/AGENTS.md`
+**completely**, and follow the links in the file when required.
+
+If you need to learn more about particular Effect apis and concepts that the
+guide doesn't cover, search through the source code in `node_modules/effect/src`.
+
 ## Sharp Edges
 
 - Plain `taizn` should behave like `taizn package`.
@@ -65,9 +75,8 @@ consumer apps. Keep it a shell-out tool, not an app framework.
 
 ## Worktrees
 
-`.worktreeinclude` carries env and `.repos/effect` into managed worktrees;
-Claude symlinks `.repos`. Run `vp install`, `vp run hooks:install`, and
-`vp run verify`. If live-test env is missing, run
+`.worktreeinclude` carries local env files into managed worktrees. Run
+`vp install`, `vp run hooks:install`, and `vp run verify`. If live-test env is missing, run
 `vp run live:test:setup -- --from <consumer-app> --target <tv-ip>`.
 
 ## Checks
@@ -86,8 +95,6 @@ vp run typecheck
 vp run smoke
 vp run test
 ```
-
-Effect source is bootstrapped into ignored `.repos/effect` by `scripts/prepare-effect.sh` outside CI.
 
 Live Tizen checks when the local toolchain/certs/device exist:
 
