@@ -9,10 +9,10 @@ allowBuilds:
   "@parcel/watcher": true
   msgpackr-extract: true
 minimumReleaseAgeExclude:
-  - "@effect/platform-node-shared@4.0.0-beta.78"
-  - "@effect/platform-node@4.0.0-beta.78"
-  - "@effect/vitest@4.0.0-beta.78"
-  - effect@4.0.0-beta.78
+  - "@effect/platform-node-shared@4.0.0-beta.107"
+  - "@effect/platform-node@4.0.0-beta.107"
+  - "@effect/vitest@4.0.0-beta.107"
+  - effect@4.0.0-beta.107
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@0.2.6
   vitest: 4.1.10

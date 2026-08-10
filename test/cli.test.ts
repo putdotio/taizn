@@ -11,10 +11,12 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import { Effect, Fiber, Layer, Schema } from "effect";
 import { WebSocketServer } from "ws";
-import { fetchSamsungTvInfo } from "../src/remote.js";
+import { TaiznEnv } from "../src/env.js";
+import { fetchSamsungTvInfo, sendSamsungTvKeys } from "../src/remote.js";
 import { appBuildEnv, redactCommandArgs, TaiznSystem } from "../src/runtime.js";
 
 const cliPath = resolve("dist/taizn.mjs");
@@ -806,6 +808,52 @@ describe("taizn cli", () => {
       assert.lengthOf(receivedKeys, 5);
       assert.include(receivedKeys[3] ?? "", '"DataOfCmd":"KEY_DOWN"');
       assert.include(receivedKeys[4] ?? "", '"DataOfCmd":"KEY_ENTER"');
+    } finally {
+      server.close();
+    }
+  });
+
+  it("closes Samsung TV remote sockets when the Effect is interrupted", async () => {
+    const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+    await waitForServer(server);
+
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      server.close();
+      throw new Error("Expected TCP websocket test server address.");
+    }
+
+    const connected = Promise.withResolvers<void>();
+    const closed = Promise.withResolvers<void>();
+    server.once("connection", (socket) => {
+      connected.resolve();
+      socket.once("close", () => closed.resolve());
+    });
+
+    const env = TaiznEnv.make({
+      tvHost: "127.0.0.1",
+      tvPort: address.port,
+      tvProtocol: "ws",
+      tvTimeoutMs: 30_000,
+      tvToken: "test-token",
+      variant: "development",
+    });
+    const fiber = Effect.runFork(
+      sendSamsungTvKeys(env, ["KEY_ENTER"]).pipe(
+        Effect.provide(Layer.mergeAll(NodeServices.layer, TaiznSystem.Live)),
+      ),
+    );
+
+    try {
+      await connected.promise;
+      await Effect.runPromise(Fiber.interrupt(fiber));
+      await Promise.race([
+        closed.promise,
+        new Promise<never>((_resolve, reject) =>
+          setTimeout(() => reject(new Error("Interrupted websocket did not close")), 1_000),
+        ),
+      ]);
+      assert.strictEqual(server.clients.size, 0);
     } finally {
       server.close();
     }

@@ -54,7 +54,7 @@ export const loadEnv = Effect.fn("loadEnv")(function* () {
       variant: env.TAIZN_VARIANT,
     },
     { errors: "all" },
-  ).pipe(Effect.mapError((error) => InvalidEnvironment.make({ details: error.message })));
+  ).pipe(Effect.mapError((error) => new InvalidEnvironment({ details: error.message })));
   const tvInfoPort = raw.tvInfoPort
     ? yield* parsePort(raw.tvInfoPort, "TAIZN_TV_INFO_PORT")
     : undefined;
@@ -80,7 +80,7 @@ const parsePort = Effect.fn("parsePort")(function* (value: string, variable: str
   const port = Number(value);
 
   if (!/^\d+$/.test(value) || !Number.isInteger(port) || port < 1 || port > 65535) {
-    return yield* InvalidEnvironment.make({
+    return yield* new InvalidEnvironment({
       details: `${variable} must be an integer between 1 and 65535. Received: ${value}`,
     });
   }
@@ -95,7 +95,7 @@ const parsePositiveInteger = Effect.fn("parsePositiveInteger")(function* (
   const parsed = Number(value);
 
   if (!/^\d+$/.test(value) || !Number.isInteger(parsed) || parsed < 1) {
-    return yield* InvalidEnvironment.make({
+    return yield* new InvalidEnvironment({
       details: `${variable} must be a positive integer. Received: ${value}`,
     });
   }

@@ -7,7 +7,7 @@ if [ -n "${CI:-}" ]; then
 fi
 
 effect_upstream="https://github.com/Effect-TS/effect.git"
-effect_ref="effect@4.0.0-beta.102"
+effect_ref="effect@4.0.0-beta.107"
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_dir="$(dirname "$script_dir")/.repos/effect"
 

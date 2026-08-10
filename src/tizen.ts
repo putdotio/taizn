@@ -1,4 +1,4 @@
-import { Console, Effect, FileSystem, Stream } from "effect";
+import { Console, DateTime, Effect, FileSystem, Stream } from "effect";
 import { ChildProcess } from "effect/unstable/process";
 import { ChildProcessSpawner } from "effect/unstable/process";
 import { spawn } from "node:child_process";
@@ -161,7 +161,7 @@ export const createProfile = Effect.fn("createProfile")(function* (
   const password = yield* readPassword(env.certPassword, "Tizen certificate password: ");
 
   if (!password) {
-    return yield* MissingPassword.make({
+    return yield* new MissingPassword({
       action: "create the signing profile",
       variable: "TAIZN_CERT_PASSWORD",
     });
@@ -241,8 +241,8 @@ export const packageWidget = Effect.fn("packageWidget")(function* (
     yield* fs
       .copyFile(built, installable)
       .pipe(
-        Effect.mapError((cause) =>
-          FileSystemFailure.make({ cause, operation: "copy", path: installable }),
+        Effect.mapError(
+          (cause) => new FileSystemFailure({ cause, operation: "copy", path: installable }),
         ),
       );
   }
@@ -413,12 +413,13 @@ export const proveInstalledApplication = Effect.fn("proveInstalledApplication")(
     : yield* launchApplication(tizenPath, target, application, {
         captureOutput: true,
       });
+  const now = yield* DateTime.now;
   const proof = {
     application: {
       id: application.applicationId,
       name: application.name,
     },
-    createdAt: new Date().toISOString(),
+    createdAt: DateTime.formatIso(now),
     dryRun: options.dryRun === true,
     launch: {
       output: launchOutput.trim(),
@@ -469,7 +470,7 @@ export const captureTizenLogs = Effect.fn("captureTizenLogs")(function* (
   const outputMode = options.output ?? "text";
 
   if (outputMode !== "json" && outputMode !== "ndjson" && outputMode !== "text") {
-    return yield* InvalidInput.make({
+    return yield* new InvalidInput({
       details: `expected json, ndjson, or text. Received: ${outputMode}`,
       label: "logs output",
     });
@@ -492,7 +493,7 @@ export const captureTizenLogs = Effect.fn("captureTizenLogs")(function* (
   const durationMs = options.durationMs ?? 0;
 
   if (durationMs < 0) {
-    return yield* InvalidInput.make({
+    return yield* new InvalidInput({
       details: `expected a non-negative integer. Received: ${durationMs}`,
       label: "logs duration-ms",
     });
@@ -502,12 +503,13 @@ export const captureTizenLogs = Effect.fn("captureTizenLogs")(function* (
     durationMs > 0
       ? yield* captureForDuration(sdbPath, ["-s", target, "dlog"], durationMs)
       : yield* capture(sdbPath, ["-s", target, "dlog", "-d"]);
+  const now = yield* DateTime.now;
   const lines = output
     .split("\n")
     .filter((line) => line && (!options.app || line.includes(options.app)));
   const artifact = {
     app: options.app,
-    capturedAt: new Date().toISOString(),
+    capturedAt: DateTime.formatIso(now),
     durationMs,
     lineCount: lines.length,
     lines,
@@ -586,8 +588,8 @@ const rewriteConfigForWidget = Effect.fn("rewriteConfigForWidget")(function* (
   const source = yield* fs
     .readFileString(targetPath)
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "read", path: targetPath }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "read", path: targetPath }),
       ),
     );
   const withApplication = source.replace(/<tizen:application\b[^>]*\/>/, (tag) =>
@@ -605,8 +607,8 @@ const rewriteConfigForWidget = Effect.fn("rewriteConfigForWidget")(function* (
   yield* fs
     .writeFileString(targetPath, rewritten)
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "write", path: targetPath }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "write", path: targetPath }),
       ),
     );
 });
@@ -622,8 +624,8 @@ const rewriteIndexForWidget = Effect.fn("rewriteIndexForWidget")(function* (
   const source = yield* fs
     .readFileString(indexPath)
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "read", path: indexPath }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "read", path: indexPath }),
       ),
     );
   const withAssets = options.rewriteAssetUrls
@@ -637,8 +639,8 @@ const rewriteIndexForWidget = Effect.fn("rewriteIndexForWidget")(function* (
   yield* fs
     .writeFileString(targetPath, html)
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "write", path: targetPath }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "write", path: targetPath }),
       ),
     );
 });
@@ -667,7 +669,7 @@ const removeExcludedStageFiles = Effect.fn("removeExcludedStageFiles")(function*
     yield* fs
       .remove(path, { force: true, recursive: true })
       .pipe(
-        Effect.mapError((cause) => FileSystemFailure.make({ cause, operation: "remove", path })),
+        Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "remove", path })),
       );
   }
 });
@@ -686,49 +688,49 @@ const stageWidget = Effect.fn("stageWidget")(function* (
   yield* fs
     .remove(paths.stageDir, { force: true, recursive: true })
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "remove", path: paths.stageDir }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "remove", path: paths.stageDir }),
       ),
     );
   yield* fs
     .remove(paths.outputDir, { force: true, recursive: true })
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "remove", path: paths.outputDir }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "remove", path: paths.outputDir }),
       ),
     );
   yield* fs
     .makeDirectory(paths.stageDir, { recursive: true })
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "mkdir", path: paths.stageDir }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "mkdir", path: paths.stageDir }),
       ),
     );
   yield* fs
     .makeDirectory(paths.outputDir, { recursive: true })
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "mkdir", path: paths.outputDir }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "mkdir", path: paths.outputDir }),
       ),
     );
   yield* fs
     .copy(sourceDir, paths.stageDir)
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "copy", path: paths.stageDir }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "copy", path: paths.stageDir }),
       ),
     );
   yield* fs
     .copyFile(configXml, join(paths.stageDir, "config.xml"))
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "copy", path: configXml }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "copy", path: configXml }),
       ),
     );
   yield* fs
     .copyFile(icon, join(paths.stageDir, "icon.png"))
     .pipe(
-      Effect.mapError((cause) => FileSystemFailure.make({ cause, operation: "copy", path: icon })),
+      Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "copy", path: icon })),
     );
   yield* removeExcludedStageFiles(options.excludeFiles);
   yield* rewriteConfigForWidget(variant);
@@ -741,8 +743,9 @@ const findBuiltWidget = Effect.fn("findBuiltWidget")(function* () {
   const entries = yield* fs
     .readDirectory(paths.outputDir)
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "readDirectory", path: paths.outputDir }),
+      Effect.mapError(
+        (cause) =>
+          new FileSystemFailure({ cause, operation: "readDirectory", path: paths.outputDir }),
       ),
     );
   const built = entries
@@ -754,7 +757,7 @@ const findBuiltWidget = Effect.fn("findBuiltWidget")(function* () {
     return built;
   }
 
-  return yield* PackageNotProduced.make({ outputDir: paths.outputDir });
+  return yield* new PackageNotProduced({ outputDir: paths.outputDir });
 });
 
 const listSdbDevices = Effect.fn("listSdbDevices")(function* (sdbPath: string) {
@@ -798,7 +801,7 @@ const resolveInstallTarget = Effect.fn("resolveInstallTarget")(function* (
   }
 
   if (devices.length > 1) {
-    return yield* MultipleTargetsConnected.make({
+    return yield* new MultipleTargetsConnected({
       targets: devices.map((device) => device.id),
     });
   }
@@ -831,7 +834,7 @@ const resolveRunTarget = Effect.fn("resolveRunTarget")(function* (
   }
 
   if (devices.length > 1) {
-    return yield* MultipleTargetsConnected.make({
+    return yield* new MultipleTargetsConnected({
       targets: devices.map((device) => device.id),
     });
   }
@@ -864,12 +867,12 @@ const resolveRequiredSdbTarget = Effect.fn("resolveRequiredSdbTarget")(function*
   }
 
   if (devices.length > 1) {
-    return yield* MultipleTargetsConnected.make({
+    return yield* new MultipleTargetsConnected({
       targets: devices.map((device) => device.id),
     });
   }
 
-  return yield* MissingTizenTarget.make({});
+  return yield* new MissingTizenTarget({});
 });
 
 const loadInstalledApplications = Effect.fn("loadInstalledApplications")(function* (
@@ -919,7 +922,7 @@ const resolveInstalledApplication = Effect.fn("resolveInstalledApplication")(fun
   const normalizedQuery = normalizeQuery(queryLabel);
 
   if (!normalizedQuery) {
-    return yield* ApplicationNotFound.make({ query });
+    return yield* new ApplicationNotFound({ query });
   }
 
   const exactMatch = applications.find(
@@ -942,7 +945,7 @@ const resolveInstalledApplication = Effect.fn("resolveInstalledApplication")(fun
   }
 
   if (exactNameMatches.length > 1) {
-    return yield* MultipleApplicationsMatched.make({
+    return yield* new MultipleApplicationsMatched({
       matches: exactNameMatches.map(
         (application) => `${application.name} (${application.applicationId})`,
       ),
@@ -962,13 +965,13 @@ const resolveInstalledApplication = Effect.fn("resolveInstalledApplication")(fun
   }
 
   if (matches.length > 1) {
-    return yield* MultipleApplicationsMatched.make({
+    return yield* new MultipleApplicationsMatched({
       matches: matches.map((application) => `${application.name} (${application.applicationId})`),
       query: queryLabel,
     });
   }
 
-  return yield* ApplicationNotFound.make({ query: queryLabel });
+  return yield* new ApplicationNotFound({ query: queryLabel });
 });
 
 const launchApplication = Effect.fn("launchApplication")(function* (
@@ -1005,10 +1008,10 @@ const run = Effect.fn("run")(function* (
         stdout: "inherit",
       }),
     )
-    .pipe(Effect.mapError(() => CommandFailed.make({ args: redactCommandArgs(args), command })));
+    .pipe(Effect.mapError(() => new CommandFailed({ args: redactCommandArgs(args), command })));
 
   if (exitCode !== 0) {
-    return yield* CommandFailed.make({ args: redactCommandArgs(args), command });
+    return yield* new CommandFailed({ args: redactCommandArgs(args), command });
   }
 });
 
@@ -1021,16 +1024,12 @@ const capture = Effect.fn("capture")(function* (command: string, args: ReadonlyA
         cwd: paths.appDir,
         env,
         stderr: "inherit",
-      }).pipe(
-        Effect.mapError(() => CommandFailed.make({ args: redactCommandArgs(args), command })),
-      );
+      }).pipe(Effect.mapError(() => new CommandFailed({ args: redactCommandArgs(args), command })));
       const output = yield* process.stdout
         .pipe(Stream.decodeText, Stream.mkString)
-        .pipe(
-          Effect.mapError(() => CommandFailed.make({ args: redactCommandArgs(args), command })),
-        );
+        .pipe(Effect.mapError(() => new CommandFailed({ args: redactCommandArgs(args), command })));
       const exitCode = yield* process.exitCode.pipe(
-        Effect.mapError(() => CommandFailed.make({ args: redactCommandArgs(args), command })),
+        Effect.mapError(() => new CommandFailed({ args: redactCommandArgs(args), command })),
       );
 
       return { exitCode, output };
@@ -1038,7 +1037,7 @@ const capture = Effect.fn("capture")(function* (command: string, args: ReadonlyA
   );
 
   if (output.exitCode !== 0) {
-    return yield* CommandFailed.make({ args: redactCommandArgs(args), command });
+    return yield* new CommandFailed({ args: redactCommandArgs(args), command });
   }
 
   return output.output;
@@ -1053,7 +1052,7 @@ const captureForDuration = Effect.fn("captureForDuration")(function* (
   const env = yield* withTizenPath(yield* baseChildEnv());
 
   return yield* Effect.tryPromise({
-    try: () =>
+    try: (signal) =>
       new Promise<string>((resolve, reject) => {
         const child = spawn(command, args, {
           cwd: paths.appDir,
@@ -1073,6 +1072,17 @@ const captureForDuration = Effect.fn("captureForDuration")(function* (
           stderr += chunk;
         });
 
+        const cleanup = () => {
+          clearTimeout(timer);
+          signal.removeEventListener("abort", abort);
+        };
+
+        const abort = () => {
+          cleanup();
+          child.kill("SIGTERM");
+          reject(signal.reason);
+        };
+
         const timer = setTimeout(() => {
           timedOut = true;
           child.kill("SIGTERM");
@@ -1080,7 +1090,7 @@ const captureForDuration = Effect.fn("captureForDuration")(function* (
 
         child.on("error", reject);
         child.on("close", (code, signal) => {
-          clearTimeout(timer);
+          cleanup();
 
           if (timedOut || code === 0 || signal === "SIGTERM") {
             resolve(stdout);
@@ -1089,7 +1099,11 @@ const captureForDuration = Effect.fn("captureForDuration")(function* (
 
           reject(new Error(stderr.trim() || `exit ${code ?? signal ?? "unknown"}`));
         });
+        signal.addEventListener("abort", abort, { once: true });
+        if (signal.aborted) {
+          abort();
+        }
       }),
-    catch: () => CommandFailed.make({ args: redactCommandArgs(args), command }),
+    catch: () => new CommandFailed({ args: redactCommandArgs(args), command }),
   });
 });

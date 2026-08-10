@@ -1,4 +1,4 @@
-import { Console, Effect, Schema } from "effect";
+import { Console, DateTime, Effect, Schema } from "effect";
 import type { TaiznEnv } from "./env.js";
 import { InvalidInput, InvalidJson } from "./errors.js";
 import { readJsonFile, validateAgentResourceInput, writeJsonArtifact } from "./io.js";
@@ -52,9 +52,10 @@ export const runTvScript = Effect.fn("runTvScript")(function* (
   }
 
   if (options.artifact) {
+    const now = yield* DateTime.now;
     yield* writeJsonArtifact(options.artifact, {
       ...result,
-      completedAt: new Date().toISOString(),
+      completedAt: DateTime.formatIso(now),
     });
   }
 
@@ -77,7 +78,7 @@ const loadTvScript = Effect.fn("loadTvScript")(function* (file: string) {
   const json = yield* readJsonFile(file);
 
   return yield* Schema.decodeUnknownEffect(TvScript)(json, { errors: "all" }).pipe(
-    Effect.mapError((error) => InvalidJson.make({ details: error.message, file })),
+    Effect.mapError((error) => new InvalidJson({ details: error.message, file })),
   );
 });
 
@@ -90,14 +91,14 @@ const resolveScriptSteps = Effect.fn("resolveScriptSteps")(function* (script: Tv
     const delayMs = step.delayMs ?? script.delayMs ?? 250;
 
     if (keys.length === 0) {
-      return yield* InvalidInput.make({
+      return yield* new InvalidInput({
         details: "each TV script step must include key or keys",
         label: "TV script",
       });
     }
 
     if (!Number.isInteger(delayMs) || delayMs < 0) {
-      return yield* InvalidInput.make({
+      return yield* new InvalidInput({
         details: `delayMs must be a non-negative integer. Received: ${delayMs}`,
         label: "TV script",
       });

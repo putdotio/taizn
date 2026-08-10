@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-export class ConfigNotFound extends Schema.TaggedErrorClass<ConfigNotFound>()("ConfigNotFound", {
+export class ConfigNotFound extends Schema.TaggedError<ConfigNotFound>()("ConfigNotFound", {
   path: Schema.String,
 }) {
   override get message(): string {
@@ -8,7 +8,7 @@ export class ConfigNotFound extends Schema.TaggedErrorClass<ConfigNotFound>()("C
   }
 }
 
-export class InvalidConfig extends Schema.TaggedErrorClass<InvalidConfig>()("InvalidConfig", {
+export class InvalidConfig extends Schema.TaggedError<InvalidConfig>()("InvalidConfig", {
   details: Schema.String,
 }) {
   override get message(): string {
@@ -16,7 +16,7 @@ export class InvalidConfig extends Schema.TaggedErrorClass<InvalidConfig>()("Inv
   }
 }
 
-export class InvalidEnvironment extends Schema.TaggedErrorClass<InvalidEnvironment>()(
+export class InvalidEnvironment extends Schema.TaggedError<InvalidEnvironment>()(
   "InvalidEnvironment",
   {
     details: Schema.String,
@@ -27,7 +27,7 @@ export class InvalidEnvironment extends Schema.TaggedErrorClass<InvalidEnvironme
   }
 }
 
-export class InvalidJson extends Schema.TaggedErrorClass<InvalidJson>()("InvalidJson", {
+export class InvalidJson extends Schema.TaggedError<InvalidJson>()("InvalidJson", {
   file: Schema.String,
   details: Schema.String,
 }) {
@@ -36,7 +36,7 @@ export class InvalidJson extends Schema.TaggedErrorClass<InvalidJson>()("Invalid
   }
 }
 
-export class InvalidInput extends Schema.TaggedErrorClass<InvalidInput>()("InvalidInput", {
+export class InvalidInput extends Schema.TaggedError<InvalidInput>()("InvalidInput", {
   label: Schema.String,
   details: Schema.String,
 }) {
@@ -45,7 +45,7 @@ export class InvalidInput extends Schema.TaggedErrorClass<InvalidInput>()("Inval
   }
 }
 
-export class MissingFile extends Schema.TaggedErrorClass<MissingFile>()("MissingFile", {
+export class MissingFile extends Schema.TaggedError<MissingFile>()("MissingFile", {
   label: Schema.String,
   path: Schema.String,
 }) {
@@ -54,12 +54,12 @@ export class MissingFile extends Schema.TaggedErrorClass<MissingFile>()("Missing
   }
 }
 
-export class FileSystemFailure extends Schema.TaggedErrorClass<FileSystemFailure>()(
+export class FileSystemFailure extends Schema.TaggedError<FileSystemFailure>()(
   "FileSystemFailure",
   {
     operation: Schema.String,
     path: Schema.String,
-    cause: Schema.Unknown,
+    cause: Schema.Defect(),
   },
 ) {
   override get message(): string {
@@ -67,7 +67,7 @@ export class FileSystemFailure extends Schema.TaggedErrorClass<FileSystemFailure
   }
 }
 
-export class CommandFailed extends Schema.TaggedErrorClass<CommandFailed>()("CommandFailed", {
+export class CommandFailed extends Schema.TaggedError<CommandFailed>()("CommandFailed", {
   command: Schema.String,
   args: Schema.Array(Schema.String),
 }) {
@@ -76,7 +76,7 @@ export class CommandFailed extends Schema.TaggedErrorClass<CommandFailed>()("Com
   }
 }
 
-export class ApplicationNotFound extends Schema.TaggedErrorClass<ApplicationNotFound>()(
+export class ApplicationNotFound extends Schema.TaggedError<ApplicationNotFound>()(
   "ApplicationNotFound",
   {
     query: Schema.String,
@@ -87,7 +87,7 @@ export class ApplicationNotFound extends Schema.TaggedErrorClass<ApplicationNotF
   }
 }
 
-export class MultipleApplicationsMatched extends Schema.TaggedErrorClass<MultipleApplicationsMatched>()(
+export class MultipleApplicationsMatched extends Schema.TaggedError<MultipleApplicationsMatched>()(
   "MultipleApplicationsMatched",
   {
     matches: Schema.Array(Schema.String),
@@ -99,7 +99,7 @@ export class MultipleApplicationsMatched extends Schema.TaggedErrorClass<Multipl
   }
 }
 
-export class PackageNotProduced extends Schema.TaggedErrorClass<PackageNotProduced>()(
+export class PackageNotProduced extends Schema.TaggedError<PackageNotProduced>()(
   "PackageNotProduced",
   {
     outputDir: Schema.String,
@@ -110,7 +110,7 @@ export class PackageNotProduced extends Schema.TaggedErrorClass<PackageNotProduc
   }
 }
 
-export class MissingPassword extends Schema.TaggedErrorClass<MissingPassword>()("MissingPassword", {
+export class MissingPassword extends Schema.TaggedError<MissingPassword>()("MissingPassword", {
   variable: Schema.String,
   action: Schema.String,
 }) {
@@ -119,7 +119,7 @@ export class MissingPassword extends Schema.TaggedErrorClass<MissingPassword>()(
   }
 }
 
-export class SecretReadInterrupted extends Schema.TaggedErrorClass<SecretReadInterrupted>()(
+export class SecretReadInterrupted extends Schema.TaggedError<SecretReadInterrupted>()(
   "SecretReadInterrupted",
   {},
 ) {
@@ -128,7 +128,7 @@ export class SecretReadInterrupted extends Schema.TaggedErrorClass<SecretReadInt
   }
 }
 
-export class MultipleTargetsConnected extends Schema.TaggedErrorClass<MultipleTargetsConnected>()(
+export class MultipleTargetsConnected extends Schema.TaggedError<MultipleTargetsConnected>()(
   "MultipleTargetsConnected",
   {
     targets: Schema.Array(Schema.String),
@@ -139,7 +139,7 @@ export class MultipleTargetsConnected extends Schema.TaggedErrorClass<MultipleTa
   }
 }
 
-export class MissingTizenTarget extends Schema.TaggedErrorClass<MissingTizenTarget>()(
+export class MissingTizenTarget extends Schema.TaggedError<MissingTizenTarget>()(
   "MissingTizenTarget",
   {},
 ) {
@@ -148,7 +148,7 @@ export class MissingTizenTarget extends Schema.TaggedErrorClass<MissingTizenTarg
   }
 }
 
-export class MissingTvRemoteHost extends Schema.TaggedErrorClass<MissingTvRemoteHost>()(
+export class MissingTvRemoteHost extends Schema.TaggedError<MissingTvRemoteHost>()(
   "MissingTvRemoteHost",
   {},
 ) {
@@ -157,7 +157,7 @@ export class MissingTvRemoteHost extends Schema.TaggedErrorClass<MissingTvRemote
   }
 }
 
-export class MissingTvRemoteToken extends Schema.TaggedErrorClass<MissingTvRemoteToken>()(
+export class MissingTvRemoteToken extends Schema.TaggedError<MissingTvRemoteToken>()(
   "MissingTvRemoteToken",
   {},
 ) {
@@ -166,10 +166,10 @@ export class MissingTvRemoteToken extends Schema.TaggedErrorClass<MissingTvRemot
   }
 }
 
-export class TvRemoteConnectionFailed extends Schema.TaggedErrorClass<TvRemoteConnectionFailed>()(
+export class TvRemoteConnectionFailed extends Schema.TaggedError<TvRemoteConnectionFailed>()(
   "TvRemoteConnectionFailed",
   {
-    cause: Schema.Unknown,
+    cause: Schema.Defect(),
     target: Schema.String,
   },
 ) {
@@ -178,7 +178,7 @@ export class TvRemoteConnectionFailed extends Schema.TaggedErrorClass<TvRemoteCo
   }
 }
 
-export class TvRemoteProtocolError extends Schema.TaggedErrorClass<TvRemoteProtocolError>()(
+export class TvRemoteProtocolError extends Schema.TaggedError<TvRemoteProtocolError>()(
   "TvRemoteProtocolError",
   {
     details: Schema.String,
@@ -189,7 +189,7 @@ export class TvRemoteProtocolError extends Schema.TaggedErrorClass<TvRemoteProto
   }
 }
 
-export class TvRemoteTimeout extends Schema.TaggedErrorClass<TvRemoteTimeout>()("TvRemoteTimeout", {
+export class TvRemoteTimeout extends Schema.TaggedError<TvRemoteTimeout>()("TvRemoteTimeout", {
   target: Schema.String,
 }) {
   override get message(): string {
@@ -197,7 +197,7 @@ export class TvRemoteTimeout extends Schema.TaggedErrorClass<TvRemoteTimeout>()(
   }
 }
 
-export class TvRemoteUnauthorized extends Schema.TaggedErrorClass<TvRemoteUnauthorized>()(
+export class TvRemoteUnauthorized extends Schema.TaggedError<TvRemoteUnauthorized>()(
   "TvRemoteUnauthorized",
   {
     target: Schema.String,

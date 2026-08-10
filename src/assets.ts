@@ -37,48 +37,45 @@ export const readConfiguredIndexHtml = Effect.fn("readConfiguredIndexHtml")(func
   return yield* fs
     .readFileString(indexPath)
     .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "read", path: indexPath }),
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "read", path: indexPath }),
       ),
     );
 });
 
 export const probeAssetUrls = Effect.fn("probeAssetUrls")(function* (urls: readonly string[]) {
-  const probes: AssetProbe[] = [];
+  return yield* Effect.forEach(urls, probeAssetUrl, { concurrency: 4 });
+});
 
-  for (const url of urls) {
-    const parsed = yield* parseHttpUrl(url);
-    const type = probeType(parsed);
-    const result = yield* Effect.tryPromise({
-      try: async () => {
-        const response = await fetch(parsed, {
-          cache: "no-store",
-          method: "GET",
-          signal: AbortSignal.timeout(15_000),
-        });
+const probeAssetUrl = Effect.fn("probeAssetUrl")(function* (url: string) {
+  const parsed = yield* parseHttpUrl(url);
+  const type = probeType(parsed);
 
-        return {
-          ok: response.ok,
-          status: response.status,
-          type,
-          url: parsed.href,
-        } satisfies AssetProbe;
-      },
-      catch: (cause) => cause,
-    }).pipe(
-      Effect.catch(() =>
-        Effect.succeed({
-          ok: false,
-          type,
-          url: parsed.href,
-        } satisfies AssetProbe),
-      ),
-    );
+  return yield* Effect.tryPromise({
+    try: async (signal) => {
+      const response = await fetch(parsed, {
+        cache: "no-store",
+        method: "GET",
+        signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
+      });
 
-    probes.push(result);
-  }
-
-  return probes;
+      return {
+        ok: response.ok,
+        status: response.status,
+        type,
+        url: parsed.href,
+      } satisfies AssetProbe;
+    },
+    catch: (cause) => cause,
+  }).pipe(
+    Effect.catch(() =>
+      Effect.succeed({
+        ok: false,
+        type,
+        url: parsed.href,
+      } satisfies AssetProbe),
+    ),
+  );
 });
 
 export const validateAssetUrls = Effect.fn("validateAssetUrls")(function* (
@@ -98,14 +95,14 @@ const parseHttpUrl = Effect.fn("parseHttpUrl")(function* (url: string) {
   const parsed = yield* Effect.try({
     try: () => new URL(url),
     catch: () =>
-      InvalidInput.make({
+      new InvalidInput({
         details: `expected an absolute http(s) URL. Received: ${url}`,
         label: "asset URL",
       }),
   });
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return yield* InvalidInput.make({
+    return yield* new InvalidInput({
       details: `expected an absolute http(s) URL. Received: ${url}`,
       label: "asset URL",
     });
