@@ -141,11 +141,11 @@ const readPath = (source: unknown, segments: readonly string[]) => {
   let current = source;
 
   for (const segment of segments) {
-    if (!Predicate.isObject(current)) {
+    if (!Predicate.isObjectOrArray(current)) {
       return undefined;
     }
 
-    current = current[segment];
+    current = Reflect.get(current, segment);
   }
 
   return current;

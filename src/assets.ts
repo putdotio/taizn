@@ -59,12 +59,16 @@ const probeAssetUrl = Effect.fn("probeAssetUrl")(function* (url: string) {
         signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
       });
 
-      return {
-        ok: response.ok,
-        status: response.status,
-        type,
-        url: parsed.href,
-      } satisfies AssetProbe;
+      try {
+        return {
+          ok: response.ok,
+          status: response.status,
+          type,
+          url: parsed.href,
+        } satisfies AssetProbe;
+      } finally {
+        await response.body?.cancel();
+      }
     },
     catch: (cause) => cause,
   }).pipe(

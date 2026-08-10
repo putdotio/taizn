@@ -15,6 +15,7 @@ import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Schema } from "effect";
 import { WebSocketServer } from "ws";
+import { probeAssetUrls } from "../src/assets.js";
 import { TaiznEnv } from "../src/env.js";
 import { fetchSamsungTvInfo, sendSamsungTvKeys } from "../src/remote.js";
 import { appBuildEnv, redactCommandArgs, TaiznSystem } from "../src/runtime.js";
@@ -202,6 +203,20 @@ describe("taizn cli", () => {
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
     assert.deepStrictEqual(JSON.parse(result.stdout), { target: "127.0.0.1:26101" });
+  });
+
+  it("applies field masks through array entries", () => {
+    const dir = createToolingFixture();
+    const result = runTaizn(["apps", "--json", "--fields", "applications.0.id", "example"], dir, {
+      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      TAIZN_TARGET: "127.0.0.1:26101",
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    assert.deepStrictEqual(JSON.parse(result.stdout), {
+      applications: { 0: { id: "Example.app" } },
+    });
   });
 
   it("prints only JSON for installed applications when auto-picking one target", () => {
@@ -1129,6 +1144,49 @@ describe("taizn cli", () => {
       assert.strictEqual(probe.probes[0]?.ok, false);
       assert.include(result.stderr, "hosted asset probe");
     } finally {
+      server.close();
+    }
+  });
+
+  it("closes successful hosted asset response bodies", async () => {
+    let resolveClosed: (() => void) | undefined;
+    const responseClosed = new Promise<void>((resolve) => {
+      resolveClosed = resolve;
+    });
+    const server = createServer((_request, response) => {
+      response.once("close", () => resolveClosed?.());
+      response.writeHead(200, { "content-type": "application/javascript" });
+      response.write("export const ready = true;\n");
+    });
+
+    try {
+      await waitForHttpServer(server);
+      const address = server.address();
+
+      if (!address || typeof address === "string") {
+        throw new Error("Expected TCP HTTP test server address.");
+      }
+
+      const probes = await Effect.runPromise(
+        probeAssetUrls([`http://127.0.0.1:${address.port}/stream.js`]),
+      );
+      assert.deepStrictEqual(probes, [
+        {
+          ok: true,
+          status: 200,
+          type: "script",
+          url: `http://127.0.0.1:${address.port}/stream.js`,
+        },
+      ]);
+
+      await Promise.race([
+        responseClosed,
+        new Promise<never>((_resolve, reject) => {
+          setTimeout(() => reject(new Error("Expected asset response body to close.")), 1_000);
+        }),
+      ]);
+    } finally {
+      server.closeAllConnections();
       server.close();
     }
   });
