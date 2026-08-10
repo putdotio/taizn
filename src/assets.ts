@@ -67,7 +67,9 @@ const probeAssetUrl = Effect.fn("probeAssetUrl")(function* (url: string) {
           url: parsed.href,
         } satisfies AssetProbe;
       } finally {
-        await response.body?.cancel();
+        if (response.body) {
+          await response.body.cancel().catch(() => undefined);
+        }
       }
     },
     catch: (cause) => cause,

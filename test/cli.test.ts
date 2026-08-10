@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { NodeServices } from "@effect/platform-node";
-import { assert, describe, it } from "@effect/vitest";
+import { assert, describe, it, vi } from "@effect/vitest";
 import { Effect, Fiber, Layer, Schema } from "effect";
 import { WebSocketServer } from "ws";
 import { probeAssetUrls } from "../src/assets.js";
@@ -1188,6 +1188,30 @@ describe("taizn cli", () => {
     } finally {
       server.closeAllConnections();
       server.close();
+    }
+  });
+
+  it("preserves successful probes when response cleanup fails", async () => {
+    const body = new ReadableStream({
+      cancel: () => Promise.reject(new Error("stream cleanup failed")),
+    });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(body, { status: 200 }));
+
+    try {
+      const probes = await Effect.runPromise(probeAssetUrls(["https://example.com/stream.js"]));
+
+      assert.deepStrictEqual(probes, [
+        {
+          ok: true,
+          status: 200,
+          type: "script",
+          url: "https://example.com/stream.js",
+        },
+      ]);
+    } finally {
+      fetchMock.mockRestore();
     }
   });
 
