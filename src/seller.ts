@@ -1,8 +1,6 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { connect } from "node:net";
+import { spawn } from "node:child_process";
 import { isAbsolute } from "node:path";
-import { Console, Effect, Exit, FileSystem, Schema } from "effect";
+import { Console, Effect, FileSystem, Schema } from "effect";
 import WebSocket from "ws";
 import type { TaiznEnv } from "./env.js";
 import {
@@ -37,9 +35,7 @@ export class SellerApplicationsResult extends Schema.Class<SellerApplicationsRes
 }) {}
 
 class SellerBrowserState extends Schema.Class<SellerBrowserState>("SellerBrowserState")({
-  owner: Schema.optionalKey(Schema.NonEmptyString),
-  pid: Schema.optionalKey(Schema.Number),
-  port: Schema.optionalKey(Schema.Number),
+  port: Schema.Number,
   schemaVersion: Schema.Literal(1),
 }) {}
 
@@ -48,23 +44,6 @@ class CdpTarget extends Schema.Class<CdpTarget>("CdpTarget")({
   type: Schema.String,
   url: Schema.String,
   webSocketDebuggerUrl: Schema.optionalKey(Schema.String),
-}) {}
-
-class CdpBrowserVersion extends Schema.Class<CdpBrowserVersion>("CdpBrowserVersion")({
-  webSocketDebuggerUrl: Schema.String,
-}) {}
-
-class CdpBrowserCommandLine extends Schema.Class<CdpBrowserCommandLine>("CdpBrowserCommandLine")({
-  arguments: Schema.Array(Schema.String),
-}) {}
-
-class CdpProcessInfo extends Schema.Class<CdpProcessInfo>("CdpProcessInfo")({
-  id: Schema.Number,
-  type: Schema.String,
-}) {}
-
-class CdpSystemInfo extends Schema.Class<CdpSystemInfo>("CdpSystemInfo")({
-  processInfo: Schema.Array(CdpProcessInfo),
 }) {}
 
 class CdpError extends Schema.Class<CdpError>("CdpError")({
@@ -117,8 +96,7 @@ export const loginSeller = Effect.fn("loginSeller")(function* (
 ) {
   const paths = yield* getPaths();
   const browser = yield* resolveSellerBrowser(env);
-  const owner = randomUUID();
-  const args = sellerBrowserArgs(paths.sellerProfileDir, owner);
+  const args = sellerBrowserArgs(paths.sellerProfileDir);
   const result = {
     browser,
     browserProfile: paths.sellerProfileDir,
@@ -141,138 +119,23 @@ export const loginSeller = Effect.fn("loginSeller")(function* (
         FileSystemFailure.make({ cause, operation: "mkdir", path: paths.sellerProfileDir }),
       ),
     );
-  yield* Effect.acquireUseRelease(
-    Effect.gen(function* () {
-      const child = yield* Effect.tryPromise({
-        try: () => launchBrowser(browser, args),
-        catch: (cause) => SellerBrowserConnectionFailed.make({ cause, target: browser }),
-      });
-      const pid = child.pid;
-      if (pid === undefined) {
-        return yield* SellerBrowserConnectionFailed.make({
-          cause: new Error("browser process has no PID"),
-          target: browser,
-        });
-      }
+  yield* Effect.tryPromise({
+    try: () => launchBrowser(browser, args),
+    catch: (cause) => SellerBrowserConnectionFailed.make({ cause, target: browser }),
+  });
+  const port = yield* waitForDevToolsPort(paths.sellerDevToolsPortPath);
 
-      yield* writeJsonArtifact(
-        paths.sellerStatePath,
-        SellerBrowserState.make({ owner, pid, schemaVersion: 1 }),
-      ).pipe(
-        Effect.catch((writeError) =>
-          Effect.tryPromise({
-            try: () => terminateSellerBrowserTree(pid),
-            catch: (cleanupError) =>
-              SellerBrowserConnectionFailed.make({ cause: cleanupError, target: browser }),
-          }).pipe(
-            Effect.andThen(
-              fs.remove(paths.sellerStatePath, { force: true }).pipe(
-                Effect.mapError((cause) =>
-                  FileSystemFailure.make({
-                    cause,
-                    operation: "remove",
-                    path: paths.sellerStatePath,
-                  }),
-                ),
-              ),
-            ),
-            Effect.andThen(Effect.fail(writeError)),
-          ),
-        ),
-      );
-      return child;
-    }),
-    (child) =>
-      Effect.gen(function* () {
-        const pid = child.pid;
-        if (pid === undefined) {
-          return yield* SellerBrowserConnectionFailed.make({
-            cause: new Error("browser process has no PID"),
-            target: browser,
-          });
-        }
-
-        const port = yield* waitForDevToolsPort(paths.sellerDevToolsPortPath);
-        yield* writeJsonArtifact(
-          paths.sellerStatePath,
-          SellerBrowserState.make({ owner, pid, port, schemaVersion: 1 }),
-        );
-        yield* Effect.sync(() => child.unref());
-        yield* printLoginResult(result, options.json);
-      }),
-    (child, exit) =>
-      Exit.isSuccess(exit)
-        ? Effect.void
-        : Effect.tryPromise({
-            try: () => terminateSellerBrowserTree(child.pid),
-            catch: (cause) => SellerBrowserConnectionFailed.make({ cause, target: browser }),
-          }).pipe(
-            Effect.andThen(
-              fs.remove(paths.sellerStatePath, { force: true }).pipe(
-                Effect.mapError((cause) =>
-                  FileSystemFailure.make({
-                    cause,
-                    operation: "remove",
-                    path: paths.sellerStatePath,
-                  }),
-                ),
-              ),
-            ),
-          ),
+  yield* writeJsonArtifact(
+    paths.sellerStatePath,
+    SellerBrowserState.make({ port, schemaVersion: 1 }),
   );
-});
-
-export const closeSeller = Effect.fn("closeSeller")(function* (
-  options: { readonly json?: boolean } = {},
-) {
-  const paths = yield* getPaths();
-  const fs = yield* FileSystem.FileSystem;
-  const exists = yield* fs
-    .exists(paths.sellerStatePath)
-    .pipe(
-      Effect.mapError((cause) =>
-        FileSystemFailure.make({ cause, operation: "exists", path: paths.sellerStatePath }),
-      ),
-    );
-
-  let closed = false;
-
-  if (exists) {
-    const state = yield* readSellerBrowserState();
-    const target =
-      state.port === undefined ? paths.sellerStatePath : `http://127.0.0.1:${state.port}`;
-    closed = yield* Effect.tryPromise({
-      try: () => closeOwnedBrowser(state, paths.sellerProfileDir),
-      catch: (cause) => normalizeSellerError(cause, target),
-    });
-    yield* fs
-      .remove(paths.sellerStatePath, { force: true })
-      .pipe(
-        Effect.mapError((cause) =>
-          FileSystemFailure.make({ cause, operation: "remove", path: paths.sellerStatePath }),
-        ),
-      );
-  }
-
-  const result = { closed, sessionState: paths.sellerStatePath };
-
-  if (options.json) {
-    yield* Console.log(JSON.stringify(result));
-    return;
-  }
-
-  yield* Console.log(closed ? "Closed the Seller Office browser." : "Seller Office is stopped.");
+  yield* printLoginResult(result, options.json);
 });
 
 export const listSellerApplications = Effect.fn("listSellerApplications")(function* (
   options: SellerOutputOptions = {},
 ) {
   const state = yield* readSellerBrowserState();
-  if (state.port === undefined) {
-    return yield* SellerPortalProtocolError.make({
-      details: "Seller Office browser login did not finish starting",
-    });
-  }
   const target = `http://127.0.0.1:${state.port}`;
   const result = yield* Effect.tryPromise({
     try: () => readSellerApplications(target),
@@ -335,10 +198,8 @@ const defaultSellerBrowser = () => {
   return "google-chrome";
 };
 
-const sellerBrowserArgs = (profileDir: string, owner: string) => [
+const sellerBrowserArgs = (profileDir: string) => [
   `--user-data-dir=${profileDir}`,
-  `--taizn-owner=${owner}`,
-  "--enable-automation",
   "--remote-debugging-address=127.0.0.1",
   "--remote-debugging-port=0",
   "--no-first-run",
@@ -347,7 +208,7 @@ const sellerBrowserArgs = (profileDir: string, owner: string) => [
 ];
 
 const launchBrowser = (browser: string, args: readonly string[]) =>
-  new Promise<ChildProcess>((resolve, reject) => {
+  new Promise<void>((resolve, reject) => {
     const child = spawn(browser, args, {
       detached: true,
       stdio: "ignore",
@@ -355,160 +216,8 @@ const launchBrowser = (browser: string, args: readonly string[]) =>
 
     child.once("error", reject);
     child.once("spawn", () => {
-      resolve(child);
-    });
-  });
-
-export const terminateSellerBrowserTree = async (pid: number | undefined) => {
-  if (pid === undefined) return;
-
-  if (process.platform === "win32") {
-    await terminateWindowsBrowserTree(pid);
-    return;
-  }
-
-  signalProcessGroup(pid, "SIGTERM");
-  if (await waitForProcessExit(-pid, 500)) return;
-
-  signalProcessGroup(pid, "SIGKILL");
-  if (await waitForProcessExit(-pid, 5_000)) return;
-
-  throw new Error(`owned Seller Office browser process group ${pid} did not exit after SIGKILL`);
-};
-
-const terminateWindowsBrowserTree = async (pid: number) => {
-  await runTaskkill(pid, true);
-};
-
-const runTaskkill = (pid: number, force: boolean) =>
-  new Promise<void>((resolve, reject) => {
-    const args = ["/PID", String(pid), "/T", ...(force ? ["/F"] : [])];
-    const taskkill = spawn("taskkill", args, { stdio: "ignore", windowsHide: true });
-
-    taskkill.once("error", reject);
-    taskkill.once("close", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      reject(new Error(`taskkill ${args.join(" ")} exited with code ${code ?? 1}`));
-    });
-  });
-
-const waitForProcessExit = async (target: number, timeoutMs: number) => {
-  const deadline = Date.now() + timeoutMs;
-
-  while (processExists(target)) {
-    if (Date.now() >= deadline) return false;
-    await delay(25);
-  }
-
-  return true;
-};
-
-const processExists = (target: number) => {
-  try {
-    process.kill(target, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code !== "ESRCH";
-  }
-};
-
-const signalProcessGroup = (pid: number, signal: NodeJS.Signals) => {
-  try {
-    process.kill(-pid, signal);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
-  }
-};
-
-const closeOwnedBrowser = async (state: SellerBrowserState, profileDir: string) => {
-  if (state.owner === undefined || state.pid === undefined || state.port === undefined) {
-    throw SellerPortalProtocolError.make({
-      details: "seller session has incomplete ownership evidence; close it manually",
-    });
-  }
-
-  await assertBrowserEndpointOwner(state.port, state.pid, profileDir, state.owner);
-  await terminateSellerBrowserTree(state.pid);
-  await waitForBrowserEndpointClose(state.port);
-  return true;
-};
-
-const assertBrowserEndpointOwner = async (
-  port: number,
-  pid: number,
-  profileDir: string,
-  owner: string,
-) => {
-  const response = await fetch(`http://127.0.0.1:${port}/json/version`, {
-    signal: AbortSignal.timeout(500),
-  });
-
-  if (!response.ok) throw new Error(`DevTools HTTP ${response.status}`);
-  const raw: unknown = await response.json();
-  const version = Schema.decodeUnknownSync(CdpBrowserVersion)(raw);
-  const { rawCommandLine, rawSystemInfo } = await withCdp(
-    version.webSocketDebuggerUrl,
-    async (send) => ({
-      rawCommandLine: await send("Browser.getBrowserCommandLine", {}),
-      rawSystemInfo: await send("SystemInfo.getProcessInfo", {}),
-    }),
-  );
-  const commandLine = Schema.decodeUnknownSync(CdpBrowserCommandLine)(rawCommandLine);
-  const systemInfo = Schema.decodeUnknownSync(CdpSystemInfo)(rawSystemInfo);
-  const browser = systemInfo.processInfo.find((processInfo) => processInfo.type === "browser");
-
-  if (browser?.id !== pid) {
-    throw SellerPortalProtocolError.make({
-      details: `seller browser endpoint ${port} does not belong to PID ${pid}`,
-    });
-  }
-
-  if (
-    !commandLine.arguments.includes(`--user-data-dir=${profileDir}`) ||
-    !commandLine.arguments.includes(`--taizn-owner=${owner}`)
-  ) {
-    throw SellerPortalProtocolError.make({
-      details: `seller browser endpoint ${port} does not carry the expected ownership arguments`,
-    });
-  }
-};
-
-const waitForBrowserEndpointClose = async (port: number) => {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    if (!(await isLoopbackPortOpen(port))) return;
-
-    await delay(50);
-  }
-
-  throw new Error(`Seller Office browser endpoint ${port} did not stop`);
-};
-
-const isLoopbackPortOpen = (port: number) =>
-  new Promise<boolean>((resolve, reject) => {
-    const socket = connect({ host: "127.0.0.1", port });
-    const timeout = setTimeout(() => {
-      socket.destroy();
-      reject(new Error(`timed out probing Seller Office browser endpoint ${port}`));
-    }, 250);
-    const settle = (result: boolean) => {
-      clearTimeout(timeout);
-      socket.destroy();
-      resolve(result);
-    };
-
-    socket.once("connect", () => settle(true));
-    socket.once("error", (error: NodeJS.ErrnoException) => {
-      if (error.code === "ECONNREFUSED" || error.code === "ECONNRESET") {
-        settle(false);
-        return;
-      }
-
-      clearTimeout(timeout);
-      reject(error);
+      child.unref();
+      resolve();
     });
   });
 
@@ -574,24 +283,9 @@ const readSellerBrowserState = Effect.fn("readSellerBrowserState")(function* () 
     ),
   );
 
-  if (
-    state.port !== undefined &&
-    (!Number.isInteger(state.port) || state.port < 1 || state.port > 65_535)
-  ) {
+  if (!Number.isInteger(state.port) || state.port < 1 || state.port > 65_535) {
     return yield* SellerPortalProtocolError.make({
       details: `invalid seller browser port: ${state.port}`,
-    });
-  }
-
-  if (state.pid !== undefined && (!Number.isInteger(state.pid) || state.pid < 1)) {
-    return yield* SellerPortalProtocolError.make({
-      details: `invalid seller browser PID: ${state.pid}`,
-    });
-  }
-
-  if (state.pid === undefined && state.port === undefined) {
-    return yield* SellerPortalProtocolError.make({
-      details: "seller session state has no browser ownership information",
     });
   }
 

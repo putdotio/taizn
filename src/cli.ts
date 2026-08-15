@@ -11,7 +11,7 @@ import {
 import { describeCli } from "./describe.js";
 import { inspectWidgetArchive, prepareSubmission, validateSubmission } from "./inspect.js";
 import { probeHostedAssets } from "./probe.js";
-import { closeSeller, listSellerApplications, loginSeller } from "./seller.js";
+import { listSellerApplications, loginSeller } from "./seller.js";
 import { listTargets, showCurrentTarget } from "./targets.js";
 import {
   captureTizenLogs,
@@ -389,13 +389,7 @@ const sellerAppsList = Command.make(
 
 const sellerApps = Command.make("apps", {}).pipe(Command.withSubcommands([sellerAppsList]));
 
-const sellerClose = Command.make("close", { json: Flag.boolean("json") }, ({ json }) =>
-  closeSeller({ json }),
-);
-
-const seller = Command.make("seller", {}).pipe(
-  Command.withSubcommands([sellerLogin, sellerApps, sellerClose]),
-);
+const seller = Command.make("seller", {}).pipe(Command.withSubcommands([sellerLogin, sellerApps]));
 
 const describe = Command.make("describe", {}, () => describeCli());
 

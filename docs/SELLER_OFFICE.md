@@ -22,7 +22,6 @@ Then list applications:
 taizn seller apps list --json
 taizn seller apps list --json --fields applications
 taizn seller apps list --json --artifact .taizn/seller-apps.json
-taizn seller close
 ```
 
 The result contains only a schema version and sanitized application name,
@@ -31,10 +30,10 @@ group, cookie, token, raw HTML, or raw portal-response data.
 
 ## Local State
 
-| Path                            | Contents                                                   |
-| ------------------------------- | ---------------------------------------------------------- |
-| `.taizn/seller/chrome-profile/` | Dedicated human-owned Chrome profile and Samsung session   |
-| `.taizn/seller.json`            | Schema version, owner token, process ID, and DevTools port |
+| Path                            | Contents                                                 |
+| ------------------------------- | -------------------------------------------------------- |
+| `.taizn/seller/chrome-profile/` | Dedicated human-owned Chrome profile and Samsung session |
+| `.taizn/seller.json`            | Schema version and localhost DevTools port               |
 
 Keep all of `.taizn/` ignored. Treat the Chrome profile as sensitive session
 material even though Taizn does not inspect or print it.
@@ -48,9 +47,6 @@ location.
 - Taizn navigates the visible public portal UI; it does not call undocumented
   Seller Office HTTP endpoints.
 - Login remains interactive and human-owned; CI login is unsupported.
-- `taizn seller login` tears down the browser process tree if startup fails or
-  the command is interrupted. A successful login hands the browser to the
-  local session state until `taizn seller close` is run.
 - Portal layout drift fails with `SellerPortalDrift` instead of guessing.
 - A signed-out browser fails with `SellerAuthenticationRequired`.
 - Upload, pre-test, release requests, submission, and other portal mutations are
@@ -60,10 +56,6 @@ location.
 
 - Missing state: run `taizn seller login`.
 - Signed out: finish login in the visible dedicated browser, then retry.
-- Finished or abandoned task: run `taizn seller close`; it is safe to repeat.
-- Browser connection failed: failed startup normally cleans itself up. If
-  cleanup also fails, Taizn preserves partial ownership state and refuses
-  automatic teardown without endpoint proof; close the dedicated profile
-  manually and verify its process tree is gone before removing that stale state.
+- Browser connection failed: close the dedicated profile and run login again.
 - Portal drift: stop automation and update the adapter against the current
   visible page before retrying.
