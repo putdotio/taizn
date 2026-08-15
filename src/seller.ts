@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { isAbsolute } from "node:path";
-import { Console, Effect, Exit, FileSystem, Schema } from "effect";
+import { Console, Effect, Exit, FileSystem, Result, Schema } from "effect";
 import WebSocket from "ws";
 import type { TaiznEnv } from "./env.js";
 import {
@@ -140,8 +140,8 @@ export const loginSeller = Effect.fn("loginSeller")(function* (
     (child, exit) =>
       Exit.isSuccess(exit)
         ? Effect.void
-        : Effect.all(
-            [
+        : Effect.gen(function* () {
+            const stateCleanup = yield* (
               stateWritten
                 ? fs.remove(paths.sellerStatePath, { force: true }).pipe(
                     Effect.mapError((cause) =>
@@ -152,14 +152,16 @@ export const loginSeller = Effect.fn("loginSeller")(function* (
                       }),
                     ),
                   )
-                : Effect.void,
-              Effect.tryPromise({
-                try: () => stopBrowser(child),
-                catch: (cause) => SellerBrowserConnectionFailed.make({ cause, target: browser }),
-              }),
-            ],
-            { concurrency: "unbounded" },
-          ).pipe(Effect.asVoid),
+                : Effect.void
+            ).pipe(Effect.result);
+            const browserCleanup = yield* Effect.tryPromise({
+              try: () => stopBrowser(child),
+              catch: (cause) => SellerBrowserConnectionFailed.make({ cause, target: browser }),
+            }).pipe(Effect.result);
+
+            if (Result.isFailure(stateCleanup)) return yield* Effect.fail(stateCleanup.failure);
+            if (Result.isFailure(browserCleanup)) return yield* Effect.fail(browserCleanup.failure);
+          }),
   );
 });
 
