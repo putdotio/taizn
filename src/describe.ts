@@ -215,6 +215,32 @@ const commandDescriptions = [
     resultSchema: "CurrentTargetResult",
   }),
   CommandDescription.make({
+    artifacts: false,
+    command: "seller login",
+    dryRun: true,
+    env: ["TAIZN_SELLER_BROWSER"],
+    fieldMask: false,
+    flags: ["--json", "--dry-run"],
+    mutates: true,
+    outputs: ["text", "json"],
+    purpose:
+      "Open a dedicated local Chrome profile for human-owned TV Seller Office authentication.",
+    resultSchema: "SellerLoginResult",
+  }),
+  CommandDescription.make({
+    artifacts: true,
+    command: "seller apps list",
+    dryRun: false,
+    env: [],
+    fieldMask: true,
+    flags: ["--json", "--artifact <path>", "--fields <mask>"],
+    mutates: false,
+    outputs: ["text", "json", "artifact"],
+    purpose:
+      "List sanitized application identity and status from a human-authenticated TV Seller Office browser.",
+    resultSchema: "SellerApplicationsResult",
+  }),
+  CommandDescription.make({
     artifacts: true,
     command: "tv doctor",
     dryRun: false,

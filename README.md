@@ -45,6 +45,8 @@ Common project files:
 | `.taizn/.env`          | Optional local secrets read by Node            |
 | `.taizn/certificates/` | Optional local author and distributor certs    |
 | `.taizn/remote.json`   | Optional paired Samsung TV remote token        |
+| `.taizn/seller.json`   | Local Seller Office browser connection state   |
+| `.taizn/seller/`       | Dedicated human-owned Chrome profile           |
 | `.taizn/build/`        | Generated package staging and output           |
 
 ## Config
@@ -104,6 +106,8 @@ pnpm exec taizn prove --dry-run --json --fields application.id,target Example.ap
 pnpm exec taizn prove --json --artifact .taizn/proof.json Example.app
 pnpm exec taizn prepare submission --json --artifact .taizn/submission.json package.wgt
 pnpm exec taizn validate submission --json --fields ok,problems
+pnpm exec taizn seller login --dry-run --json
+pnpm exec taizn seller apps list --json --artifact .taizn/seller-apps.json
 pnpm exec taizn tv doctor --connect --json --artifact .taizn/tv-doctor.json
 ```
 
@@ -130,6 +134,8 @@ home for local proof state.
 | `package`                            | Build and sign a `.wgt`                            |
 | `install`                            | Package and sideload the widget                    |
 | `run`                                | Launch the configured variant application          |
+| `seller login`                       | Open the human-owned Seller Office browser profile |
+| `seller apps list`                   | Read sanitized Seller Office application status    |
 | `tv doctor` / `tv info`              | Inspect Samsung TV remote-control readiness        |
 | `tv pair` / `tv press` / `tv script` | Pair and send Samsung remote-control key sequences |
 
@@ -148,6 +154,7 @@ TAIZN_VARIANT=development
 TAIZN_TARGET=<tv-ip>:26101
 TAIZN_TIZEN_CLI=~/tizen-studio/tools/ide/bin/tizen
 TAIZN_SDB=~/tizen-studio/tools/sdb
+TAIZN_SELLER_BROWSER=/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome
 TAIZN_TV_HOST=<tv-ip>
 TAIZN_TV_PORT=8002
 TAIZN_TV_PROTOCOL=wss
@@ -158,13 +165,21 @@ TAIZN_TV_TOKEN=<paired-remote-token>
 host is set. `taizn tv pair` writes the paired remote token to
 `.taizn/remote.json`; keep `.taizn/` ignored.
 
+`taizn seller login` opens a dedicated visible Chrome profile under `.taizn/`
+and stores only its localhost DevTools port in `.taizn/seller.json`. Complete
+Samsung login yourself; Taizn does not request or read passwords, cookies, MFA,
+or browser tokens. See [Seller Office](./docs/SELLER_OFFICE.md) for the supported
+read-only workflow and recovery steps.
+
 ## Boundaries
 
 `taizn` owns platform mechanics: Tizen CLI, `sdb`, widget archives, local
 submission preparation, Samsung remote keys, target inventory, logs,
 hosted-asset probes, and proof artifacts. Consumer apps own product journeys,
 credentials, app IDs, content IDs, account state, visual assertions, release
-decisions, and Samsung TV Seller Office portal mutations.
+decisions, and Samsung TV Seller Office portal mutations. Taizn's Seller Office
+surface is limited to a human-owned local browser session and sanitized
+read-only discovery.
 
 ## Docs
 
@@ -172,6 +187,7 @@ decisions, and Samsung TV Seller Office portal mutations.
 - [Distribution](./docs/DISTRIBUTION.md)
 - [Live Test](./live-test/README.md)
 - [Samsung TV Remote](./docs/TV_REMOTE.md)
+- [Seller Office](./docs/SELLER_OFFICE.md)
 - [Security](./SECURITY.md)
 
 ## Repo Internals

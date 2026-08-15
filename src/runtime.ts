@@ -10,6 +10,9 @@ export type TaiznPaths = {
   readonly envPath: string;
   readonly outputDir: string;
   readonly remoteStatePath: string;
+  readonly sellerDevToolsPortPath: string;
+  readonly sellerProfileDir: string;
+  readonly sellerStatePath: string;
   readonly stageDir: string;
   readonly taiznDir: string;
 };
@@ -46,6 +49,7 @@ export class TaiznSystem extends Context.Service<
 
 export const makePaths = (appDir: string): TaiznPaths => {
   const taiznDir = join(appDir, ".taizn");
+  const sellerProfileDir = join(taiznDir, "seller", "chrome-profile");
 
   return {
     appDir,
@@ -53,6 +57,9 @@ export const makePaths = (appDir: string): TaiznPaths => {
     envPath: join(taiznDir, ".env"),
     outputDir: join(taiznDir, "build", "output"),
     remoteStatePath: join(taiznDir, "remote.json"),
+    sellerDevToolsPortPath: join(sellerProfileDir, "DevToolsActivePort"),
+    sellerProfileDir,
+    sellerStatePath: join(taiznDir, "seller.json"),
     stageDir: join(taiznDir, "build", "stage"),
     taiznDir,
   };

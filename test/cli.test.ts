@@ -73,6 +73,7 @@ describe("taizn cli", () => {
     assert.include(result.stdout, "prepare");
     assert.include(result.stdout, "prove");
     assert.include(result.stdout, "run");
+    assert.include(result.stdout, "seller");
     assert.include(result.stdout, "tv");
     assert.strictEqual(result.stderr, "");
   });
@@ -98,6 +99,7 @@ describe("taizn cli", () => {
     assert.isTrue(described.commands.some((command) => command.command === "prove"));
     assert.isTrue(described.commands.some((command) => command.command === "probe hosted-assets"));
     assert.isTrue(described.commands.some((command) => command.command === "prepare submission"));
+    assert.isTrue(described.commands.some((command) => command.command === "seller apps list"));
     assert.isFalse(described.commands.some((command) => command.command === "targets"));
     assert.isFalse(described.commands.some((command) => command.command === "tv"));
     assert.isTrue(described.commands.some((command) => command.command === "targets list"));
@@ -114,6 +116,146 @@ describe("taizn cli", () => {
     const tvScript = described.commands.find((command) => command.command === "tv script");
     assert.isFalse(tvScript?.fieldMask);
   });
+
+  it("dry-runs the human-owned Seller Office login without storing credentials", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-login-"));
+    const result = runTaizn(["seller", "login", "--dry-run", "--json"], dir, {
+      TAIZN_SELLER_BROWSER: process.execPath,
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    assert.deepStrictEqual(JSON.parse(result.stdout), {
+      browser: process.execPath,
+      browserProfile: join(realpathSync(dir), ".taizn/seller/chrome-profile"),
+      dryRun: true,
+      sessionState: join(realpathSync(dir), ".taizn/seller.json"),
+      storesCredentials: false,
+      url: "https://seller.samsungapps.com/tv/",
+    });
+  });
+
+  it("reports a missing Seller Office browser session as structured JSON", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-missing-"));
+    const result = runTaizn(["seller", "apps", "list", "--json"], dir);
+
+    assert.strictEqual(result.status, 1);
+    assert.deepStrictEqual(JSON.parse(result.stderr), {
+      error: {
+        message: `Seller Office browser session not found: ${join(realpathSync(dir), ".taizn/seller.json")}. Run \`taizn seller login\` first.`,
+        type: "SellerSessionNotFound",
+      },
+      ok: false,
+    });
+    assert.notInclude(result.stderr, "at ");
+  });
+
+  it("lists sanitized Seller Office applications through the local browser adapter", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-apps-"));
+    const fixture = await startFakeSellerBrowser(dir, {
+      applications: [
+        {
+          name: "Example App",
+          sellerAppId: "1234567890123",
+          status: "For Sale",
+          type: "Web",
+          updatedAt: "2026-01-02",
+        },
+      ],
+      state: "ready",
+    });
+
+    try {
+      const result = await runTaiznAsync(
+        ["seller", "apps", "list", "--json", "--artifact", ".taizn/seller-apps.json"],
+        dir,
+      );
+
+      assert.strictEqual(result.status, 0);
+      assert.strictEqual(result.stderr, "");
+      const applications = parseSellerApplicationsJson(result.stdout);
+      assert.deepStrictEqual(applications, {
+        applications: [
+          {
+            name: "Example App",
+            sellerAppId: "1234567890123",
+            status: "For Sale",
+            type: "Web",
+            updatedAt: "2026-01-02",
+          },
+        ],
+        schemaVersion: 1,
+      });
+      assert.deepStrictEqual(
+        JSON.parse(readFileSync(join(dir, ".taizn/seller-apps.json"), "utf8")),
+        applications,
+      );
+      assert.deepStrictEqual(fixture.methods, ["Page.navigate", "Runtime.evaluate"]);
+      assert.deepStrictEqual(fixture.httpPaths, ["/json/list"]);
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it("fails clearly when Seller Office is signed out", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-signed-out-"));
+    const fixture = await startFakeSellerBrowser(dir, { state: "signedOut" });
+
+    try {
+      const result = await runTaiznAsync(["seller", "apps", "list", "--json"], dir);
+
+      assert.strictEqual(result.status, 1);
+      assert.strictEqual(JSON.parse(result.stderr).error.type, "SellerAuthenticationRequired");
+      assert.notInclude(result.stderr, "at ");
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it("fails closed when the Seller Office application layout drifts", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-drift-"));
+    const fixture = await startFakeSellerBrowser(dir, {
+      details: "application card fields are missing",
+      state: "drift",
+    });
+
+    try {
+      const result = await runTaiznAsync(["seller", "apps", "list", "--json"], dir);
+
+      assert.strictEqual(result.status, 1);
+      assert.deepStrictEqual(JSON.parse(result.stderr), {
+        error: {
+          message: "Seller Office portal layout changed: application card fields are missing",
+          type: "SellerPortalDrift",
+        },
+        ok: false,
+      });
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it("fails closed when Seller Office leaves a CDP request unanswered", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-cdp-timeout-"));
+    const fixture = await startFakeSellerBrowser(dir, { state: "ready" }, ["Page.navigate"]);
+
+    try {
+      const result = await runTaiznAsync(["seller", "apps", "list", "--json"], dir);
+
+      assert.strictEqual(result.status, 1);
+      assert.deepStrictEqual(JSON.parse(result.stderr), {
+        error: {
+          message:
+            "Seller Office browser protocol failed: Page.navigate request 1 timed out after 10000ms",
+          type: "SellerPortalProtocolError",
+        },
+        ok: false,
+      });
+      assert.deepStrictEqual(fixture.methods, ["Page.navigate"]);
+    } finally {
+      fixture.close();
+    }
+  }, 15_000);
 
   it("reports missing config without a stack trace", () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-missing-config-"));
@@ -1937,6 +2079,26 @@ const TargetsJsonSchema = Schema.Struct({
 
 type TargetsJson = typeof TargetsJsonSchema.Type;
 
+const SellerApplicationsJsonSchema = Schema.Struct({
+  applications: Schema.Array(
+    Schema.Struct({
+      name: Schema.String,
+      sellerAppId: Schema.String,
+      status: Schema.String,
+      type: Schema.String,
+      updatedAt: Schema.optionalKey(Schema.String),
+    }),
+  ),
+  schemaVersion: Schema.Literal(1),
+});
+
+type SellerApplicationsJson = typeof SellerApplicationsJsonSchema.Type;
+
+const CdpRequestSchema = Schema.Struct({
+  id: Schema.Number,
+  method: Schema.String,
+});
+
 const ProbeJsonSchema = Schema.Struct({
   urls: Schema.Array(Schema.String),
 });
@@ -2041,6 +2203,11 @@ const parseTargetsJson = (text: string): TargetsJson => {
   return Schema.decodeUnknownSync(TargetsJsonSchema)(targets);
 };
 
+const parseSellerApplicationsJson = (text: string): SellerApplicationsJson => {
+  const applications: unknown = JSON.parse(text);
+  return Schema.decodeUnknownSync(SellerApplicationsJsonSchema)(applications);
+};
+
 const parseProbeJson = (text: string): ProbeJson => {
   const probe: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(ProbeJsonSchema)(probe);
@@ -2142,6 +2309,83 @@ const waitForFile = async (path: string) => {
   }
 
   throw new Error(`Timed out waiting for ${path}`);
+};
+
+const startFakeSellerBrowser = async (
+  dir: string,
+  extraction: unknown,
+  unansweredMethods: readonly string[] = [],
+) => {
+  const methods: string[] = [];
+  const httpPaths: string[] = [];
+  const websocketServer = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+  await waitForServer(websocketServer);
+  const websocketAddress = websocketServer.address();
+
+  if (!websocketAddress || typeof websocketAddress === "string") {
+    websocketServer.close();
+    throw new Error("Expected Seller Office websocket address.");
+  }
+
+  websocketServer.on("connection", (socket) => {
+    socket.on("message", (data) => {
+      const json: unknown = JSON.parse(data.toString());
+      const request = Schema.decodeUnknownSync(CdpRequestSchema)(json);
+      methods.push(request.method);
+
+      if (unansweredMethods.includes(request.method)) {
+        return;
+      }
+
+      socket.send(
+        JSON.stringify({
+          id: request.id,
+          result:
+            request.method === "Runtime.evaluate"
+              ? { result: { type: "object", value: extraction } }
+              : { frameId: "fixture" },
+        }),
+      );
+    });
+  });
+
+  const httpServer = createServer((request, response) => {
+    httpPaths.push(request.url ?? "");
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify([
+        {
+          id: "fixture-page",
+          type: "page",
+          url: "about:blank",
+          webSocketDebuggerUrl: `ws://127.0.0.1:${websocketAddress.port}`,
+        },
+      ]),
+    );
+  });
+  await waitForHttpServer(httpServer);
+  const httpAddress = httpServer.address();
+
+  if (!httpAddress || typeof httpAddress === "string") {
+    httpServer.close();
+    websocketServer.close();
+    throw new Error("Expected Seller Office HTTP address.");
+  }
+
+  mkdirSync(join(dir, ".taizn"), { recursive: true });
+  writeFileSync(
+    join(dir, ".taizn/seller.json"),
+    `${JSON.stringify({ port: httpAddress.port, schemaVersion: 1 }, null, 2)}\n`,
+  );
+
+  return {
+    close: () => {
+      httpServer.close();
+      websocketServer.close();
+    },
+    httpPaths,
+    methods,
+  };
 };
 
 const makeStoredZip = (
