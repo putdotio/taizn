@@ -265,6 +265,7 @@ export class SellerPortalDrift extends Schema.TaggedError<SellerPortalDrift>()(
 export class SellerPortalProtocolError extends Schema.TaggedError<SellerPortalProtocolError>()(
   "SellerPortalProtocolError",
   {
+    cause: Schema.optionalKey(Schema.Defect()),
     details: Schema.String,
   },
 ) {

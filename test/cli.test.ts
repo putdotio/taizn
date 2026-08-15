@@ -235,6 +235,28 @@ describe("taizn cli", () => {
     }
   });
 
+  it("fails closed when Seller Office leaves a CDP request unanswered", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-cdp-timeout-"));
+    const fixture = await startFakeSellerBrowser(dir, { state: "ready" }, ["Page.navigate"]);
+
+    try {
+      const result = await runTaiznAsync(["seller", "apps", "list", "--json"], dir);
+
+      assert.strictEqual(result.status, 1);
+      assert.deepStrictEqual(JSON.parse(result.stderr), {
+        error: {
+          message:
+            "Seller Office browser protocol failed: Page.navigate request 1 timed out after 10000ms",
+          type: "SellerPortalProtocolError",
+        },
+        ok: false,
+      });
+      assert.deepStrictEqual(fixture.methods, ["Page.navigate"]);
+    } finally {
+      fixture.close();
+    }
+  }, 15_000);
+
   it("reports missing config without a stack trace", () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-missing-config-"));
     const result = runTaizn(["package"], dir);
@@ -2289,7 +2311,11 @@ const waitForFile = async (path: string) => {
   throw new Error(`Timed out waiting for ${path}`);
 };
 
-const startFakeSellerBrowser = async (dir: string, extraction: unknown) => {
+const startFakeSellerBrowser = async (
+  dir: string,
+  extraction: unknown,
+  unansweredMethods: readonly string[] = [],
+) => {
   const methods: string[] = [];
   const httpPaths: string[] = [];
   const websocketServer = new WebSocketServer({ host: "127.0.0.1", port: 0 });
@@ -2306,6 +2332,11 @@ const startFakeSellerBrowser = async (dir: string, extraction: unknown) => {
       const json: unknown = JSON.parse(data.toString());
       const request = Schema.decodeUnknownSync(CdpRequestSchema)(json);
       methods.push(request.method);
+
+      if (unansweredMethods.includes(request.method)) {
+        return;
+      }
+
       socket.send(
         JSON.stringify({
           id: request.id,

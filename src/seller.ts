@@ -388,9 +388,12 @@ const withCdp = <A>(
     const socket = new WebSocket(url, { handshakeTimeout: SELLER_TIMEOUT_MS });
     let nextId = 1;
     let settled = false;
+    const rejectPendingRequests = new Set<(cause: unknown) => void>();
 
-    const close = () => {
-      socket.close();
+    const rejectPending = (cause: unknown) => {
+      for (const rejectRequest of rejectPendingRequests) {
+        rejectRequest(cause);
+      }
     };
 
     const fail = (cause: unknown) => {
@@ -399,7 +402,8 @@ const withCdp = <A>(
       }
 
       settled = true;
-      close();
+      rejectPending(cause);
+      socket.close();
       reject(cause);
     };
 
@@ -409,7 +413,7 @@ const withCdp = <A>(
       }
 
       settled = true;
-      close();
+      socket.close();
       resolve(value);
     };
 
@@ -418,6 +422,30 @@ const withCdp = <A>(
       nextId += 1;
 
       return new Promise<unknown>((resolveRequest, rejectRequest) => {
+        let requestSettled = false;
+        const cleanup = () => {
+          clearTimeout(timeout);
+          socket.off("message", onMessage);
+          rejectPendingRequests.delete(failRequest);
+        };
+        const failRequest = (cause: unknown) => {
+          if (requestSettled) {
+            return;
+          }
+
+          requestSettled = true;
+          cleanup();
+          rejectRequest(cause);
+        };
+        const succeedRequest = (result: unknown) => {
+          if (requestSettled) {
+            return;
+          }
+
+          requestSettled = true;
+          cleanup();
+          resolveRequest(result);
+        };
         const onMessage = (data: WebSocket.RawData) => {
           try {
             const json: unknown = JSON.parse(data.toString());
@@ -427,10 +455,8 @@ const withCdp = <A>(
               return;
             }
 
-            socket.off("message", onMessage);
-
             if (message.error) {
-              rejectRequest(
+              failRequest(
                 SellerPortalProtocolError.make({
                   details: `${method}: ${message.error.message}`,
                 }),
@@ -438,18 +464,26 @@ const withCdp = <A>(
               return;
             }
 
-            resolveRequest(message.result);
+            succeedRequest(message.result);
           } catch {
-            socket.off("message", onMessage);
-            rejectRequest(SellerPortalProtocolError.make({ details: "invalid DevTools response" }));
+            failRequest(SellerPortalProtocolError.make({ details: "invalid DevTools response" }));
           }
         };
+        const timeout = setTimeout(() => {
+          const cause = new Error(`DevTools request ${id} did not receive a response`);
+          failRequest(
+            SellerPortalProtocolError.make({
+              cause,
+              details: `${method} request ${id} timed out after ${SELLER_TIMEOUT_MS}ms`,
+            }),
+          );
+        }, SELLER_TIMEOUT_MS);
 
+        rejectPendingRequests.add(failRequest);
         socket.on("message", onMessage);
         socket.send(JSON.stringify({ id, method, params }), (cause) => {
           if (cause) {
-            socket.off("message", onMessage);
-            rejectRequest(cause);
+            failRequest(cause);
           }
         });
       });
