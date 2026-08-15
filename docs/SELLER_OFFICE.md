@@ -15,6 +15,9 @@ taizn seller login
 
 Complete Samsung login and MFA in the opened browser. Taizn never requests or
 reads the password, cookies, MFA values, or browser tokens.
+Before login succeeds, Taizn stops that exact browser tree on failure or
+interruption. After success, the visible session is handed to the operator and
+left running.
 
 Then list applications:
 

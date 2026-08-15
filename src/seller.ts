@@ -1,6 +1,7 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
+import { once } from "node:events";
 import { isAbsolute } from "node:path";
-import { Console, Effect, FileSystem, Schema } from "effect";
+import { Console, Effect, Exit, FileSystem, Result, Schema } from "effect";
 import WebSocket from "ws";
 import type { TaiznEnv } from "./env.js";
 import {
@@ -119,17 +120,49 @@ export const loginSeller = Effect.fn("loginSeller")(function* (
         FileSystemFailure.make({ cause, operation: "mkdir", path: paths.sellerProfileDir }),
       ),
     );
-  yield* Effect.tryPromise({
-    try: () => launchBrowser(browser, args),
-    catch: (cause) => SellerBrowserConnectionFailed.make({ cause, target: browser }),
-  });
-  const port = yield* waitForDevToolsPort(paths.sellerDevToolsPortPath);
+  let stateWritten = false;
+  yield* Effect.acquireUseRelease(
+    Effect.tryPromise({
+      try: () => launchBrowser(browser, args),
+      catch: (cause) => SellerBrowserConnectionFailed.make({ cause, target: browser }),
+    }),
+    (child) =>
+      Effect.gen(function* () {
+        const port = yield* waitForDevToolsPort(paths.sellerDevToolsPortPath);
+        yield* writeJsonArtifact(
+          paths.sellerStatePath,
+          SellerBrowserState.make({ port, schemaVersion: 1 }),
+        );
+        stateWritten = true;
+        yield* printLoginResult(result, options.json);
+        child.unref();
+      }),
+    (child, exit) =>
+      Exit.isSuccess(exit)
+        ? Effect.void
+        : Effect.gen(function* () {
+            const stateCleanup = yield* (
+              stateWritten
+                ? fs.remove(paths.sellerStatePath, { force: true }).pipe(
+                    Effect.mapError((cause) =>
+                      FileSystemFailure.make({
+                        cause,
+                        operation: "remove",
+                        path: paths.sellerStatePath,
+                      }),
+                    ),
+                  )
+                : Effect.void
+            ).pipe(Effect.result);
+            const browserCleanup = yield* Effect.tryPromise({
+              try: () => stopBrowser(child),
+              catch: (cause) => SellerBrowserConnectionFailed.make({ cause, target: browser }),
+            }).pipe(Effect.result);
 
-  yield* writeJsonArtifact(
-    paths.sellerStatePath,
-    SellerBrowserState.make({ port, schemaVersion: 1 }),
+            if (Result.isFailure(stateCleanup)) return yield* Effect.fail(stateCleanup.failure);
+            if (Result.isFailure(browserCleanup)) return yield* Effect.fail(browserCleanup.failure);
+          }),
   );
-  yield* printLoginResult(result, options.json);
 });
 
 export const listSellerApplications = Effect.fn("listSellerApplications")(function* (
@@ -208,18 +241,66 @@ const sellerBrowserArgs = (profileDir: string) => [
 ];
 
 const launchBrowser = (browser: string, args: readonly string[]) =>
-  new Promise<void>((resolve, reject) => {
+  new Promise<ChildProcess>((resolve, reject) => {
     const child = spawn(browser, args, {
-      detached: true,
+      detached: process.platform !== "win32",
       stdio: "ignore",
     });
 
     child.once("error", reject);
     child.once("spawn", () => {
-      child.unref();
-      resolve();
+      resolve(child);
     });
   });
+
+const browserTreeExists = (pid: number) => {
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
+    throw error;
+  }
+};
+
+const waitForBrowserTreeExit = async (pid: number, timeoutMs: number) => {
+  const deadline = Date.now() + timeoutMs;
+  while (browserTreeExists(pid)) {
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  return true;
+};
+
+const stopBrowser = async (child: ChildProcess) => {
+  if (child.pid === undefined) return;
+
+  if (process.platform === "win32") {
+    const killer = spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
+      stdio: "ignore",
+    });
+    const [code] = (await once(killer, "exit")) as [number | null];
+    if (code !== 0) throw new Error(`Seller Office browser tree ${child.pid} was not verified.`);
+    return;
+  }
+
+  if (!browserTreeExists(child.pid)) return;
+
+  const signal = (name: NodeJS.Signals) => {
+    try {
+      process.kill(-child.pid!, name);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+    }
+  };
+
+  signal("SIGTERM");
+  if (await waitForBrowserTreeExit(child.pid, 2_000)) return;
+  signal("SIGKILL");
+  if (!(await waitForBrowserTreeExit(child.pid, 2_000))) {
+    throw new Error(`Seller Office browser ${child.pid} did not stop.`);
+  }
+};
 
 const waitForDevToolsPort = Effect.fn("waitForDevToolsPort")(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
