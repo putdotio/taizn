@@ -1,5 +1,6 @@
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -9,7 +10,7 @@ import {
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it, vi } from "@effect/vitest";
@@ -19,6 +20,7 @@ import { probeAssetUrls } from "../src/assets.js";
 import { TaiznEnv } from "../src/env.js";
 import { fetchSamsungTvInfo, sendSamsungTvKeys } from "../src/remote.js";
 import { appBuildEnv, redactCommandArgs, TaiznSystem } from "../src/runtime.js";
+import { terminateSellerBrowserTree } from "../src/seller.js";
 import { captureForDuration } from "../src/tizen.js";
 
 const cliPath = resolve("dist/taizn.mjs");
@@ -149,6 +151,194 @@ describe("taizn cli", () => {
     });
     assert.notInclude(result.stderr, "at ");
   });
+
+  it("closes the owned Seller Office browser and removes its session state", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-close-"));
+    const profileDir = join(realpathSync(dir), ".taizn/seller/chrome-profile");
+    const owner = "close-owner";
+    const browser = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      detached: true,
+      stdio: "ignore",
+    });
+    const browserPid = browser.pid;
+    if (browserPid === undefined) throw new Error("Expected owned browser PID.");
+    const fixture = await startFakeSellerBrowser(
+      dir,
+      { applications: [], state: "ready" },
+      [],
+      browserPid,
+      owner,
+      [`--user-data-dir=${profileDir}`, `--taizn-owner=${owner}`],
+    );
+
+    try {
+      const result = await runTaiznAsync(["seller", "close", "--json"], dir);
+
+      assert.strictEqual(
+        result.status,
+        0,
+        JSON.stringify({
+          httpPaths: fixture.httpPaths,
+          methods: fixture.methods,
+          stderr: result.stderr,
+        }),
+      );
+      assert.strictEqual(result.stderr, "");
+      assert.deepStrictEqual(JSON.parse(result.stdout), {
+        closed: true,
+        sessionState: join(realpathSync(dir), ".taizn/seller.json"),
+      });
+      assert.isFalse(existsSync(join(dir, ".taizn/seller.json")));
+      assert.isFalse(isProcessAlive(browserPid));
+      assert.deepStrictEqual(fixture.methods, [
+        "Browser.getBrowserCommandLine",
+        "SystemInfo.getProcessInfo",
+      ]);
+      assert.deepStrictEqual(fixture.httpPaths, ["/json/version"]);
+    } finally {
+      fixture.close();
+      killTestProcessTree(browserPid);
+    }
+  });
+
+  it("makes Seller Office browser teardown idempotent", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-close-empty-"));
+    const result = runTaizn(["seller", "close", "--json"], dir);
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+    assert.deepStrictEqual(JSON.parse(result.stdout), {
+      closed: false,
+      sessionState: join(realpathSync(dir), ".taizn/seller.json"),
+    });
+  });
+
+  it("preserves Seller Office session state when browser teardown cannot be confirmed", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-close-failed-"));
+    mkdirSync(join(dir, ".taizn"), { recursive: true });
+    writeFileSync(
+      join(dir, ".taizn/seller.json"),
+      `${JSON.stringify({ port: 1, schemaVersion: 1 }, null, 2)}\n`,
+    );
+
+    const result = await runTaiznAsync(["seller", "close", "--json"], dir);
+
+    assert.strictEqual(result.status, 1);
+    assert.strictEqual(JSON.parse(result.stderr).error.type, "SellerPortalProtocolError");
+    assert.isTrue(existsSync(join(dir, ".taizn/seller.json")));
+  });
+
+  it("refuses stale Seller Office state that points at an unowned process", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-close-unowned-"));
+    const owner = "expected-owner";
+    const embeddedOwnerArgument = `prefix"--taizn-owner=${owner}"`;
+    const unowned = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      detached: true,
+      stdio: "ignore",
+    });
+    const unownedPid = unowned.pid;
+    if (unownedPid === undefined) throw new Error("Expected unowned process PID.");
+    const fixture = await startFakeSellerBrowser(
+      dir,
+      { applications: [], state: "ready" },
+      [],
+      unownedPid,
+      owner,
+      [
+        `--user-data-dir=${join(realpathSync(dir), ".taizn/seller/chrome-profile")}`,
+        embeddedOwnerArgument,
+      ],
+    );
+
+    try {
+      const result = await runTaiznAsync(["seller", "close", "--json"], dir);
+
+      assert.strictEqual(result.status, 1);
+      assert.strictEqual(JSON.parse(result.stderr).error.type, "SellerPortalProtocolError");
+      assert.isTrue(existsSync(join(dir, ".taizn/seller.json")));
+      assert.isTrue(isProcessAlive(unownedPid));
+      assert.deepStrictEqual(fixture.httpPaths, ["/json/version"]);
+      assert.deepStrictEqual(fixture.methods, [
+        "Browser.getBrowserCommandLine",
+        "SystemInfo.getProcessInfo",
+      ]);
+    } finally {
+      fixture.close();
+      killTestProcessTree(unownedPid);
+    }
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "tears down the Seller Office browser process tree when login is interrupted",
+    async () => {
+      const dir = mkdtempSync(join(tmpdir(), "taizn-seller-interrupt-"));
+      const pidPath = join(dir, "browser-pids.json");
+      const browserPath = join(dir, "fake-browser.mjs");
+      writeFileSync(
+        browserPath,
+        `#!/usr/bin/env node
+        import { spawn } from "node:child_process";
+        import { writeFileSync } from "node:fs";
+        const descendant = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+          stdio: "ignore",
+        });
+        writeFileSync(process.env.TAIZN_TEST_PID_FILE, JSON.stringify({
+          browser: process.pid,
+          descendant: descendant.pid,
+        }));
+        setInterval(() => {}, 1000);
+      `,
+      );
+      chmodSync(browserPath, 0o755);
+
+      const command = spawn(process.execPath, [cliPath, "seller", "login"], {
+        cwd: dir,
+        env: {
+          ...process.env,
+          TAIZN_SELLER_BROWSER: browserPath,
+          TAIZN_TEST_PID_FILE: pidPath,
+        },
+        stdio: "ignore",
+      });
+      const completed = waitForChild(command);
+      let browserPid: number | undefined;
+
+      try {
+        const pids = JSON.parse(await waitForFile(pidPath)) as {
+          readonly browser: number;
+          readonly descendant: number;
+        };
+        browserPid = pids.browser;
+        command.kill("SIGINT");
+        await completed;
+        assert.isFalse(isProcessAlive(pids.browser));
+        assert.isFalse(isProcessAlive(pids.descendant));
+        assert.isFalse(existsSync(join(dir, ".taizn/seller.json")));
+      } finally {
+        command.kill("SIGKILL");
+        if (browserPid !== undefined) {
+          killTestProcessTree(browserPid);
+        }
+      }
+    },
+    10_000,
+  );
+
+  it.runIf(process.platform === "win32")(
+    "terminates the owned Windows Seller Office browser tree",
+    async () => {
+      const browser = spawn("notepad.exe", [], { detached: true, stdio: "ignore" });
+      const pid = browser.pid;
+      if (pid === undefined) throw new Error("Expected Windows browser PID.");
+
+      try {
+        await terminateSellerBrowserTree(pid);
+        assert.isFalse(isProcessAlive(pid));
+      } finally {
+        killTestProcessTree(pid);
+      }
+    },
+  );
 
   it("lists sanitized Seller Office applications through the local browser adapter", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-seller-apps-"));
@@ -2311,10 +2501,46 @@ const waitForFile = async (path: string) => {
   throw new Error(`Timed out waiting for ${path}`);
 };
 
+const waitForChild = (child: ChildProcess) =>
+  new Promise<void>((resolve, reject) => {
+    child.once("close", () => resolve());
+    child.once("error", reject);
+  });
+
+const isProcessAlive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const killTestProcessTree = (pid: number) => {
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch {
+    // The owned process group already exited, which is the expected path.
+  }
+};
+
 const startFakeSellerBrowser = async (
   dir: string,
   extraction: unknown,
   unansweredMethods: readonly string[] = [],
+  ownerPid?: number,
+  owner?: string,
+  browserArguments: readonly string[] = owner === undefined
+    ? []
+    : [
+        `--user-data-dir=${join(realpathSync(dir), ".taizn/seller/chrome-profile")}`,
+        `--taizn-owner=${owner}`,
+      ],
 ) => {
   const methods: string[] = [];
   const httpPaths: string[] = [];
@@ -2343,9 +2569,21 @@ const startFakeSellerBrowser = async (
           result:
             request.method === "Runtime.evaluate"
               ? { result: { type: "object", value: extraction } }
-              : { frameId: "fixture" },
+              : request.method === "Browser.getBrowserCommandLine"
+                ? { arguments: browserArguments }
+                : request.method === "SystemInfo.getProcessInfo"
+                  ? { processInfo: [{ id: ownerPid, type: "browser" }] }
+                  : { frameId: "fixture" },
         }),
       );
+
+      if (request.method === "SystemInfo.getProcessInfo" && ownerPid !== undefined) {
+        setTimeout(() => {
+          socket.close();
+          httpServer.close();
+          websocketServer.close();
+        }, 0);
+      }
     });
   });
 
@@ -2353,14 +2591,16 @@ const startFakeSellerBrowser = async (
     httpPaths.push(request.url ?? "");
     response.setHeader("content-type", "application/json");
     response.end(
-      JSON.stringify([
-        {
-          id: "fixture-page",
-          type: "page",
-          url: "about:blank",
-          webSocketDebuggerUrl: `ws://127.0.0.1:${websocketAddress.port}`,
-        },
-      ]),
+      request.url === "/json/version"
+        ? JSON.stringify({ webSocketDebuggerUrl: `ws://127.0.0.1:${websocketAddress.port}` })
+        : JSON.stringify([
+            {
+              id: "fixture-page",
+              type: "page",
+              url: "about:blank",
+              webSocketDebuggerUrl: `ws://127.0.0.1:${websocketAddress.port}`,
+            },
+          ]),
     );
   });
   await waitForHttpServer(httpServer);
@@ -2375,7 +2615,7 @@ const startFakeSellerBrowser = async (
   mkdirSync(join(dir, ".taizn"), { recursive: true });
   writeFileSync(
     join(dir, ".taizn/seller.json"),
-    `${JSON.stringify({ port: httpAddress.port, schemaVersion: 1 }, null, 2)}\n`,
+    `${JSON.stringify({ ...(ownerPid === undefined ? {} : { owner, pid: ownerPid }), port: httpAddress.port, schemaVersion: 1 }, null, 2)}\n`,
   );
 
   return {

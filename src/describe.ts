@@ -224,8 +224,21 @@ const commandDescriptions = [
     mutates: true,
     outputs: ["text", "json"],
     purpose:
-      "Open a dedicated local Chrome profile for human-owned TV Seller Office authentication.",
+      "Open a dedicated local Chrome profile, clean interrupted startup, and persist ownership for seller close.",
     resultSchema: "SellerLoginResult",
+  }),
+  CommandDescription.make({
+    artifacts: false,
+    command: "seller close",
+    dryRun: false,
+    env: [],
+    fieldMask: false,
+    flags: ["--json"],
+    mutates: true,
+    outputs: ["text", "json"],
+    purpose:
+      "Validate and stop Taizn's owned Seller Office browser, removing state only after confirmed teardown.",
+    resultSchema: "SellerCloseResult",
   }),
   CommandDescription.make({
     artifacts: true,
