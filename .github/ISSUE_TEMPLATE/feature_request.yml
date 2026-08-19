@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest a generic harness improvement for taizn
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What packaging, device, remote, or proof workflow is not served well today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the command surface or behavior you want. taizn stays a generic Tizen harness, so product-specific journeys belong in consumer repos.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Workarounds or other approaches you considered.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched for existing issues covering the same idea
+          required: true
