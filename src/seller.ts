@@ -219,7 +219,7 @@ const resolveSellerBrowser = Effect.fn("resolveSellerBrowser")(function* (env: T
   return browser;
 });
 
-const defaultSellerBrowser = () => {
+export const defaultSellerBrowser = () => {
   if (process.platform === "darwin") {
     return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
   }
@@ -231,7 +231,7 @@ const defaultSellerBrowser = () => {
   return "google-chrome";
 };
 
-const sellerBrowserArgs = (profileDir: string) => [
+export const sellerBrowserArgs = (profileDir: string) => [
   `--user-data-dir=${profileDir}`,
   "--remote-debugging-address=127.0.0.1",
   "--remote-debugging-port=0",
@@ -302,7 +302,7 @@ const stopBrowser = async (child: ChildProcess) => {
   }
 };
 
-const waitForDevToolsPort = Effect.fn("waitForDevToolsPort")(function* (path: string) {
+export const waitForDevToolsPort = Effect.fn("waitForDevToolsPort")(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
 
   for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -342,7 +342,7 @@ const waitForDevToolsPort = Effect.fn("waitForDevToolsPort")(function* (path: st
   });
 });
 
-const readSellerBrowserState = Effect.fn("readSellerBrowserState")(function* () {
+export const readSellerBrowserState = Effect.fn("readSellerBrowserState")(function* () {
   const paths = yield* getPaths();
   const fs = yield* FileSystem.FileSystem;
   const exists = yield* fs
@@ -450,7 +450,7 @@ const findBrowserPage = async (target: string) => {
   return page;
 };
 
-const decodeSellerExtraction = (raw: unknown) => {
+export const decodeSellerExtraction = (raw: unknown) => {
   try {
     const evaluated = Schema.decodeUnknownSync(CdpEvaluationResult)(raw);
     return Schema.decodeUnknownSync(SellerExtraction)(evaluated.result.value);
@@ -581,7 +581,7 @@ const withCdp = <A>(
     });
   });
 
-const normalizeSellerError = (cause: unknown, target: string): SellerError => {
+export const normalizeSellerError = (cause: unknown, target: string): SellerError => {
   if (
     cause instanceof SellerAuthenticationRequired ||
     cause instanceof SellerPortalDrift ||
@@ -626,7 +626,7 @@ const delay = (milliseconds: number) =>
     setTimeout(resolve, milliseconds);
   });
 
-const SELLER_APPLICATIONS_EXPRESSION = String.raw`(() => {
+export const SELLER_APPLICATIONS_EXPRESSION = String.raw`(() => {
   if (location.pathname.includes("/login")) {
     return { state: "signedOut" };
   }
