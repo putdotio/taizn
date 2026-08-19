@@ -3,6 +3,22 @@
 `taizn` is a typed Tizen TV packaging and live-device proof harness for
 consumer apps. Keep it a shell-out tool, not an app framework.
 
+## Start Here
+
+Read only what the current task needs:
+
+- Consumer config, env, command, and output contracts: [README.md](README.md)
+- CI, release, and npm publishing mechanics:
+  [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)
+- Seller Office login, read-only discovery, and session safety:
+  [docs/SELLER_OFFICE.md](docs/SELLER_OFFICE.md)
+- Samsung TV remote pairing, key scripts, and boundaries:
+  [docs/TV_REMOTE.md](docs/TV_REMOTE.md)
+- Live Tizen fixture harness setup and device checks:
+  [live-test/README.md](live-test/README.md)
+- Agent-facing command workflow shipped with the package:
+  [skills/taizn/SKILL.md](skills/taizn/SKILL.md)
+
 ## Generic Tool Boundary
 
 - Keep `taizn` free of put.io product behavior. Do not add put.io app IDs,
@@ -56,6 +72,21 @@ guide doesn't cover, search through the source code in `node_modules/effect/src`
 - `tv script` is still a remote-key driver only. JSON scripts may encode key
   sequences and delays, but not product journeys, visual assertions, or content
   expectations.
+- `seller login` mutates local state only: it launches a visible human-owned
+  Chrome on the dedicated `.taizn/seller/chrome-profile` profile with DevTools
+  bound to `127.0.0.1` and writes the port to `.taizn/seller.json`. It never
+  reads, requests, or stores Samsung credentials.
+- A failed or interrupted `seller login` must stop the exact browser tree it
+  spawned and remove the freshly written `.taizn/seller.json`; after success
+  the visible session is handed to the operator and left running.
+- `seller apps list` is read-only toward Seller Office: it attaches to the
+  saved DevTools port and uses `Page.navigate` plus a sanitizing
+  `Runtime.evaluate` extraction only. Do not add clicks, form input, uploads,
+  submissions, or private portal endpoint calls.
+- Seller reads fail closed: signed-out is `SellerAuthenticationRequired`,
+  portal layout drift is `SellerPortalDrift`. Never guess at missing
+  application card fields, and keep raw HTML and portal responses out of
+  output and artifacts.
 - `inspect wgt`, `validate submission`, `probe hosted-assets`, `logs capture`,
   and `targets` are generic harness surfaces. Keep product-specific checks in
   consumer repos.
@@ -94,6 +125,8 @@ vp run check
 vp run typecheck
 vp run smoke
 vp run test
+vp run test:coverage
+vp run skills:lint
 ```
 
 Live Tizen checks when the local toolchain/certs/device exist:
