@@ -1,6 +1,6 @@
 ---
 name: taizn
-description: Operate Taizn as an agent-first generic Tizen TV packaging, device, remote, logs, Seller Office discovery, artifact, and proof harness. Use when packaging or proving a Tizen widget, inspecting a .wgt, preparing or validating generic submission metadata, reading sanitized Seller Office application status through a human-owned browser, collecting Samsung TV diagnostics, driving Samsung remote keys, or using Taizn's agent-facing JSON/artifact surfaces.
+description: Operate Taizn as an agent-first generic Tizen TV packaging, device, remote, logs, Seller Office discovery, artifact, and proof harness. Use when packaging or proving a Tizen widget, inspecting a .wgt, preparing or validating generic submission metadata, reading sanitized Seller Office application status through a human-owned browser, collecting Samsung TV diagnostics, driving Samsung remote keys, or using Taizn's agent-facing JSON/artifact surfaces. Do not use for product journeys, content or visual assertions, Seller Office mutations such as uploads or submissions, CI-driven portal login, or non-Tizen platforms.
 ---
 
 # Taizn

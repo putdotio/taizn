@@ -58,10 +58,12 @@
     "live:test:tv-assets": "vp pack src/taizn.ts && node live-test/run-live-test.ts --roundtrip --tv-assets",
     "live:test:tv-assets:production": "vp pack src/taizn.ts && node live-test/run-live-test.ts --roundtrip --tv-assets --production",
     "prepack": "vp pack src/taizn.ts",
+    "skills:lint": "skillcheck lint",
     "smoke": "vp pack src/taizn.ts && node dist/taizn.mjs --version && node dist/taizn.mjs --help >/dev/null",
-    "test": "vp test run --passWithNoTests",
+    "test": "vp test run",
+    "test:coverage": "vp test run --coverage",
     "typecheck": "tsc --noEmit",
-    "verify": "vp check . && tsc --noEmit && vp pack src/taizn.ts && node dist/taizn.mjs --version && node dist/taizn.mjs --help >/dev/null && vp test run --passWithNoTests && npm pack --dry-run"
+    "verify": "vp check . && tsc --noEmit && vp pack src/taizn.ts && node dist/taizn.mjs --version && node dist/taizn.mjs --help >/dev/null && vp test run --coverage && skillcheck lint && npm pack --dry-run"
   },
   "dependencies": {
     "@effect/platform-node": "4.0.0-beta.107",
@@ -73,6 +75,8 @@
     "@effect/vitest": "4.0.0-beta.107",
     "@types/node": "^26.1.0",
     "@types/ws": "^8.18.1",
+    "@uinaf/skillcheck": "0.4.0",
+    "@vitest/coverage-v8": "4.1.10",
     "typescript": "^7.0.2",
     "vite": "catalog:",
     "vite-plus": "0.2.7",

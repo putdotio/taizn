@@ -1,0 +1,47 @@
+name: Bug report
+description: Report a reproducible taizn problem
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Exact command and minimal `taizn.json` or env needed to reproduce.
+      placeholder: |
+        1. taizn.json contents (redact anything private)
+        2. Run `taizn package --json`
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: Paste the command output. Use `--json` output when available.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: taizn version, Node version, OS, Tizen Studio CLI and sdb versions, and TV model or emulator if relevant.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched for existing issues covering the same problem
+          required: true
+        - label: I removed certificates, passwords, tokens, and private app data from the report
+          required: true
