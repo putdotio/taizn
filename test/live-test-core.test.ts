@@ -102,11 +102,11 @@ describe("live test harness core", () => {
 
   it("prefers a beacon host reachable from the selected Tizen target subnet", () => {
     assert.strictEqual(
-      selectBeaconHost(["100.119.97.88", "192.168.1.107"], "192.168.1.99:26101"),
-      "192.168.1.107",
+      selectBeaconHost(["203.0.113.88", "192.0.2.107"], "192.0.2.99:26101"),
+      "192.0.2.107",
     );
-    assert.strictEqual(selectBeaconHost(["100.119.97.88", "10.0.0.12"], undefined), "10.0.0.12");
-    assert.strictEqual(selectBeaconHost(["100.119.97.88"], undefined), "100.119.97.88");
+    assert.strictEqual(selectBeaconHost(["203.0.113.88", "10.0.0.12"], undefined), "10.0.0.12");
+    assert.strictEqual(selectBeaconHost(["203.0.113.88"], undefined), "203.0.113.88");
   });
 
   it("parses beacon timeouts with actionable validation", () => {
