@@ -97,6 +97,10 @@ guide doesn't cover, search through the source code in `node_modules/effect/src`
   be misleading. If a dry run is not real proof, say what it validates.
 - Keep `skills/taizn/SKILL.md` aligned when command-surface guardrails change.
 - Unit tests use `@effect/vitest` through `vp run test`; only `vp run live:test:*` proves real Tizen behavior.
+- CLI tests default to the in-process harness (`runTaiznInProcess` over
+  `runTaiznCli` from `src/main.ts`) so V8 coverage attributes them. Spawn
+  `dist/taizn.mjs` only when the process boundary itself is under test; those
+  runs are invisible to coverage on vitest 4 (see `vite.config.ts`).
 
 ## When Contracts Change
 
