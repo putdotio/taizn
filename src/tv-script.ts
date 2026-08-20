@@ -3,6 +3,7 @@ import type { TaiznEnv } from "./env.js";
 import { InvalidInput, InvalidJson } from "./errors.js";
 import { readJsonFile, validateAgentResourceInput, writeJsonArtifact } from "./io.js";
 import { sendSamsungTvKeys } from "./remote.js";
+import { appPath, getPaths } from "./runtime.js";
 
 class TvScriptStep extends Schema.Class<TvScriptStep>("TvScriptStep")({
   delayMs: Schema.optional(Schema.Number),
@@ -75,7 +76,8 @@ export const runTvScript = Effect.fn("runTvScript")(function* (
 });
 
 const loadTvScript = Effect.fn("loadTvScript")(function* (file: string) {
-  const json = yield* readJsonFile(file);
+  const paths = yield* getPaths();
+  const json = yield* readJsonFile(appPath(paths.appDir, file));
 
   return yield* Schema.decodeUnknownEffect(TvScript)(json, { errors: "all" }).pipe(
     Effect.mapError((error) => new InvalidJson({ details: error.message, file })),

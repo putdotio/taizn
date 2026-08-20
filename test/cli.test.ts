@@ -7,23 +7,28 @@ import {
   writeFileSync,
 } from "node:fs";
 import { createServer } from "node:http";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it, vi } from "@effect/vitest";
-import { Effect, Fiber, Layer, Schema } from "effect";
+import { Console, Effect, Fiber, Layer, Schema } from "effect";
 import { WebSocketServer } from "ws";
 import { probeAssetUrls } from "../src/assets.js";
 import { TaiznEnv } from "../src/env.js";
+import { SecretReadInterrupted } from "../src/errors.js";
+import { runTaiznCli } from "../src/main.js";
 import { fetchSamsungTvInfo, sendSamsungTvKeys } from "../src/remote.js";
 import { appBuildEnv, redactCommandArgs, TaiznSystem } from "../src/runtime.js";
 import { captureForDuration } from "../src/tizen.js";
 
 const cliPath = resolve("dist/taizn.mjs");
 
-const runTaizn = (args: string[], cwd = process.cwd(), env: NodeJS.ProcessEnv = {}) =>
+// Kept for the boundary tests below that prove the packaged binary itself:
+// boot, stream separation, and exit codes. Everything else runs the same CLI
+// entry in-process through runTaiznInProcess so V8 coverage attributes it.
+const spawnTaizn = (args: string[], cwd = process.cwd(), env: NodeJS.ProcessEnv = {}) =>
   spawnSync(process.execPath, [cliPath, ...args], {
     cwd,
     encoding: "utf8",
@@ -33,36 +38,66 @@ const runTaizn = (args: string[], cwd = process.cwd(), env: NodeJS.ProcessEnv = 
     },
   });
 
-const runTaiznAsync = (args: string[], cwd = process.cwd(), env: NodeJS.ProcessEnv = {}) =>
-  new Promise<{ readonly status: number | null; readonly stderr: string; readonly stdout: string }>(
-    (resolve) => {
-      const child = spawn(process.execPath, [cliPath, ...args], {
-        cwd,
-        env: {
-          ...process.env,
-          ...env,
-        },
-      });
-      let stdout = "";
-      let stderr = "";
-
-      child.stdout.setEncoding("utf8");
-      child.stderr.setEncoding("utf8");
-      child.stdout.on("data", (chunk: string) => {
-        stdout += chunk;
-      });
-      child.stderr.on("data", (chunk: string) => {
-        stderr += chunk;
-      });
-      child.on("close", (status) => {
-        resolve({ status, stderr, stdout });
-      });
-    },
+const runTaiznInProcess = async (
+  args: string[],
+  cwd = process.cwd(),
+  env: NodeJS.ProcessEnv = {},
+): Promise<{ readonly status: number; readonly stderr: string; readonly stdout: string }> => {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const system = Layer.succeed(TaiznSystem)({
+    cwd: Effect.sync(() => realpathSync(cwd)),
+    env: Effect.succeed({ ...process.env, ...env }),
+    homeDir: Effect.sync(() => homedir()),
+    loadEnvFile: () => Effect.void,
+    readSecret: () => Effect.fail(new SecretReadInterrupted({})),
+  });
+  const status = await Effect.runPromise(
+    runTaiznCli(args).pipe(
+      Effect.provideService(Console.Console, makeCapturedConsole(stdout, stderr)),
+      Effect.provide(Layer.mergeAll(NodeServices.layer, system)),
+    ),
   );
+
+  return {
+    status,
+    stderr: joinOutputLines(stderr),
+    stdout: joinOutputLines(stdout),
+  };
+};
+
+const joinOutputLines = (lines: readonly string[]) => lines.map((line) => `${line}\n`).join("");
+
+const makeCapturedConsole = (stdout: string[], stderr: string[]): Console.Console => {
+  const realConsole = globalThis.console;
+  const format = (args: ReadonlyArray<unknown>) => args.map(String).join(" ");
+
+  return {
+    assert: realConsole.assert.bind(realConsole),
+    clear: realConsole.clear.bind(realConsole),
+    count: realConsole.count.bind(realConsole),
+    countReset: realConsole.countReset.bind(realConsole),
+    debug: (...args: ReadonlyArray<unknown>) => stdout.push(format(args)),
+    dir: realConsole.dir.bind(realConsole),
+    dirxml: realConsole.dirxml.bind(realConsole),
+    error: (...args: ReadonlyArray<unknown>) => stderr.push(format(args)),
+    group: realConsole.group.bind(realConsole),
+    groupCollapsed: realConsole.groupCollapsed.bind(realConsole),
+    groupEnd: realConsole.groupEnd.bind(realConsole),
+    info: (...args: ReadonlyArray<unknown>) => stdout.push(format(args)),
+    log: (...args: ReadonlyArray<unknown>) => stdout.push(format(args)),
+    table: realConsole.table.bind(realConsole),
+    time: realConsole.time.bind(realConsole),
+    timeEnd: realConsole.timeEnd.bind(realConsole),
+    timeLog: realConsole.timeLog.bind(realConsole),
+    trace: realConsole.trace.bind(realConsole),
+    warn: (...args: ReadonlyArray<unknown>) => stderr.push(format(args)),
+  };
+};
 
 describe("taizn cli", () => {
   it("prints help without a project config", () => {
-    const result = runTaizn(["--help"]);
+    const result = spawnTaizn(["--help"]);
 
     assert.strictEqual(result.status, 0);
     assert.include(result.stdout, "COMMANDS");
@@ -79,15 +114,15 @@ describe("taizn cli", () => {
   });
 
   it("prints the package version", () => {
-    const result = runTaizn(["--version"]);
+    const result = spawnTaizn(["--version"]);
 
     assert.strictEqual(result.status, 0);
     assert.match(result.stdout.trim(), /^taizn v\d+\.\d+\.\d+/);
     assert.strictEqual(result.stderr, "");
   });
 
-  it("describes the agent-facing command surface as JSON", () => {
-    const result = runTaizn(["describe"]);
+  it("describes the agent-facing command surface as JSON", async () => {
+    const result = await runTaiznInProcess(["describe"]);
 
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
@@ -117,9 +152,9 @@ describe("taizn cli", () => {
     assert.isFalse(tvScript?.fieldMask);
   });
 
-  it("dry-runs the human-owned Seller Office login without storing credentials", () => {
+  it("dry-runs the human-owned Seller Office login without storing credentials", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-seller-login-"));
-    const result = runTaizn(["seller", "login", "--dry-run", "--json"], dir, {
+    const result = await runTaiznInProcess(["seller", "login", "--dry-run", "--json"], dir, {
       TAIZN_SELLER_BROWSER: process.execPath,
     });
 
@@ -135,9 +170,9 @@ describe("taizn cli", () => {
     });
   });
 
-  it("reports a missing Seller Office browser session as structured JSON", () => {
+  it("reports a missing Seller Office browser session as structured JSON", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-seller-missing-"));
-    const result = runTaizn(["seller", "apps", "list", "--json"], dir);
+    const result = await runTaiznInProcess(["seller", "apps", "list", "--json"], dir);
 
     assert.strictEqual(result.status, 1);
     assert.deepStrictEqual(JSON.parse(result.stderr), {
@@ -166,7 +201,7 @@ describe("taizn cli", () => {
     });
 
     try {
-      const result = await runTaiznAsync(
+      const result = await runTaiznInProcess(
         ["seller", "apps", "list", "--json", "--artifact", ".taizn/seller-apps.json"],
         dir,
       );
@@ -202,7 +237,7 @@ describe("taizn cli", () => {
     const fixture = await startFakeSellerBrowser(dir, { state: "signedOut" });
 
     try {
-      const result = await runTaiznAsync(["seller", "apps", "list", "--json"], dir);
+      const result = await runTaiznInProcess(["seller", "apps", "list", "--json"], dir);
 
       assert.strictEqual(result.status, 1);
       assert.strictEqual(JSON.parse(result.stderr).error.type, "SellerAuthenticationRequired");
@@ -220,7 +255,7 @@ describe("taizn cli", () => {
     });
 
     try {
-      const result = await runTaiznAsync(["seller", "apps", "list", "--json"], dir);
+      const result = await runTaiznInProcess(["seller", "apps", "list", "--json"], dir);
 
       assert.strictEqual(result.status, 1);
       assert.deepStrictEqual(JSON.parse(result.stderr), {
@@ -240,7 +275,7 @@ describe("taizn cli", () => {
     const fixture = await startFakeSellerBrowser(dir, { state: "ready" }, ["Page.navigate"]);
 
     try {
-      const result = await runTaiznAsync(["seller", "apps", "list", "--json"], dir);
+      const result = await runTaiznInProcess(["seller", "apps", "list", "--json"], dir);
 
       assert.strictEqual(result.status, 1);
       assert.deepStrictEqual(JSON.parse(result.stderr), {
@@ -257,9 +292,9 @@ describe("taizn cli", () => {
     }
   }, 15_000);
 
-  it("reports missing config without a stack trace", () => {
+  it("reports missing config without a stack trace", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-missing-config-"));
-    const result = runTaizn(["package"], dir);
+    const result = await runTaiznInProcess(["package"], dir);
 
     assert.strictEqual(result.status, 1);
     assert.include(result.stderr, "Config file not found:");
@@ -268,14 +303,9 @@ describe("taizn cli", () => {
 
   it("checks tooling without requiring a project config", () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-check-"));
-    const result = spawnSync(process.execPath, [cliPath, "check"], {
-      cwd: dir,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        TAIZN_SDB: "/bin/echo",
-        TAIZN_TIZEN_CLI: "/bin/echo",
-      },
+    const result = spawnTaizn(["check"], dir, {
+      TAIZN_SDB: "/bin/echo",
+      TAIZN_TIZEN_CLI: "/bin/echo",
     });
 
     assert.strictEqual(result.status, 0);
@@ -285,9 +315,9 @@ describe("taizn cli", () => {
     assert.strictEqual(result.stderr, "");
   });
 
-  it("checks tooling and connected targets as JSON", () => {
+  it("checks tooling and connected targets as JSON", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["check", "--json"], dir, {
+    const result = await runTaiznInProcess(["check", "--json"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
@@ -306,9 +336,9 @@ describe("taizn cli", () => {
     });
   });
 
-  it("lists installed Tizen applications without requiring a project config", () => {
+  it("lists installed Tizen applications without requiring a project config", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["apps", "example"], dir, {
+    const result = await runTaiznInProcess(["apps", "example"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
     });
@@ -319,9 +349,9 @@ describe("taizn cli", () => {
     assert.notInclude(result.stdout, "Other App");
   });
 
-  it("lists installed Tizen applications as JSON", () => {
+  it("lists installed Tizen applications as JSON", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["apps", "--json", "example"], dir, {
+    const result = await runTaiznInProcess(["apps", "--json", "example"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
     });
@@ -336,24 +366,32 @@ describe("taizn cli", () => {
     });
   });
 
-  it("applies field masks to structured read output", () => {
+  it("applies field masks to structured read output", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["apps", "--json", "--fields", "target", "example"], dir, {
-      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
-      TAIZN_TARGET: "127.0.0.1:26101",
-    });
+    const result = await runTaiznInProcess(
+      ["apps", "--json", "--fields", "target", "example"],
+      dir,
+      {
+        TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+        TAIZN_TARGET: "127.0.0.1:26101",
+      },
+    );
 
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
     assert.deepStrictEqual(JSON.parse(result.stdout), { target: "127.0.0.1:26101" });
   });
 
-  it("applies field masks through array entries", () => {
+  it("applies field masks through array entries", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["apps", "--json", "--fields", "applications.0.id", "example"], dir, {
-      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
-      TAIZN_TARGET: "127.0.0.1:26101",
-    });
+    const result = await runTaiznInProcess(
+      ["apps", "--json", "--fields", "applications.0.id", "example"],
+      dir,
+      {
+        TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+        TAIZN_TARGET: "127.0.0.1:26101",
+      },
+    );
 
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
@@ -362,9 +400,9 @@ describe("taizn cli", () => {
     });
   });
 
-  it("prints only JSON for installed applications when auto-picking one target", () => {
+  it("prints only JSON for installed applications when auto-picking one target", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["apps", "--json"], dir, {
+    const result = await runTaiznInProcess(["apps", "--json"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
     });
 
@@ -378,9 +416,11 @@ describe("taizn cli", () => {
     assert.strictEqual(inventory.target, "127.0.0.1:26101");
   });
 
+  // Spawned: asserts the launched tool's inherited stdio reaches the CLI's own
+  // stdout, which only exists at the real process boundary.
   it("launches an installed Tizen application without requiring a project config", () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["launch", "Example.app"], dir, {
+    const result = spawnTaizn(["launch", "Example.app"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
@@ -391,9 +431,9 @@ describe("taizn cli", () => {
     assert.include(result.stdout, "Launched Example App (Example.app) on 127.0.0.1:26101");
   });
 
-  it("rejects ambiguous installed application launch queries", () => {
+  it("rejects ambiguous installed application launch queries", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["launch", "app"], dir, {
+    const result = await runTaiznInProcess(["launch", "app"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
@@ -404,9 +444,9 @@ describe("taizn cli", () => {
     assert.notInclude(result.stderr, "Error:");
   });
 
-  it("proves an installed Tizen application without requiring a project config", () => {
+  it("proves an installed Tizen application without requiring a project config", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["prove", "Example.app"], dir, {
+    const result = await runTaiznInProcess(["prove", "Example.app"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
@@ -419,9 +459,9 @@ describe("taizn cli", () => {
     assert.include(result.stdout, "Launch proof: Example.app started on 127.0.0.1:26101");
   });
 
-  it("prints structured proof as JSON", () => {
+  it("prints structured proof as JSON", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["prove", "--json", "Example.app"], dir, {
+    const result = await runTaiznInProcess(["prove", "--json", "Example.app"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
@@ -436,9 +476,9 @@ describe("taizn cli", () => {
     assert.strictEqual(proof.target, "127.0.0.1:26101");
   });
 
-  it("does not claim dry-run proofs launched the app", () => {
+  it("does not claim dry-run proofs launched the app", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["prove", "--dry-run", "Example.app"], dir, {
+    const result = await runTaiznInProcess(["prove", "--dry-run", "Example.app"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
@@ -449,9 +489,9 @@ describe("taizn cli", () => {
     assert.notInclude(result.stdout, "started on");
   });
 
-  it("returns structured errors in JSON mode", () => {
+  it("returns structured errors in JSON mode", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["prove", "--json", "../Example.app"], dir, {
+    const result = await runTaiznInProcess(["prove", "--json", "../Example.app"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
@@ -469,7 +509,7 @@ describe("taizn cli", () => {
   });
 
   it("returns structured CLI parse errors in JSON mode", () => {
-    const result = runTaizn(["prove", "--json"]);
+    const result = spawnTaizn(["prove", "--json"]);
 
     assert.strictEqual(result.status, 1);
     assert.strictEqual(result.stdout, "");
@@ -482,34 +522,42 @@ describe("taizn cli", () => {
     });
   });
 
-  it("writes proof artifacts inside the app directory", () => {
+  it("writes proof artifacts inside the app directory", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["prove", "--artifact", ".taizn/proof.json", "Example.app"], dir, {
-      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
-      TAIZN_TARGET: "127.0.0.1:26101",
-      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
-    });
+    const result = await runTaiznInProcess(
+      ["prove", "--artifact", ".taizn/proof.json", "Example.app"],
+      dir,
+      {
+        TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+        TAIZN_TARGET: "127.0.0.1:26101",
+        TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+      },
+    );
 
     assert.strictEqual(result.status, 0);
     const proof = parseProofJson(readFileSync(join(dir, ".taizn/proof.json"), "utf8"));
     assert.strictEqual(proof.application.id, "Example.app");
   });
 
-  it("rejects proof artifact paths outside the app directory", () => {
+  it("rejects proof artifact paths outside the app directory", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["prove", "--artifact", "../proof.json", "Example.app"], dir, {
-      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
-      TAIZN_TARGET: "127.0.0.1:26101",
-      TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
-    });
+    const result = await runTaiznInProcess(
+      ["prove", "--artifact", "../proof.json", "Example.app"],
+      dir,
+      {
+        TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+        TAIZN_TARGET: "127.0.0.1:26101",
+        TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+      },
+    );
 
     assert.strictEqual(result.status, 1);
     assert.include(result.stderr, "output path must stay inside the app directory");
   });
 
-  it("prints only JSON for structured proof when auto-picking one target", () => {
+  it("prints only JSON for structured proof when auto-picking one target", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["prove", "--json", "Example.app"], dir, {
+    const result = await runTaiznInProcess(["prove", "--json", "Example.app"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
     });
@@ -521,11 +569,11 @@ describe("taizn cli", () => {
     assert.strictEqual(proof.target, "127.0.0.1:26101");
   });
 
-  it("reports schema errors with config paths", () => {
+  it("reports schema errors with config paths", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-config-"));
     writeFileSync(join(dir, "taizn.json"), '{"build":{"command":[]}}\n');
 
-    const result = runTaizn(["package"], dir);
+    const result = await runTaiznInProcess(["package"], dir);
 
     assert.strictEqual(result.status, 1);
     assert.include(result.stderr, "Invalid taizn.json:");
@@ -559,7 +607,7 @@ describe("taizn cli", () => {
     ),
   );
 
-  it("redacts Tizen password command arguments", () => {
+  it("redacts Tizen password command arguments", async () => {
     assert.deepEqual(redactCommandArgs(["-p", "author", "-dp", "dist"]), [
       "-p",
       "[redacted]",
@@ -568,9 +616,9 @@ describe("taizn cli", () => {
     ]);
   });
 
-  it("rejects partial Samsung TV remote ports", () => {
+  it("rejects partial Samsung TV remote ports", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-tv-port-"));
-    const result = runTaizn(["tv", "info"], dir, {
+    const result = await runTaiznInProcess(["tv", "info"], dir, {
       TAIZN_TV_HOST: "127.0.0.1",
       TAIZN_TV_PORT: "8002abc",
     });
@@ -580,12 +628,12 @@ describe("taizn cli", () => {
     assert.include(result.stderr, "TAIZN_TV_PORT must be an integer between 1 and 65535");
   });
 
-  it("lets Samsung TV env overrides bypass malformed remote state", () => {
+  it("lets Samsung TV env overrides bypass malformed remote state", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-tv-remote-invalid-"));
     mkdirSync(join(dir, ".taizn"), { recursive: true });
     writeFileSync(join(dir, ".taizn/remote.json"), "{bad\n");
 
-    const result = runTaizn(["tv", "pair"], dir, {
+    const result = await runTaiznInProcess(["tv", "pair"], dir, {
       TAIZN_TV_HOST: "127.0.0.1",
       TAIZN_TV_PORT: "9",
       TAIZN_TV_PROTOCOL: "ws",
@@ -624,7 +672,7 @@ describe("taizn cli", () => {
         throw new Error("Expected TCP HTTP test server address.");
       }
 
-      const result = await runTaiznAsync(["tv", "info"], dir, {
+      const result = await runTaiznInProcess(["tv", "info"], dir, {
         TAIZN_TV_HOST: "127.0.0.1",
         TAIZN_TV_INFO_PORT: String(address.port),
       });
@@ -667,7 +715,7 @@ describe("taizn cli", () => {
         throw new Error("Expected TCP HTTP test server address.");
       }
 
-      const result = await runTaiznAsync(["tv", "info", "--json"], dir, {
+      const result = await runTaiznInProcess(["tv", "info", "--json"], dir, {
         TAIZN_TV_HOST: "127.0.0.1",
         TAIZN_TV_INFO_PORT: String(address.port),
       });
@@ -768,7 +816,7 @@ describe("taizn cli", () => {
         )}\n`,
       );
 
-      const result = await runTaiznAsync(["tv", "doctor", "--connect", "--json"], dir, {
+      const result = await runTaiznInProcess(["tv", "doctor", "--connect", "--json"], dir, {
         TAIZN_TV_HOST: "127.0.0.1",
         TAIZN_TV_INFO_PORT: String(infoAddress.port),
       });
@@ -918,14 +966,14 @@ describe("taizn cli", () => {
         )}\n`,
       );
 
-      const pair = await runTaiznAsync(["tv", "pair"], dir);
+      const pair = await runTaiznInProcess(["tv", "pair"], dir);
 
       assert.strictEqual(pair.status, 0);
       assert.include(pair.stdout, "TAIZN_TV_TOKEN=test-token");
       assert.notInclude(requestUrls[0] ?? "", "token=stale-token");
       assert.include(readFileSync(join(dir, ".taizn/remote.json"), "utf8"), "test-token");
 
-      const press = await runTaiznAsync(
+      const press = await runTaiznInProcess(
         ["tv", "press", "--delay-ms", "1", "KEY_UP", "KEY_ENTER"],
         dir,
       );
@@ -936,7 +984,7 @@ describe("taizn cli", () => {
       assert.include(receivedKeys[0] ?? "", '"DataOfCmd":"KEY_UP"');
       assert.include(receivedKeys[1] ?? "", '"DataOfCmd":"KEY_ENTER"');
 
-      const jsonPress = await runTaiznAsync(["tv", "press", "--json", "KEY_LEFT"], dir);
+      const jsonPress = await runTaiznInProcess(["tv", "press", "--json", "KEY_LEFT"], dir);
 
       assert.strictEqual(jsonPress.status, 0);
       assert.strictEqual(jsonPress.stderr, "");
@@ -958,7 +1006,10 @@ describe("taizn cli", () => {
         join(dir, "keys.json"),
         JSON.stringify({ delayMs: 1, steps: [{ keys: ["KEY_DOWN", "KEY_ENTER"] }] }),
       );
-      const script = await runTaiznAsync(["tv", "script", "--json", "--file", "keys.json"], dir);
+      const script = await runTaiznInProcess(
+        ["tv", "script", "--json", "--file", "keys.json"],
+        dir,
+      );
 
       assert.strictEqual(script.status, 0);
       assert.strictEqual(script.stderr, "");
@@ -1017,14 +1068,17 @@ describe("taizn cli", () => {
     }
   });
 
-  it("dry-runs Samsung TV remote scripts from JSON", () => {
+  it("dry-runs Samsung TV remote scripts from JSON", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-tv-script-"));
     writeFileSync(
       join(dir, "keys.json"),
       JSON.stringify({ delayMs: 1, steps: [{ keys: ["KEY_UP", "KEY_ENTER"] }] }),
     );
 
-    const result = runTaizn(["tv", "script", "--dry-run", "--json", "--file", "keys.json"], dir);
+    const result = await runTaiznInProcess(
+      ["tv", "script", "--dry-run", "--json", "--file", "keys.json"],
+      dir,
+    );
 
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
@@ -1033,11 +1087,15 @@ describe("taizn cli", () => {
     assert.strictEqual(script.keyCount, 2);
   });
 
-  it("dry-runs Samsung TV remote keys without a paired token", () => {
+  it("dry-runs Samsung TV remote keys without a paired token", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-tv-press-dry-run-"));
-    const result = runTaizn(["tv", "press", "--dry-run", "--json", "KEY_HOME"], dir, {
-      TAIZN_TV_HOST: "127.0.0.1",
-    });
+    const result = await runTaiznInProcess(
+      ["tv", "press", "--dry-run", "--json", "KEY_HOME"],
+      dir,
+      {
+        TAIZN_TV_HOST: "127.0.0.1",
+      },
+    );
 
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
@@ -1048,12 +1106,12 @@ describe("taizn cli", () => {
     assert.strictEqual(press.target.url, "wss://127.0.0.1:8002");
   });
 
-  it("dry-runs mutating package and run commands", () => {
+  it("dry-runs mutating package and run commands", async () => {
     const dir = createPackageFixture();
-    const packageResult = runTaizn(["package", "--dry-run"], dir, {
+    const packageResult = await runTaiznInProcess(["package", "--dry-run"], dir, {
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
     });
-    const runResult = runTaizn(["run", "--dry-run"], dir, {
+    const runResult = await runTaiznInProcess(["run", "--dry-run"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
@@ -1065,9 +1123,9 @@ describe("taizn cli", () => {
     assert.strictEqual(JSON.parse(runResult.stdout).dryRun, true);
   });
 
-  it("keeps dry-run launch JSON quiet when auto-picking one target", () => {
+  it("keeps dry-run launch JSON quiet when auto-picking one target", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["launch", "--dry-run", "Example.app"], dir, {
+    const result = await runTaiznInProcess(["launch", "--dry-run", "Example.app"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
     });
@@ -1077,9 +1135,9 @@ describe("taizn cli", () => {
     assert.strictEqual(JSON.parse(result.stdout).target, "127.0.0.1:26101");
   });
 
-  it("captures target logs as JSON", () => {
+  it("captures target logs as JSON", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["logs", "capture", "--json", "--app", "Example"], dir, {
+    const result = await runTaiznInProcess(["logs", "capture", "--json", "--app", "Example"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
     });
@@ -1091,9 +1149,9 @@ describe("taizn cli", () => {
     assert.include(logs.lines[0] ?? "", "Example");
   });
 
-  it("connects configured targets before log capture", () => {
+  it("connects configured targets before log capture", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["logs", "capture", "--json", "--app", "Example"], dir, {
+    const result = await runTaiznInProcess(["logs", "capture", "--json", "--app", "Example"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "192.0.2.10:26101",
     });
@@ -1103,21 +1161,25 @@ describe("taizn cli", () => {
     assert.strictEqual(parseLogsJson(result.stdout).target, "192.0.2.10:26101");
   });
 
-  it("honors explicit JSON log output mode", () => {
+  it("honors explicit JSON log output mode", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["logs", "capture", "--output", "json", "--app", "Example"], dir, {
-      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
-      TAIZN_TARGET: "127.0.0.1:26101",
-    });
+    const result = await runTaiznInProcess(
+      ["logs", "capture", "--output", "json", "--app", "Example"],
+      dir,
+      {
+        TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+        TAIZN_TARGET: "127.0.0.1:26101",
+      },
+    );
 
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
     assert.strictEqual(parseLogsJson(result.stdout).lineCount, 1);
   });
 
-  it("captures target logs as text by default", () => {
+  it("captures target logs as text by default", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["logs", "capture", "--app", "Example"], dir, {
+    const result = await runTaiznInProcess(["logs", "capture", "--app", "Example"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
     });
@@ -1127,9 +1189,9 @@ describe("taizn cli", () => {
     assert.include(result.stdout, "Captured 1 log lines from 127.0.0.1:26101");
   });
 
-  it("formats output=json errors as structured JSON", () => {
+  it("formats output=json errors as structured JSON", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-json-error-"));
-    const result = runTaizn(["logs", "capture", "--output=json"], dir, {
+    const result = await runTaiznInProcess(["logs", "capture", "--output=json"], dir, {
       TAIZN_SDB: "/bin/echo",
       TAIZN_TARGET: "",
     });
@@ -1145,9 +1207,9 @@ describe("taizn cli", () => {
     });
   });
 
-  it("formats output ndjson errors as structured JSON", () => {
+  it("formats output ndjson errors as structured JSON", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-ndjson-error-"));
-    const result = runTaizn(["logs", "capture", "--output", "ndjson"], dir, {
+    const result = await runTaiznInProcess(["logs", "capture", "--output", "ndjson"], dir, {
       TAIZN_SDB: "/bin/echo",
       TAIZN_TARGET: "",
     });
@@ -1163,12 +1225,16 @@ describe("taizn cli", () => {
     });
   });
 
-  it("honors target log capture duration", () => {
+  it("honors target log capture duration", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["logs", "capture", "--json", "--duration-ms", "500"], dir, {
-      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
-      TAIZN_TARGET: "127.0.0.1:26101",
-    });
+    const result = await runTaiznInProcess(
+      ["logs", "capture", "--json", "--duration-ms", "500"],
+      dir,
+      {
+        TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+        TAIZN_TARGET: "127.0.0.1:26101",
+      },
+    );
 
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
@@ -1177,15 +1243,19 @@ describe("taizn cli", () => {
     assert.include(logs.lines[0] ?? "", "streamed");
   });
 
-  it("cleans up bounded log capture after a spawn error", () => {
+  it("cleans up bounded log capture after a spawn error", async () => {
     const dir = createToolingFixture();
     const brokenSdb = join(dir, "non-executable-sdb");
     writeFileSync(brokenSdb, "not executable\n");
     const startedAt = Date.now();
-    const result = runTaizn(["logs", "capture", "--json", "--duration-ms", "10000"], dir, {
-      TAIZN_SDB: brokenSdb,
-      TAIZN_TARGET: "127.0.0.1:26101",
-    });
+    const result = await runTaiznInProcess(
+      ["logs", "capture", "--json", "--duration-ms", "10000"],
+      dir,
+      {
+        TAIZN_SDB: brokenSdb,
+        TAIZN_TARGET: "127.0.0.1:26101",
+      },
+    );
 
     assert.strictEqual(result.status, 1);
     assert.include(result.stderr, "Command failed");
@@ -1222,12 +1292,16 @@ describe("taizn cli", () => {
     assert.throws(() => process.kill(pid, 0));
   });
 
-  it("streams target logs as NDJSON", () => {
+  it("streams target logs as NDJSON", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["logs", "capture", "--output", "ndjson", "--app", "Example"], dir, {
-      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
-      TAIZN_TARGET: "127.0.0.1:26101",
-    });
+    const result = await runTaiznInProcess(
+      ["logs", "capture", "--output", "ndjson", "--app", "Example"],
+      dir,
+      {
+        TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+        TAIZN_TARGET: "127.0.0.1:26101",
+      },
+    );
 
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
@@ -1239,11 +1313,15 @@ describe("taizn cli", () => {
     assert.include(lines[0].line, "Example");
   });
 
-  it("keeps NDJSON logs quiet when auto-picking one target", () => {
+  it("keeps NDJSON logs quiet when auto-picking one target", async () => {
     const dir = createToolingFixture();
-    const result = runTaizn(["logs", "capture", "--output", "ndjson", "--app", "Example"], dir, {
-      TAIZN_SDB: join(dir, "fake-sdb.mjs"),
-    });
+    const result = await runTaiznInProcess(
+      ["logs", "capture", "--output", "ndjson", "--app", "Example"],
+      dir,
+      {
+        TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+      },
+    );
 
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
@@ -1255,16 +1333,16 @@ describe("taizn cli", () => {
     assert.include(lines[0].line, "Example");
   });
 
-  it("rejects invalid log output mode before resolving device tooling", () => {
+  it("rejects invalid log output mode before resolving device tooling", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-log-output-"));
-    const result = runTaizn(["logs", "capture", "--output", "yaml"], dir);
+    const result = await runTaiznInProcess(["logs", "capture", "--output", "yaml"], dir);
 
     assert.strictEqual(result.status, 1);
     assert.include(result.stderr, "Invalid logs output");
     assert.notInclude(result.stderr, "sdb not found");
   });
 
-  it("lists connected and aliased targets as JSON", () => {
+  it("lists connected and aliased targets as JSON", async () => {
     const dir = createToolingFixture();
     mkdirSync(join(dir, ".taizn"), { recursive: true });
     writeFileSync(
@@ -1272,7 +1350,7 @@ describe("taizn cli", () => {
       JSON.stringify({ targets: [{ alias: "living-room", target: "127.0.0.1:26101" }] }),
     );
 
-    const result = runTaizn(["targets", "list", "--json"], dir, {
+    const result = await runTaiznInProcess(["targets", "list", "--json"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
     });
@@ -1284,9 +1362,9 @@ describe("taizn cli", () => {
     assert.strictEqual(targets.connected[0]?.id, "127.0.0.1:26101");
   });
 
-  it("dry-runs configured hosted asset probes", () => {
+  it("dry-runs configured hosted asset probes", async () => {
     const dir = createPackageFixture();
-    const result = runTaizn(["probe", "hosted-assets", "--dry-run", "--json"], dir, {
+    const result = await runTaiznInProcess(["probe", "hosted-assets", "--dry-run", "--json"], dir, {
       TAIZN_VARIANT: "production",
     });
 
@@ -1299,9 +1377,12 @@ describe("taizn cli", () => {
     ]);
   });
 
-  it("validates hosted asset URLs during dry-run", () => {
+  it("validates hosted asset URLs during dry-run", async () => {
     const dir = createPackageFixture();
-    const result = runTaizn(["probe", "hosted-assets", "--dry-run", "--json", "not-a-url"], dir);
+    const result = await runTaiznInProcess(
+      ["probe", "hosted-assets", "--dry-run", "--json", "not-a-url"],
+      dir,
+    );
 
     assert.strictEqual(result.status, 1);
     assert.include(result.stderr, "Invalid asset URL");
@@ -1322,7 +1403,7 @@ describe("taizn cli", () => {
         throw new Error("Expected TCP HTTP test server address.");
       }
 
-      const result = await runTaiznAsync(
+      const result = await runTaiznInProcess(
         ["probe", "hosted-assets", "--json", `http://127.0.0.1:${address.port}/missing.js`],
         dir,
       );
@@ -1403,9 +1484,9 @@ describe("taizn cli", () => {
     }
   });
 
-  it("validates generic submission metadata without portal automation", () => {
+  it("validates generic submission metadata without portal automation", async () => {
     const dir = createPackageFixture();
-    const result = runTaizn(["validate", "submission", "--json"], dir, {
+    const result = await runTaiznInProcess(["validate", "submission", "--json"], dir, {
       TAIZN_VARIANT: "production",
     });
 
@@ -1416,14 +1497,14 @@ describe("taizn cli", () => {
     assert.strictEqual(validation.hostedAssets.length, 2);
   });
 
-  it("fails submission validation when configured metadata is invalid", () => {
+  it("fails submission validation when configured metadata is invalid", async () => {
     const dir = createPackageFixture();
     const config = JSON.parse(readFileSync(join(dir, "taizn.json"), "utf8"));
 
     config.widget.variants.production.applicationId = "Bad?app";
     writeFileSync(join(dir, "taizn.json"), JSON.stringify(config, null, 2));
 
-    const result = runTaizn(["validate", "submission", "--json"], dir, {
+    const result = await runTaiznInProcess(["validate", "submission", "--json"], dir, {
       TAIZN_VARIANT: "production",
     });
 
@@ -1433,7 +1514,7 @@ describe("taizn cli", () => {
     assert.include(validation.problems[0] ?? "", "applicationId");
   });
 
-  it("fails submission validation when Tizen identifiers contain spaces", () => {
+  it("fails submission validation when Tizen identifiers contain spaces", async () => {
     const dir = createPackageFixture();
     const config = JSON.parse(readFileSync(join(dir, "taizn.json"), "utf8"));
 
@@ -1441,7 +1522,7 @@ describe("taizn cli", () => {
     config.widget.variants.production.packageId = "Bad Package";
     writeFileSync(join(dir, "taizn.json"), JSON.stringify(config, null, 2));
 
-    const result = runTaizn(["validate", "submission", "--json"], dir, {
+    const result = await runTaiznInProcess(["validate", "submission", "--json"], dir, {
       TAIZN_VARIANT: "production",
     });
 
@@ -1452,7 +1533,7 @@ describe("taizn cli", () => {
     assert.include(validation.problems.join("\n"), "packageId");
   });
 
-  it("fails submission validation when archive metadata mismatches the selected variant", () => {
+  it("fails submission validation when archive metadata mismatches the selected variant", async () => {
     const dir = createPackageFixture();
     const path = join(dir, "bad.wgt");
     writeFileSync(
@@ -1466,7 +1547,7 @@ describe("taizn cli", () => {
       ]),
     );
 
-    const result = runTaizn(["validate", "submission", "--json", path], dir, {
+    const result = await runTaiznInProcess(["validate", "submission", "--json", path], dir, {
       TAIZN_VARIANT: "production",
     });
 
@@ -1477,12 +1558,12 @@ describe("taizn cli", () => {
     assert.include(validation.problems.join("\n"), "archive packageId");
   });
 
-  it("validates the locally provable Samsung submission checklist for a WGT", () => {
+  it("validates the locally provable Samsung submission checklist for a WGT", async () => {
     const dir = createPackageFixture();
     const path = join(dir, "example.wgt");
     writeFileSync(path, makeValidSubmissionWgt());
 
-    const result = runTaizn(["validate", "submission", "--json", path], dir, {
+    const result = await runTaiznInProcess(["validate", "submission", "--json", path], dir, {
       TAIZN_VARIANT: "production",
     });
 
@@ -1493,19 +1574,19 @@ describe("taizn cli", () => {
     assert.deepStrictEqual(validation.problems, []);
   });
 
-  it("rejects WGT archives without a complete ZIP directory", () => {
+  it("rejects WGT archives without a complete ZIP directory", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-wgt-zip-"));
     const path = join(dir, "fixture.wgt");
     const archive = makeValidSubmissionWgt();
     writeFileSync(path, archive.subarray(0, archive.byteLength - 22));
 
-    const result = runTaizn(["prepare", "submission", "--json", path], dir);
+    const result = await runTaiznInProcess(["prepare", "submission", "--json", path], dir);
 
     assert.strictEqual(result.status, 1);
     assert.include(result.stderr, "ZIP end-of-central-directory record is missing");
   });
 
-  it("rejects inconsistent ZIP local headers and missing data descriptors", () => {
+  it("rejects inconsistent ZIP local headers and missing data descriptors", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-wgt-entries-"));
     const archive = makeValidSubmissionWgt();
     const badLocalHeader = Buffer.from(archive);
@@ -1524,8 +1605,11 @@ describe("taizn cli", () => {
     const missingDescriptorPath = join(dir, "missing_descriptor.wgt");
     writeFileSync(missingDescriptorPath, missingDescriptor);
 
-    const localResult = runTaizn(["prepare", "submission", "--json", badLocalPath], dir);
-    const descriptorResult = runTaizn(
+    const localResult = await runTaiznInProcess(
+      ["prepare", "submission", "--json", badLocalPath],
+      dir,
+    );
+    const descriptorResult = await runTaiznInProcess(
       ["prepare", "submission", "--json", missingDescriptorPath],
       dir,
     );
@@ -1536,7 +1620,7 @@ describe("taizn cli", () => {
     assert.include(descriptorResult.stderr, "data descriptor");
   });
 
-  it("rejects malformed or namespace-invalid config XML", () => {
+  it("rejects malformed or namespace-invalid config XML", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-wgt-xml-"));
     const path = join(dir, "fixture.wgt");
     writeFileSync(
@@ -1546,14 +1630,14 @@ describe("taizn cli", () => {
       ),
     );
 
-    const result = runTaizn(["prepare", "submission", "--json", path], dir);
+    const result = await runTaiznInProcess(["prepare", "submission", "--json", path], dir);
 
     assert.strictEqual(result.status, 1);
     assert.include(result.stderr, "Invalid archive config.xml");
     assert.include(result.stderr, "unbound namespace prefix");
   });
 
-  it("validates Seller Office WGT file-name characters and byte length", () => {
+  it("validates Seller Office WGT file-name characters and byte length", async () => {
     const dir = createPackageFixture();
     const specialPath = join(dir, "bad#.wgt");
     const longPath = join(dir, `${"a".repeat(97)}.wgt`);
@@ -1561,10 +1645,14 @@ describe("taizn cli", () => {
     writeFileSync(specialPath, archive);
     writeFileSync(longPath, archive);
 
-    const special = runTaizn(["validate", "submission", "--json", specialPath], dir, {
-      TAIZN_VARIANT: "production",
-    });
-    const long = runTaizn(["validate", "submission", "--json", longPath], dir, {
+    const special = await runTaiznInProcess(
+      ["validate", "submission", "--json", specialPath],
+      dir,
+      {
+        TAIZN_VARIANT: "production",
+      },
+    );
+    const long = await runTaiznInProcess(["validate", "submission", "--json", longPath], dir, {
       TAIZN_VARIANT: "production",
     });
 
@@ -1574,7 +1662,7 @@ describe("taizn cli", () => {
     assert.include(JSON.parse(long.stdout).problems.join("\n"), "100 bytes");
   });
 
-  it("reports actionable signed WGT submission problems", () => {
+  it("reports actionable signed WGT submission problems", async () => {
     const dir = createPackageFixture();
     const path = join(dir, "example.WGT");
     writeFileSync(
@@ -1589,7 +1677,7 @@ describe("taizn cli", () => {
       ]),
     );
 
-    const result = runTaizn(["validate", "submission", "--json", path], dir, {
+    const result = await runTaiznInProcess(["validate", "submission", "--json", path], dir, {
       TAIZN_VARIANT: "production",
     });
 
@@ -1606,7 +1694,7 @@ describe("taizn cli", () => {
     assert.include(validation.problems.join("\n"), "signature1.xml");
   });
 
-  it("decodes the default application name from config XML", () => {
+  it("decodes the default application name from config XML", async () => {
     const dir = createPackageFixture();
     const config = JSON.parse(readFileSync(join(dir, "taizn.json"), "utf8"));
     config.widget.variants.production.name = "Rock & Roll";
@@ -1619,8 +1707,8 @@ describe("taizn cli", () => {
       ),
     );
 
-    const prepared = runTaizn(["prepare", "submission", "--json", path], dir);
-    const validated = runTaizn(["validate", "submission", "--json", path], dir, {
+    const prepared = await runTaiznInProcess(["prepare", "submission", "--json", path], dir);
+    const validated = await runTaiznInProcess(["validate", "submission", "--json", path], dir, {
       TAIZN_VARIANT: "production",
     });
 
@@ -1629,7 +1717,7 @@ describe("taizn cli", () => {
     assert.strictEqual(validated.status, 0);
   });
 
-  it("honors defaultlocale and Unicode name whitespace", () => {
+  it("honors defaultlocale and Unicode name whitespace", async () => {
     const dir = createPackageFixture();
     const config = JSON.parse(readFileSync(join(dir, "taizn.json"), "utf8"));
     config.widget.variants.production.name = "Rock & Roll";
@@ -1642,8 +1730,8 @@ describe("taizn cli", () => {
       ),
     );
 
-    const prepared = runTaizn(["prepare", "submission", "--json", path], dir);
-    const validated = runTaizn(["validate", "submission", "--json", path], dir, {
+    const prepared = await runTaiznInProcess(["prepare", "submission", "--json", path], dir);
+    const validated = await runTaiznInProcess(["validate", "submission", "--json", path], dir, {
       TAIZN_VARIANT: "production",
     });
 
@@ -1652,7 +1740,7 @@ describe("taizn cli", () => {
     assert.strictEqual(validated.status, 0);
   });
 
-  it("accepts a ZIP comment containing an EOCD signature sequence", () => {
+  it("accepts a ZIP comment containing an EOCD signature sequence", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-wgt-comment-"));
     const path = join(dir, "fixture.wgt");
     writeFileSync(
@@ -1660,22 +1748,22 @@ describe("taizn cli", () => {
       makeValidSubmissionWgt(undefined, Buffer.from([0x50, 0x4b, 0x05, 0x06, 0, 0, 0])),
     );
 
-    const result = runTaizn(["prepare", "submission", "--json", path], dir);
+    const result = await runTaiznInProcess(["prepare", "submission", "--json", path], dir);
 
     assert.strictEqual(result.status, 0);
   });
 
-  it("prepares a deterministic signed WGT submission manifest", () => {
+  it("prepares a deterministic signed WGT submission manifest", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-prepare-submission-"));
     const path = join(dir, "fixture.wgt");
     const archive = makeValidSubmissionWgt();
     writeFileSync(path, archive);
 
-    const first = runTaizn(
+    const first = await runTaiznInProcess(
       ["prepare", "submission", "--json", "--artifact", ".taizn/submission.json", path],
       dir,
     );
-    const second = runTaizn(["prepare", "submission", "--json", path], dir);
+    const second = await runTaiznInProcess(["prepare", "submission", "--json", path], dir);
 
     assert.strictEqual(first.status, 0);
     assert.strictEqual(first.stderr, "");
@@ -1714,7 +1802,7 @@ describe("taizn cli", () => {
     });
   });
 
-  it("inspects Tizen widget archive metadata as JSON", () => {
+  it("inspects Tizen widget archive metadata as JSON", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-inspect-wgt-"));
     const path = join(dir, "fixture.wgt");
     writeFileSync(
@@ -1729,7 +1817,7 @@ describe("taizn cli", () => {
       ]),
     );
 
-    const result = runTaizn(["inspect", "wgt", "--json", path], dir);
+    const result = await runTaiznInProcess(["inspect", "wgt", "--json", path], dir);
 
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
@@ -1738,9 +1826,9 @@ describe("taizn cli", () => {
     assert.strictEqual(inspected.entryCount, 2);
   });
 
-  it("runs the configured widget variant on the target", () => {
+  it("runs the configured widget variant on the target", async () => {
     const dir = createPackageFixture();
-    const result = runTaizn(["run"], dir, {
+    const result = await runTaiznInProcess(["run"], dir, {
       TAIZN_SDB: join(dir, "fake-sdb.mjs"),
       TAIZN_TARGET: "127.0.0.1:26101",
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
@@ -1754,10 +1842,10 @@ describe("taizn cli", () => {
     assert.include(readFileSync(join(dir, "run-args.json"), "utf8"), '"127.0.0.1:26101"');
   });
 
-  it("uses variant widget overrides when staging the package", () => {
+  it("uses variant widget overrides when staging the package", async () => {
     const dir = createPackageFixture();
 
-    const development = runTaizn(["package"], dir, {
+    const development = await runTaiznInProcess(["package"], dir, {
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
     });
 
@@ -1771,7 +1859,7 @@ describe("taizn cli", () => {
       'href="./css/main.css"',
     );
 
-    const production = runTaizn(["package"], dir, {
+    const production = await runTaiznInProcess(["package"], dir, {
       TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
       TAIZN_VARIANT: "production",
     });
