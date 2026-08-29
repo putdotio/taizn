@@ -21,9 +21,10 @@ minimumReleaseAgeExclude:
   - "@uinaf/*"
   - effect@4.0.0-beta.107
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@0.2.6
+  vite: npm:@voidzero-dev/vite-plus-core@0.2.9
   vitest: 4.1.10
-  vite-plus: 0.2.7
+  vite-plus: 0.2.9
+  "@vitest/coverage-v8": 4.1.10
 peerDependencyRules:
   allowAny:
     - vite
