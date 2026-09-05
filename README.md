@@ -113,7 +113,10 @@ pnpm exec taizn tv doctor --connect --json --artifact .taizn/tv-doctor.json
 
 Use `--dry-run` before mutating platform state when the command supports it.
 Artifact paths must stay inside the app directory; `.taizn/...` is the normal
-home for local proof state.
+home for local proof state. Existing parent and destination symlinks must resolve
+inside the physical app directory; dangling links are rejected. Symlinked app
+checkouts and internal links are supported. This checks the filesystem before
+writing; it does not isolate writes from concurrent filesystem changes.
 
 Finite SDB queries, target connections, and captured launch commands have a
 30-second deadline per subprocess. Timeout errors identify the command and its
