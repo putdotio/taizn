@@ -1,9 +1,11 @@
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createServer } from "node:http";
@@ -553,6 +555,68 @@ describe("taizn cli", () => {
 
     assert.strictEqual(result.status, 1);
     assert.include(result.stderr, "output path must stay inside the app directory");
+  });
+
+  for (const kind of ["parent", "file", "dangling", "nested"] as const) {
+    it(`rejects proof artifacts through an outside ${kind} symlink`, async () => {
+      const dir = createToolingFixture();
+      const outside = mkdtempSync(join(tmpdir(), "taizn-outside-"));
+      const destination = join(outside, "proof.json");
+      if (kind !== "dangling") writeFileSync(destination, "untouched");
+      mkdirSync(join(dir, ".taizn"), { recursive: true });
+      const artifact =
+        kind === "parent" || kind === "nested" ? ".taizn/link/new/proof.json" : ".taizn/proof.json";
+      if (kind === "parent" || kind === "nested") {
+        symlinkSync(outside, join(dir, ".taizn/link"));
+        if (kind === "nested") {
+          symlinkSync(join(dir, ".taizn/link"), join(dir, ".taizn/alias"));
+        }
+      } else {
+        symlinkSync(destination, join(dir, ".taizn/proof.json"));
+      }
+      const result = await runTaiznInProcess(
+        [
+          "prove",
+          "--artifact",
+          kind === "nested" ? ".taizn/alias/new/proof.json" : artifact,
+          "Example.app",
+        ],
+        dir,
+        {
+          TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+          TAIZN_TARGET: "127.0.0.1:26101",
+          TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+        },
+      );
+      assert.strictEqual(result.status, 1);
+      assert.include(result.stderr, "output path must stay inside the app directory");
+      assert.isFalse(existsSync(join(outside, "new")));
+      if (kind === "dangling") assert.isFalse(existsSync(destination));
+      else assert.strictEqual(readFileSync(destination, "utf8"), "untouched");
+    });
+  }
+
+  it("writes artifacts through internal links in a symlinked app checkout", async () => {
+    const dir = createToolingFixture();
+    const parent = mkdtempSync(join(tmpdir(), "taizn-checkout-link-"));
+    const checkout = join(parent, "app");
+    symlinkSync(dir, checkout);
+    mkdirSync(join(dir, "proofs"));
+    symlinkSync(join(dir, "proofs"), join(dir, "artifacts"));
+    const result = await runTaiznInProcess(
+      ["prove", "--artifact", "artifacts/new/proof.json", "Example.app"],
+      checkout,
+      {
+        TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+        TAIZN_TARGET: "127.0.0.1:26101",
+        TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+      },
+    );
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(
+      parseProofJson(readFileSync(join(dir, "proofs/new/proof.json"), "utf8")).application.id,
+      "Example.app",
+    );
   });
 
   it("prints only JSON for structured proof when auto-picking one target", async () => {

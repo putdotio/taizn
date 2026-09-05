@@ -1,4 +1,4 @@
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { Effect, FileSystem, Predicate } from "effect";
 import { FileSystemFailure, InvalidInput, InvalidJson } from "./errors.js";
 import { getPaths } from "./runtime.js";
@@ -33,15 +33,77 @@ export const resolveOutputPath = Effect.fn("resolveOutputPath")(function* (reque
     : resolve(paths.appDir, requestedPath);
   const rel = relative(paths.appDir, resolved);
 
-  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+  if (rel === "" || escapesDirectory(rel)) {
     return yield* new InvalidInput({
       details: `output path must stay inside the app directory. Received: ${requestedPath}`,
       label: "output path",
     });
   }
 
-  return resolved;
+  const fs = yield* FileSystem.FileSystem;
+  const root = yield* fs
+    .realPath(paths.appDir)
+    .pipe(
+      Effect.mapError(
+        (cause) => new FileSystemFailure({ cause, operation: "realpath", path: paths.appDir }),
+      ),
+    );
+  let physical = root;
+
+  for (const segment of rel.split(sep)) {
+    const candidate = resolve(physical, segment);
+    const canonical = yield* fs
+      .realPath(candidate)
+      .pipe(
+        Effect.catch((cause) =>
+          cause.reason._tag === "NotFound"
+            ? Effect.succeed(undefined)
+            : Effect.fail(new FileSystemFailure({ cause, operation: "realpath", path: candidate })),
+        ),
+      );
+
+    if (canonical === undefined) {
+      // realpath also reports NotFound for dangling links. Never write through one.
+      const link = yield* fs
+        .readLink(candidate)
+        .pipe(
+          Effect.catch((cause) =>
+            cause.reason._tag === "NotFound"
+              ? Effect.succeed(undefined)
+              : Effect.fail(
+                  new FileSystemFailure({ cause, operation: "readlink", path: candidate }),
+                ),
+          ),
+        );
+      if (link !== undefined) {
+        return yield* new InvalidInput({
+          details: `output path must stay inside the app directory; dangling links are not allowed. Received: ${requestedPath}`,
+          label: "output path",
+        });
+      }
+    }
+
+    physical = canonical ?? candidate;
+    if (escapesDirectory(relative(root, physical))) {
+      return yield* new InvalidInput({
+        details: `output path must stay inside the app directory. Received: ${requestedPath}`,
+        label: "output path",
+      });
+    }
+  }
+
+  if (physical === root) {
+    return yield* new InvalidInput({
+      details: `output path must name a file inside the app directory. Received: ${requestedPath}`,
+      label: "output path",
+    });
+  }
+
+  return physical;
 });
+
+const escapesDirectory = (path: string) =>
+  path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path);
 
 export const writeJsonArtifact = Effect.fn("writeJsonArtifact")(function* (
   requestedPath: string,
