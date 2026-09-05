@@ -24,6 +24,10 @@ The npm package includes `dist`, `README.md`, `docs`, `skills`, `AGENTS.md`,
 README's support, contribution, and automation links without cloning extra
 context.
 
+The published dependencies pin Effect, platform-node, and platform-node-shared to
+the same prerelease. Keep these aligned: consumers do not inherit the repository
+pnpm overrides, and a newer shared runtime can be incompatible.
+
 ## Release Environment
 
 The release job uses the GitHub Environment named `release`.
