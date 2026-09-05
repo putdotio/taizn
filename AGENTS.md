@@ -42,15 +42,11 @@ Read only what the current task needs:
 - Keep file/process side effects explicit: copy, stage, clean, run Tizen, fail clearly.
 - Prefer small helpers over new framework layers or compatibility modes.
 
-## Learning more about the Effect
+## Effect
 
-This repository uses the Effect Typescript library.
-
-Before writing any Effect code, first read `node_modules/effect/AGENTS.md`
-**completely**, and follow the links in the file when required.
-
-If you need to learn more about particular Effect apis and concepts that the
-guide doesn't cover, search through the source code in `node_modules/effect/src`.
+This repository uses the Effect TypeScript library. The installed version's own
+guide is `node_modules/effect/AGENTS.md`; consult it for the APIs the change
+touches, and search `node_modules/effect/src` for anything it does not cover.
 
 ## Sharp Edges
 
@@ -107,6 +103,8 @@ guide doesn't cover, search through the source code in `node_modules/effect/src`
 - Config/env/command/output changes: update `README.md` and CLI tests.
 - CI/release/publishing changes: update `docs/DISTRIBUTION.md`.
 - Keep `CLAUDE.md` as a symlink to this file.
+- Finish edits, `vp run verify`, and fixes without pausing; ask before publishing and before live runs against a TV someone else may be using.
+- Done means `vp run verify` passed and, for device-facing changes, the matching `live:test:*` proof ran or the gap is reported.
 
 ## Worktrees
 
