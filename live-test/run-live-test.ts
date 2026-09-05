@@ -203,7 +203,7 @@ function runTaizn(command: TaiznMode) {
       TAIZN_VARIANT: process.env.TAIZN_VARIANT || "development",
     },
     stdio: "inherit",
-    ...(command === "prove" || command === "doctor"
+    ...(command === "prove"
       ? { timeout: 120_000, killSignal: "SIGKILL" as const }
       : {}),
   });
@@ -424,7 +424,7 @@ function runTaiznJson(
   const result = spawnSync(process.execPath, [cliPath, ...commandArgs], {
     cwd: appDir,
     encoding: "utf8",
-    timeout: 120_000,
+    timeout: ["check", "apps", "prove"].includes(commandArgs[0] ?? "") ? 120_000 : undefined,
     killSignal: "SIGKILL",
     env: {
       ...process.env,
