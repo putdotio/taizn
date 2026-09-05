@@ -203,8 +203,12 @@ function runTaizn(command: TaiznMode) {
       TAIZN_VARIANT: process.env.TAIZN_VARIANT || "development",
     },
     stdio: "inherit",
+    ...(command === "prove" || command === "doctor"
+      ? { timeout: 120_000, killSignal: "SIGKILL" as const }
+      : {}),
   });
 
+  if (result.error) console.error(`taizn ${command}: ${result.error.message}`);
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }
@@ -420,6 +424,8 @@ function runTaiznJson(
   const result = spawnSync(process.execPath, [cliPath, ...commandArgs], {
     cwd: appDir,
     encoding: "utf8",
+    timeout: 120_000,
+    killSignal: "SIGKILL",
     env: {
       ...process.env,
       ...env,
@@ -427,7 +433,7 @@ function runTaiznJson(
     },
   });
   const stdout = result.stdout.trim();
-  const stderr = result.stderr.trim();
+  const stderr = [result.stderr.trim(), result.error?.message].filter(Boolean).join("\n");
 
   if (result.status !== 0) {
     if (stdout) {
