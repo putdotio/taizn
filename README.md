@@ -115,6 +115,11 @@ Use `--dry-run` before mutating platform state when the command supports it.
 Artifact paths must stay inside the app directory; `.taizn/...` is the normal
 home for local proof state.
 
+Finite SDB queries, target connections, and captured launch commands have a
+30-second deadline per subprocess. Timeout errors identify the command and its
+target arguments. Cleanup sends SIGTERM, then SIGKILL after one second if needed.
+Builds, signing, and installs keep their existing duration behavior.
+
 ## Command Surface
 
 | Command                              | Purpose                                            |

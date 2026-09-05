@@ -1,4 +1,4 @@
-import { Console, DateTime, Effect, FileSystem, Stream } from "effect";
+import { Console, Context, DateTime, Effect, FileSystem, Stream } from "effect";
 import { ChildProcess } from "effect/unstable/process";
 import { ChildProcessSpawner } from "effect/unstable/process";
 import { spawn } from "node:child_process";
@@ -22,6 +22,7 @@ import {
 import {
   ApplicationNotFound,
   CommandFailed,
+  CommandTimeout,
   FileSystemFailure,
   InvalidInput,
   MissingPassword,
@@ -32,6 +33,10 @@ import {
 } from "./errors.js";
 import { escapeXml, setXmlAttribute } from "./xml.js";
 import { jsonForOutput, validateAgentResourceInput, writeJsonArtifact } from "./io.js";
+
+export const CommandTimeoutMs = Context.Reference<number>("taizn/CommandTimeoutMs", {
+  defaultValue: () => 30_000,
+});
 
 type Certificates = {
   readonly author: string;
@@ -60,6 +65,7 @@ type WidgetStageOptions = WidgetIndexOptions & {
 };
 
 type RunOptions = {
+  readonly finite?: boolean;
   readonly cwd?: string;
   readonly env?: ChildEnv;
 };
@@ -279,7 +285,10 @@ export const installWidget = Effect.fn("installWidget")(function* (
   }
 
   if (context.env.target) {
-    yield* run(sdbPath, ["connect", context.env.target], { env: yield* baseChildEnv() });
+    yield* run(sdbPath, ["connect", context.env.target], {
+      env: yield* baseChildEnv(),
+      finite: true,
+    });
   }
 
   yield* run(tizenPath, installArgs, { env: yield* baseChildEnv() });
@@ -312,7 +321,7 @@ export const runWidget = Effect.fn("runWidget")(function* (
   }
 
   if (env.target) {
-    yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv() });
+    yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv(), finite: true });
   }
 
   yield* run(tizenPath, runArgs, { env: yield* baseChildEnv() });
@@ -483,7 +492,7 @@ export const captureTizenLogs = Effect.fn("captureTizenLogs")(function* (
     if (quiet) {
       yield* capture(sdbPath, ["connect", env.target]);
     } else {
-      yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv() });
+      yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv(), finite: true });
     }
   }
 
@@ -885,7 +894,7 @@ const loadInstalledApplications = Effect.fn("loadInstalledApplications")(functio
     if (options.quiet) {
       yield* capture(sdbPath, ["connect", env.target]);
     } else {
-      yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv() });
+      yield* run(sdbPath, ["connect", env.target], { env: yield* baseChildEnv(), finite: true });
     }
   }
 
@@ -998,10 +1007,11 @@ const run = Effect.fn("run")(function* (
   const paths = yield* getPaths();
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const env = yield* withTizenPath(options.env ?? (yield* baseChildEnv()));
-  const exitCode = yield* spawner
+  const execution = spawner
     .exitCode(
       ChildProcess.make(command, args, {
         cwd: options.cwd ?? paths.appDir,
+        forceKillAfter: options.finite ? "1 second" : undefined,
         env,
         stderr: "inherit",
         stdin: "inherit",
@@ -1010,17 +1020,29 @@ const run = Effect.fn("run")(function* (
     )
     .pipe(Effect.mapError(() => new CommandFailed({ args: redactCommandArgs(args), command })));
 
+  const timeoutMs = yield* CommandTimeoutMs;
+  const exitCode = yield* options.finite
+    ? execution.pipe(
+        Effect.timeoutOrElse({
+          duration: timeoutMs,
+          orElse: () =>
+            Effect.fail(new CommandTimeout({ args: redactCommandArgs(args), command, timeoutMs })),
+        }),
+      )
+    : execution;
   if (exitCode !== 0) {
     return yield* new CommandFailed({ args: redactCommandArgs(args), command });
   }
 });
 
 const capture = Effect.fn("capture")(function* (command: string, args: ReadonlyArray<string>) {
+  const timeoutMs = yield* CommandTimeoutMs;
   const output = yield* Effect.scoped(
     Effect.gen(function* () {
       const paths = yield* getPaths();
       const env = yield* withTizenPath(yield* baseChildEnv());
       const process = yield* ChildProcess.make(command, args, {
+        forceKillAfter: "1 second",
         cwd: paths.appDir,
         env,
         stderr: "inherit",
@@ -1033,6 +1055,12 @@ const capture = Effect.fn("capture")(function* (command: string, args: ReadonlyA
       );
 
       return { exitCode, output };
+    }),
+  ).pipe(
+    Effect.timeoutOrElse({
+      duration: timeoutMs,
+      orElse: () =>
+        Effect.fail(new CommandTimeout({ args: redactCommandArgs(args), command, timeoutMs })),
     }),
   );
 

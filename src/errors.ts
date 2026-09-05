@@ -76,6 +76,16 @@ export class CommandFailed extends Schema.TaggedError<CommandFailed>()("CommandF
   }
 }
 
+export class CommandTimeout extends Schema.TaggedError<CommandTimeout>()("CommandTimeout", {
+  command: Schema.String,
+  args: Schema.Array(Schema.String),
+  timeoutMs: Schema.Number,
+}) {
+  override get message(): string {
+    return `Command timed out after ${this.timeoutMs} ms: ${this.command} ${this.args.join(" ")}`;
+  }
+}
+
 export class ApplicationNotFound extends Schema.TaggedError<ApplicationNotFound>()(
   "ApplicationNotFound",
   {
@@ -277,6 +287,7 @@ export class SellerPortalProtocolError extends Schema.TaggedError<SellerPortalPr
 export type TaiznError =
   | ApplicationNotFound
   | CommandFailed
+  | CommandTimeout
   | ConfigNotFound
   | FileSystemFailure
   | InvalidConfig

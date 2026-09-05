@@ -21,7 +21,7 @@ import { SecretReadInterrupted } from "../src/errors.js";
 import { runTaiznCli } from "../src/main.js";
 import { fetchSamsungTvInfo, sendSamsungTvKeys } from "../src/remote.js";
 import { appBuildEnv, redactCommandArgs, TaiznSystem } from "../src/runtime.js";
-import { captureForDuration } from "../src/tizen.js";
+import { captureForDuration, CommandTimeoutMs } from "../src/tizen.js";
 
 const cliPath = resolve("dist/taizn.mjs");
 
@@ -42,6 +42,7 @@ const runTaiznInProcess = async (
   args: string[],
   cwd = process.cwd(),
   env: NodeJS.ProcessEnv = {},
+  commandTimeoutMs = 30_000,
 ): Promise<{ readonly status: number; readonly stderr: string; readonly stdout: string }> => {
   const stdout: string[] = [];
   const stderr: string[] = [];
@@ -54,6 +55,7 @@ const runTaiznInProcess = async (
   });
   const status = await Effect.runPromise(
     runTaiznCli(args).pipe(
+      Effect.provideService(CommandTimeoutMs, commandTimeoutMs),
       Effect.provideService(Console.Console, makeCapturedConsole(stdout, stderr)),
       Effect.provide(Layer.mergeAll(NodeServices.layer, system)),
     ),
@@ -1261,6 +1263,72 @@ describe("taizn cli", () => {
     assert.include(result.stderr, "Command failed");
     assert.isBelow(Date.now() - startedAt, 2_000);
   });
+
+  for (const scenario of [
+    { args: ["targets", "list", "--json"], stage: "devices", tool: "sdb" },
+    { args: ["apps", "--json"], stage: "applist", tool: "sdb" },
+    { args: ["logs", "capture", "--json"], stage: "dlog", tool: "sdb" },
+    { args: ["logs", "capture", "--duration-ms", "100"], stage: "connect", tool: "sdb" },
+    { args: ["prove", "--json", "Example.app"], stage: "run", tool: "tizen" },
+  ]) {
+    it(`times out a hung ${scenario.stage} subprocess and reaps it`, async () => {
+      const dir = createToolingFixture();
+      const command = join(dir, `fake-${scenario.tool}.mjs`);
+      const pidPath = join(dir, "child.pid");
+      const original = readFileSync(command, "utf8").replace(/^#![^\n]*\n/u, "");
+      writeFileSync(
+        command,
+        `#!/usr/bin/env node
+        import { writeFileSync } from "node:fs";
+        if (process.argv.includes(${JSON.stringify(scenario.stage)})) {
+          process.on("SIGTERM", () => {});
+          writeFileSync(${JSON.stringify(pidPath)}, String(process.pid));
+          setInterval(() => {}, 1000);
+          await new Promise(() => {});
+        }
+        ${original}
+      `,
+      );
+      const resultPromise = runTaiznInProcess(
+        scenario.args,
+        dir,
+        {
+          TAIZN_SDB: join(dir, "fake-sdb.mjs"),
+          TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs"),
+          TAIZN_TARGET: "127.0.0.1:26101",
+        },
+        500,
+      );
+      let pid: number | undefined;
+      let guard: ReturnType<typeof setTimeout> | undefined;
+      try {
+        pid = Number(await waitForFile(pidPath));
+        const result = await Promise.race([
+          resultPromise,
+          new Promise<never>((_, reject) => {
+            guard = setTimeout(() => reject(new Error("command failed to terminate")), 3_000);
+          }),
+        ]);
+        assert.strictEqual(result.status, 1);
+        assert.include(result.stderr, "Command timed out after 500 ms");
+        assert.include(result.stderr, scenario.stage);
+        if (scenario.args.includes("--json")) {
+          assert.strictEqual(JSON.parse(result.stderr).error.type, "CommandTimeout");
+        }
+        assert.throws(() => process.kill(pid ?? 0, 0));
+      } finally {
+        clearTimeout(guard);
+        if (pid !== undefined) {
+          try {
+            process.kill(pid, "SIGKILL");
+          } catch {
+            /* Already reaped. */
+          }
+        }
+        await resultPromise;
+      }
+    });
+  }
 
   it("force-closes interrupted log processes that ignore SIGTERM", async () => {
     const dir = mkdtempSync(join(tmpdir(), "taizn-stubborn-log-"));
