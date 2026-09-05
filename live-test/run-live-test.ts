@@ -203,9 +203,7 @@ function runTaizn(command: TaiznMode) {
       TAIZN_VARIANT: process.env.TAIZN_VARIANT || "development",
     },
     stdio: "inherit",
-    ...(command === "prove"
-      ? { timeout: 120_000, killSignal: "SIGKILL" as const }
-      : {}),
+    ...(command === "prove" ? { timeout: 120_000, killSignal: "SIGKILL" as const } : {}),
   });
 
   if (result.error) console.error(`taizn ${command}: ${result.error.message}`);
