@@ -1,6 +1,6 @@
 {
   "name": "@putdotio/taizn",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "A typed Tizen TV packaging, install, remote-control, and live proof harness.",
   "keywords": [
     "cli",
