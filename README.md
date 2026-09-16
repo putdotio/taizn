@@ -118,6 +118,11 @@ inside the physical app directory; dangling links are rejected. Symlinked app
 checkouts and internal links are supported. This checks the filesystem before
 writing; it does not isolate writes from concurrent filesystem changes.
 
+Finite SDB queries, target connections, and captured launch commands have a
+30-second deadline per subprocess. Timeout errors identify the command and its
+target arguments. Cleanup sends SIGTERM, then SIGKILL after one second if needed.
+Builds, signing, and installs keep their existing duration behavior.
+
 ## Command Surface
 
 | Command                              | Purpose                                            |

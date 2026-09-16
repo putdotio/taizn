@@ -99,6 +99,12 @@ The fixture writes `live-test/app/taizn.json` from
 `taizn-live-test`. Proof uses `TAIZN_LIVE_PROVE_APP` when set, otherwise the
 configured `TAIZN_VARIANT` application ID from the fixture template.
 
+The `check`, `apps`, and `prove` CLI steps have a two-minute wrapper watchdog.
+The CLI applies its own shorter deadlines to finite SDB/Tizen subprocesses.
+Packaging, signing, installation, and uninstall steps retain their existing
+duration behavior. Remote doctor and key-sequence steps retain their own timeout
+and delay contracts.
+
 ## Roundtrip Proof
 
 `live:test:roundtrip` starts a local HTTP beacon and waits for the launched TV
