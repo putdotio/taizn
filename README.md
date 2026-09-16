@@ -169,9 +169,8 @@ host is set. `taizn tv pair` writes the paired remote token to
 `.taizn/remote.json`; keep `.taizn/` ignored.
 
 `taizn seller login` opens a dedicated visible Chrome profile under `.taizn/`
-and stores only its localhost DevTools port in `.taizn/seller.json`. Complete
-Samsung login yourself; Taizn does not request or read passwords, cookies, MFA,
-or browser tokens. See [Seller Office](./docs/SELLER_OFFICE.md) for the supported
+and stores only its localhost DevTools port in `.taizn/seller.json`; Taizn never
+reads Samsung credentials. See [Seller Office](./docs/SELLER_OFFICE.md) for the
 read-only workflow and recovery steps.
 
 ## Boundaries

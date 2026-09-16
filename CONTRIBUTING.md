@@ -14,8 +14,6 @@ vp run hooks:install
 ```
 
 Use the Node.js version in [`.node-version`](./.node-version).
-Use `node_modules/effect/AGENTS.md` and `node_modules/effect/src` for Effect API
-guidance and source research.
 The hook setup makes the full verification gate run before pushes.
 
 ## Run Locally
@@ -50,19 +48,8 @@ vp run smoke
 vp run test
 ```
 
-Live checks for a local Tizen toolchain and device:
-
-```bash
-vp run live:test:doctor
-vp run live:test
-vp run live:test:install
-vp run live:test:prove
-vp run live:test:smoke
-vp run live:test:roundtrip
-vp run live:test:tv-assets:production
-```
-
-See [Live Test](./live-test/README.md) for signing profile setup, beacon
+Live checks for a local Tizen toolchain and device: [Live Test](./live-test/README.md)
+owns the `vp run live:test:*` scripts, signing profile setup, beacon
 configuration, remote diagnostics, and hosted asset checks.
 
 ## Development Notes
@@ -72,7 +59,7 @@ configuration, remote diagnostics, and hosted asset checks.
 - `src/runtime.ts` owns the Node service layer and runtime boundary helpers.
 - `src/tizen.ts` owns Effectful Tizen side effects.
 - `src/remote.ts` owns Samsung TV remote-control websocket behavior.
-- Tests in `test/` use `@effect/vitest` and exercise the packed CLI from `dist/taizn.mjs`.
+- Tests in `test/` use `@effect/vitest` and default to the in-process harness; spawn `dist/taizn.mjs` only when the process boundary itself is under test.
 - `live-test/` exercises the packed CLI against local Tizen tools.
 - Keep `.taizn/` generated, local, and ignored.
 

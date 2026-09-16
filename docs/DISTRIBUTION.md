@@ -46,17 +46,7 @@ During the `@semantic-release/npm` publish step, npm detects the GitHub OIDC ide
 
 Release GitHub writes use `putio-releaser`, and the release-bot remote is configured only after dependencies are installed.
 
-## Local Checks
-
-```bash
-vp install
-vp run verify
-```
-
 ## Versioning
 
-Conventional Commits drive releases:
-
-- `feat:` publishes a minor release
-- `fix:` publishes a patch release
-- breaking changes publish a major release
+Conventional Commits drive releases; the type-to-release mapping is in
+[Contributing](../CONTRIBUTING.md#release).

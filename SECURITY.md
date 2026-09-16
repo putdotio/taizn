@@ -7,8 +7,6 @@ please report it privately.
 
 - email: devs@put.io
 
-Private reports are preferred for security and privacy issues.
-
 If you are unsure whether something is sensitive, email first instead of opening
 a public issue.
 

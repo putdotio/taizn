@@ -91,7 +91,6 @@ touches, and search `node_modules/effect/src` for anything it does not cover.
   the app directory.
 - Mutating platform commands should expose `--dry-run` unless a dry run would
   be misleading. If a dry run is not real proof, say what it validates.
-- Keep `skills/taizn/SKILL.md` aligned when command-surface guardrails change.
 - Unit tests use `@effect/vitest` through `vp run test`; only `vp run live:test:*` proves real Tizen behavior.
 - CLI tests default to the in-process harness (`runTaiznInProcess` over
   `runTaiznCli` from `src/main.ts`) so V8 coverage attributes them. Spawn
@@ -100,7 +99,7 @@ touches, and search `node_modules/effect/src` for anything it does not cover.
 
 ## When Contracts Change
 
-- Config/env/command/output changes: update `README.md` and CLI tests.
+- Config/env/command/output changes: update `README.md` and CLI tests; command-surface guardrail changes also update `skills/taizn/SKILL.md`.
 - CI/release/publishing changes: update `docs/DISTRIBUTION.md`.
 - Keep `CLAUDE.md` as a symlink to this file.
 - Finish edits, `vp run verify`, and fixes without pausing; ask before publishing and before live runs against a TV someone else may be using.
@@ -131,27 +130,6 @@ vp run test:coverage
 vp run skills:lint
 ```
 
-Live Tizen checks when the local toolchain/certs/device exist:
-
-```bash
-vp run live:test:profile
-vp run live:test
-vp run live:test:doctor
-vp run live:test:doctor:connect
-vp run live:test:install
-vp run live:test:prove
-vp run live:test:remote
-vp run live:test:roundtrip
-vp run live:test:smoke
-vp run live:test:tv-assets
-vp run live:test:tv-assets:production
-```
-
-Use `LIVE_TEST_FETCH_URLS` with `live:test:roundtrip` when the TV WebView needs
-to prove it can fetch specific remote assets.
-Use `live:test:tv-assets` or `live:test:tv-assets:production` to run that same
-roundtrip against the neutral hosted-asset probe preset.
-Use `LIVE_TEST_REQUIRE_REMOTE=1` with `live:test:remote` when websocket remote
-control is a required gate instead of a diagnostic artifact.
-Use `LIVE_TEST_REMOTE_KEYS` only after `taizn tv pair` has configured a
-Samsung remote token.
+Live Tizen checks when the local toolchain/certs/device exist: each
+`vp run live:test:*` script and its `LIVE_TEST_*` knobs are described in
+[Live Test commands](live-test/README.md#commands).
