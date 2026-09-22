@@ -17,6 +17,8 @@ with `[skip ci]`.
 Verify jobs can cancel stale runs; release jobs queue so package publishing is
 not interrupted.
 
+The release job calls the [shared frontend release workflow](https://github.com/putdotio/.github/blob/main/frontend/README.md) from `putdotio/.github`, pinned to a tagged commit; the semantic-release action and plugin pins live there. [`scan.yml`](../.github/workflows/scan.yml) calls the shared frontend scan workflow from the same repository: Gitleaks, TruffleHog, Actionlint, and Zizmor on pull requests, weekly, and on manual dispatch.
+
 ## Package Contents
 
 The npm package includes `dist`, `README.md`, `docs`, `skills`, `AGENTS.md`,
@@ -44,7 +46,7 @@ The npm package uses Trusted Publishing from GitHub Actions. On npm, configure o
 
 During the `@semantic-release/npm` publish step, npm detects the GitHub OIDC identity, mints short-lived publish credentials, and publishes provenance for the release job.
 
-Release GitHub writes use `putio-releaser`, and the release-bot remote is configured only after dependencies are installed.
+Release GitHub writes use `putio-releaser`, and the release bot token is minted only after dependencies are installed.
 
 ## Versioning
 
