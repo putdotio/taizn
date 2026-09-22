@@ -76,7 +76,7 @@
     "@effect/vitest": "4.0.0-beta.107",
     "@types/node": "^26.1.0",
     "@types/ws": "^8.18.1",
-    "@uinaf/skillcheck": "0.4.0",
+    "@uinaf/skillcheck": "0.5.3",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "^7.0.2",
     "vite": "catalog:",
