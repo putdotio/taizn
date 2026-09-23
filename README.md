@@ -21,7 +21,7 @@
 pnpm add -D @putdotio/taizn
 ```
 
-Node `>=24.19`
+Node: `engines.node` in [`package.json`](./package.json)
 
 Install the Tizen command-line tools separately and make sure `tizen` and `sdb`
 work locally.
