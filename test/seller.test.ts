@@ -71,6 +71,7 @@ const evaluateSellerPage = (
 
 const systemFor = (dir: string) =>
   Layer.succeed(TaiznSystem)({
+    canRunX86_64: Effect.succeed(true),
     cwd: Effect.succeed(dir),
     env: Effect.succeed({}),
     homeDir: Effect.succeed(dir),

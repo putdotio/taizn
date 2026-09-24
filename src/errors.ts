@@ -76,6 +76,15 @@ export class CommandFailed extends Schema.TaggedError<CommandFailed>()("CommandF
   }
 }
 
+export class RosettaRequired extends Schema.TaggedError<RosettaRequired>()("RosettaRequired", {
+  label: Schema.String,
+  path: Schema.String,
+}) {
+  override get message(): string {
+    return `${this.label} at ${this.path} is an x86_64 binary and this Apple Silicon Mac has no Rosetta 2. Install it with: softwareupdate --install-rosetta --agree-to-license`;
+  }
+}
+
 export class CommandTimeout extends Schema.TaggedError<CommandTimeout>()("CommandTimeout", {
   command: Schema.String,
   args: Schema.Array(Schema.String),
@@ -302,6 +311,7 @@ export type TaiznError =
   | MultipleApplicationsMatched
   | MultipleTargetsConnected
   | PackageNotProduced
+  | RosettaRequired
   | SecretReadInterrupted
   | SellerAuthenticationRequired
   | SellerBrowserConnectionFailed

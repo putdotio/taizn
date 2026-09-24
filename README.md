@@ -26,6 +26,18 @@ Node: `engines.node` in [`package.json`](./package.json)
 Install the Tizen command-line tools separately and make sure `tizen` and `sdb`
 work locally.
 
+Tizen Studio ships `sdb` and the JDK behind `tizen` as x86_64 macOS binaries.
+On Apple Silicon Macs they run through Rosetta 2, which keeps signing on the
+developer's local certificate profile:
+
+```bash
+softwareupdate --install-rosetta --agree-to-license
+```
+
+Without Rosetta, commands that resolve `tizen` or `sdb` fail with
+`RosettaRequired` before running them. The Tizen TV emulator is x86-only, so
+Apple Silicon Macs prove against a connected TV.
+
 ## Quick Start
 
 Create `taizn.json` in the app directory, keep `.taizn/` ignored, then run:
