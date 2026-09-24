@@ -559,24 +559,20 @@ export const captureTizenLogs = Effect.fn("captureTizenLogs")(function* (
 
 const resolveTizenCli = Effect.fn("resolveTizenCli")(function* (env: TaiznEnv) {
   const path = yield* requireFile(env.tizenCli ?? (yield* defaultTizenCli()), "Tizen CLI");
-  yield* requireRunnableArchitecture(path, "Tizen CLI");
+  yield* requireNativeOrRosetta(path, "Tizen CLI", { bundledJava: true });
   return path;
 });
 
 const resolveSdb = Effect.fn("resolveSdb")(function* (env: TaiznEnv) {
   const path = yield* requireFile(env.sdb ?? (yield* defaultSdb()), "sdb");
-  yield* requireRunnableArchitecture(path, "sdb");
+  yield* requireNativeOrRosetta(path, "sdb");
   return path;
 });
 
-// The Tizen Studio `tizen` wrapper is a shell script that runs the bundled JDK
-// at <tizen-studio>/jdk relative to tools/ide/bin.
-const bundledJava = (realToolPath: string) =>
-  join(dirname(realToolPath), "../../../jdk/Contents/Home/bin/java");
-
-const requireRunnableArchitecture = Effect.fn("requireRunnableArchitecture")(function* (
+const requireNativeOrRosetta = Effect.fn("requireNativeOrRosetta")(function* (
   path: string,
   label: string,
+  options: { readonly bundledJava?: boolean } = {},
 ) {
   const system = yield* TaiznSystem;
 
@@ -597,16 +593,20 @@ const requireRunnableArchitecture = Effect.fn("requireRunnableArchitecture")(fun
     return yield* new RosettaRequired({ label, path });
   }
 
-  if (bytes[0] !== 0x23 || bytes[1] !== 0x21) {
+  const isScript = bytes[0] === 0x23 && bytes[1] === 0x21;
+
+  if (!options.bundledJava || !isScript) {
     return;
   }
 
+  // The Tizen Studio `tizen` wrapper is a shell script that runs the bundled
+  // JDK at <tizen-studio>/jdk/Contents/Home on macOS, relative to tools/ide/bin.
   const realPath = yield* fs
     .realPath(path)
     .pipe(
       Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "realPath", path })),
     );
-  const java = bundledJava(realPath);
+  const java = join(dirname(realPath), "../../../jdk/Contents/Home/bin/java");
   const javaExists = yield* fs
     .exists(java)
     .pipe(

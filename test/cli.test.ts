@@ -361,7 +361,32 @@ describe("taizn cli", () => {
     assert.isTrue(needsRosetta(machOFat([i386CpuType, x86_64CpuType])));
     assert.isFalse(needsRosetta(machOThin(arm64CpuType)));
     assert.isFalse(needsRosetta(machOFat([x86_64CpuType, arm64CpuType])));
+    assert.isTrue(needsRosetta(machOFat64([x86_64CpuType])));
+    assert.isFalse(needsRosetta(machOFat64([x86_64CpuType, arm64CpuType])));
     assert.isFalse(needsRosetta(Buffer.from("#!/bin/sh\n")));
+  });
+
+  it("checks the bundled JDK only for the Tizen CLI", async () => {
+    const dir = createToolingFixture();
+    const bin = join(dir, "tizen-studio/tools/ide/bin");
+    const javaDir = join(dir, "tizen-studio/jdk/Contents/Home/bin");
+    mkdirSync(bin, { recursive: true });
+    mkdirSync(javaDir, { recursive: true });
+    writeFileSync(join(javaDir, "java"), machOThin(x86_64CpuType));
+    const sdb = join(bin, "sdb.mjs");
+    writeFileSync(sdb, readFileSync(join(dir, "fake-sdb.mjs")));
+    chmodSync(sdb, 0o755);
+
+    const result = await runTaiznInProcess(
+      ["check", "--json"],
+      dir,
+      { TAIZN_SDB: sdb, TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs") },
+      30_000,
+      false,
+    );
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
   });
 
   it("reports missing Rosetta for an x86_64 sdb", async () => {
@@ -2543,6 +2568,14 @@ const machOFat = (cpuTypes: readonly number[]) => {
   bytes.writeUInt32BE(0xcafebabe, 0);
   bytes.writeUInt32BE(cpuTypes.length, 4);
   cpuTypes.forEach((cpuType, index) => bytes.writeUInt32BE(cpuType, 8 + index * 20));
+  return bytes;
+};
+
+const machOFat64 = (cpuTypes: readonly number[]) => {
+  const bytes = Buffer.alloc(8 + cpuTypes.length * 32);
+  bytes.writeUInt32BE(0xcafebabf, 0);
+  bytes.writeUInt32BE(cpuTypes.length, 4);
+  cpuTypes.forEach((cpuType, index) => bytes.writeUInt32BE(cpuType, 8 + index * 32));
   return bytes;
 };
 
