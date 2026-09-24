@@ -147,6 +147,7 @@ export const defaultSdb = Effect.fn("defaultSdb")(function* () {
 });
 
 const machOX86_64 = 0x01000007;
+const machOArm64 = 0x0100000c;
 
 const fatArchCpuTypes = (bytes: Uint8Array, view: DataView) => {
   const count = view.getUint32(4);
@@ -160,7 +161,7 @@ const fatArchCpuTypes = (bytes: Uint8Array, view: DataView) => {
   return cpuTypes;
 };
 
-export const isX86_64OnlyMachO = (bytes: Uint8Array) => {
+export const needsRosetta = (bytes: Uint8Array) => {
   if (bytes.length < 8) {
     return false;
   }
@@ -170,7 +171,7 @@ export const isX86_64OnlyMachO = (bytes: Uint8Array) => {
 
   if (bigEndianMagic === 0xcafebabe || bigEndianMagic === 0xcafebabf) {
     const cpuTypes = fatArchCpuTypes(bytes, view);
-    return cpuTypes.length > 0 && cpuTypes.every((cpuType) => cpuType === machOX86_64);
+    return cpuTypes.includes(machOX86_64) && !cpuTypes.includes(machOArm64);
   }
 
   return view.getUint32(0, true) === 0xfeedfacf && view.getUint32(4, true) === machOX86_64;

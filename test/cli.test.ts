@@ -22,7 +22,7 @@ import { TaiznEnv } from "../src/env.js";
 import { SecretReadInterrupted } from "../src/errors.js";
 import { runTaiznCli } from "../src/main.js";
 import { fetchSamsungTvInfo, sendSamsungTvKeys } from "../src/remote.js";
-import { appBuildEnv, redactCommandArgs, TaiznSystem } from "../src/runtime.js";
+import { appBuildEnv, needsRosetta, redactCommandArgs, TaiznSystem } from "../src/runtime.js";
 import { captureForDuration, CommandTimeoutMs } from "../src/tizen.js";
 
 const cliPath = resolve("dist/taizn.mjs");
@@ -342,7 +342,7 @@ describe("taizn cli", () => {
     });
   });
 
-  it("accepts script and universal tools on a host without Rosetta", async () => {
+  it("accepts script tools on a host without Rosetta", async () => {
     const dir = createToolingFixture();
     const result = await runTaiznInProcess(
       ["check", "--json"],
@@ -354,6 +354,14 @@ describe("taizn cli", () => {
 
     assert.strictEqual(result.status, 0);
     assert.strictEqual(result.stderr, "");
+  });
+
+  it("tells x86_64-only Mach-O binaries apart from ones Apple Silicon runs natively", () => {
+    assert.isTrue(needsRosetta(machOThin(x86_64CpuType)));
+    assert.isTrue(needsRosetta(machOFat([i386CpuType, x86_64CpuType])));
+    assert.isFalse(needsRosetta(machOThin(arm64CpuType)));
+    assert.isFalse(needsRosetta(machOFat([x86_64CpuType, arm64CpuType])));
+    assert.isFalse(needsRosetta(Buffer.from("#!/bin/sh\n")));
   });
 
   it("reports missing Rosetta for an x86_64 sdb", async () => {
@@ -2521,6 +2529,7 @@ const parseSubmissionManifestJson = (text: string): SubmissionManifestJson => {
 
 const x86_64CpuType = 0x01000007;
 const arm64CpuType = 0x0100000c;
+const i386CpuType = 0x00000007;
 
 const machOThin = (cpuType: number) => {
   const bytes = Buffer.alloc(32);

@@ -14,7 +14,7 @@ import {
   defaultSdb,
   defaultTizenCli,
   getPaths,
-  isX86_64OnlyMachO,
+  needsRosetta,
   readPassword,
   redactCommandArgs,
   requireFile,
@@ -593,7 +593,7 @@ const requireRunnableArchitecture = Effect.fn("requireRunnableArchitecture")(fun
       );
   const bytes = yield* readBytes(path);
 
-  if (isX86_64OnlyMachO(bytes)) {
+  if (needsRosetta(bytes)) {
     return yield* new RosettaRequired({ label, path });
   }
 
@@ -613,7 +613,7 @@ const requireRunnableArchitecture = Effect.fn("requireRunnableArchitecture")(fun
       Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "exists", path: java })),
     );
 
-  if (javaExists && isX86_64OnlyMachO(yield* readBytes(java))) {
+  if (javaExists && needsRosetta(yield* readBytes(java))) {
     return yield* new RosettaRequired({ label, path: java });
   }
 });
