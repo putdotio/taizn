@@ -22,6 +22,7 @@ export type ChildEnv = Record<string, string | undefined>;
 export class TaiznSystem extends Context.Service<
   TaiznSystem,
   {
+    readonly canRunX86_64: Effect.Effect<boolean>;
     readonly cwd: Effect.Effect<string>;
     readonly env: Effect.Effect<NodeJS.ProcessEnv>;
     readonly homeDir: Effect.Effect<string>;
@@ -30,6 +31,12 @@ export class TaiznSystem extends Context.Service<
   }
 >()("taizn/TaiznSystem") {
   static readonly Live = Layer.succeed(TaiznSystem)({
+    canRunX86_64: Effect.sync(
+      () =>
+        process.platform !== "darwin" ||
+        process.arch !== "arm64" ||
+        existsSync("/Library/Apple/usr/libexec/oah/libRosettaRuntime"),
+    ),
     cwd: Effect.sync(() => process.cwd()),
     env: Effect.sync(() => process.env),
     homeDir: Effect.sync(() => homedir()),
@@ -138,6 +145,36 @@ export const defaultSdb = Effect.fn("defaultSdb")(function* () {
   const home = yield* system.homeDir;
   return join(home, "tizen-studio/tools/sdb");
 });
+
+const machOX86_64 = 0x01000007;
+
+const fatArchCpuTypes = (bytes: Uint8Array, view: DataView) => {
+  const count = view.getUint32(4);
+  const stride = view.getUint32(0) === 0xcafebabf ? 32 : 20;
+  const cpuTypes: number[] = [];
+
+  for (let index = 0; index < count && 8 + (index + 1) * stride <= bytes.length; index++) {
+    cpuTypes.push(view.getUint32(8 + index * stride));
+  }
+
+  return cpuTypes;
+};
+
+export const isX86_64OnlyMachO = (bytes: Uint8Array) => {
+  if (bytes.length < 8) {
+    return false;
+  }
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const bigEndianMagic = view.getUint32(0);
+
+  if (bigEndianMagic === 0xcafebabe || bigEndianMagic === 0xcafebabf) {
+    const cpuTypes = fatArchCpuTypes(bytes, view);
+    return cpuTypes.length > 0 && cpuTypes.every((cpuType) => cpuType === machOX86_64);
+  }
+
+  return view.getUint32(0, true) === 0xfeedfacf && view.getUint32(4, true) === machOX86_64;
+};
 
 export const readPassword = Effect.fn("readPassword")(function* (
   value: string | undefined,

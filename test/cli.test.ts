@@ -45,10 +45,12 @@ const runTaiznInProcess = async (
   cwd = process.cwd(),
   env: NodeJS.ProcessEnv = {},
   commandTimeoutMs = 30_000,
+  canRunX86_64 = true,
 ): Promise<{ readonly status: number; readonly stderr: string; readonly stdout: string }> => {
   const stdout: string[] = [];
   const stderr: string[] = [];
   const system = Layer.succeed(TaiznSystem)({
+    canRunX86_64: Effect.succeed(canRunX86_64),
     cwd: Effect.sync(() => realpathSync(cwd)),
     env: Effect.succeed({ ...process.env, ...env }),
     homeDir: Effect.sync(() => homedir()),
@@ -338,6 +340,74 @@ describe("taizn cli", () => {
         tizenCli: join(dir, "fake-tizen.mjs"),
       },
     });
+  });
+
+  it("accepts script and universal tools on a host without Rosetta", async () => {
+    const dir = createToolingFixture();
+    const result = await runTaiznInProcess(
+      ["check", "--json"],
+      dir,
+      { TAIZN_SDB: join(dir, "fake-sdb.mjs"), TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs") },
+      30_000,
+      false,
+    );
+
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(result.stderr, "");
+  });
+
+  it("reports missing Rosetta for an x86_64 sdb", async () => {
+    const dir = createToolingFixture();
+    const sdb = join(dir, "sdb");
+    writeFileSync(sdb, machOThin(x86_64CpuType));
+    chmodSync(sdb, 0o755);
+
+    const result = await runTaiznInProcess(
+      ["check", "--json"],
+      dir,
+      { TAIZN_SDB: sdb, TAIZN_TIZEN_CLI: join(dir, "fake-tizen.mjs") },
+      30_000,
+      false,
+    );
+
+    assert.strictEqual(result.status, 1);
+    assert.strictEqual(result.stdout, "");
+    assert.deepStrictEqual(JSON.parse(result.stderr), {
+      error: {
+        message: `sdb at ${sdb} is an x86_64 binary and this Apple Silicon Mac has no Rosetta 2. Install it with: softwareupdate --install-rosetta --agree-to-license`,
+        type: "RosettaRequired",
+      },
+      ok: false,
+    });
+  });
+
+  it("reports missing Rosetta for the Tizen CLI's bundled x86_64 JDK", async () => {
+    const dir = createToolingFixture();
+    const studio = join(dir, "tizen-studio");
+    const bin = join(studio, "tools/ide/bin");
+    const javaDir = join(studio, "jdk/Contents/Home/bin");
+    mkdirSync(bin, { recursive: true });
+    mkdirSync(javaDir, { recursive: true });
+    writeFileSync(join(bin, "tizen"), '#!/bin/sh\nexec "$(dirname "$0")/tizen.sh" "$@"\n');
+    writeFileSync(join(javaDir, "java"), machOThin(x86_64CpuType));
+    const linkedTizen = join(dir, "tizen");
+    symlinkSync(join(bin, "tizen"), linkedTizen);
+    const sdb = join(dir, "sdb");
+    writeFileSync(sdb, machOFat([x86_64CpuType, arm64CpuType]));
+
+    const result = await runTaiznInProcess(
+      ["check", "--json"],
+      dir,
+      { TAIZN_SDB: sdb, TAIZN_TIZEN_CLI: linkedTizen },
+      30_000,
+      false,
+    );
+
+    assert.strictEqual(result.status, 1);
+    const error = JSON.parse(result.stderr).error;
+    assert.strictEqual(error.type, "RosettaRequired");
+    assert.include(error.message, `Tizen CLI at ${realpathSync(join(javaDir, "java"))}`);
+    assert.include(error.message, "softwareupdate --install-rosetta --agree-to-license");
   });
 
   it("lists installed Tizen applications without requiring a project config", async () => {
@@ -651,6 +721,7 @@ describe("taizn cli", () => {
   it.effect("keeps consumer build env free of taizn and tizen variables", () =>
     appBuildEnv().pipe(
       Effect.provideService(TaiznSystem, {
+        canRunX86_64: Effect.succeed(true),
         cwd: Effect.succeed(process.cwd()),
         env: Effect.succeed({
           DYLD_INSERT_LIBRARIES: "bad-preload",
@@ -2446,6 +2517,24 @@ const parseInspectJson = (text: string): InspectJson => {
 const parseSubmissionManifestJson = (text: string): SubmissionManifestJson => {
   const manifest: unknown = JSON.parse(text);
   return Schema.decodeUnknownSync(SubmissionManifestJsonSchema)(manifest);
+};
+
+const x86_64CpuType = 0x01000007;
+const arm64CpuType = 0x0100000c;
+
+const machOThin = (cpuType: number) => {
+  const bytes = Buffer.alloc(32);
+  bytes.writeUInt32LE(0xfeedfacf, 0);
+  bytes.writeUInt32LE(cpuType, 4);
+  return bytes;
+};
+
+const machOFat = (cpuTypes: readonly number[]) => {
+  const bytes = Buffer.alloc(8 + cpuTypes.length * 20);
+  bytes.writeUInt32BE(0xcafebabe, 0);
+  bytes.writeUInt32BE(cpuTypes.length, 4);
+  cpuTypes.forEach((cpuType, index) => bytes.writeUInt32BE(cpuType, 8 + index * 20));
+  return bytes;
 };
 
 const createToolingFixture = () => {

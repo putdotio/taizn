@@ -2,7 +2,7 @@ import { Console, Context, DateTime, Effect, FileSystem, Stream } from "effect";
 import { ChildProcess } from "effect/unstable/process";
 import { ChildProcessSpawner } from "effect/unstable/process";
 import { spawn } from "node:child_process";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { TaiznContext } from "./context.js";
 import type { TizenConfig, TizenVariant } from "./config.js";
 import type { TaiznEnv } from "./env.js";
@@ -14,9 +14,11 @@ import {
   defaultSdb,
   defaultTizenCli,
   getPaths,
+  isX86_64OnlyMachO,
   readPassword,
   redactCommandArgs,
   requireFile,
+  TaiznSystem,
   withTizenPath,
 } from "./runtime.js";
 import {
@@ -30,6 +32,7 @@ import {
   MultipleApplicationsMatched,
   MultipleTargetsConnected,
   PackageNotProduced,
+  RosettaRequired,
 } from "./errors.js";
 import { escapeXml, setXmlAttribute } from "./xml.js";
 import { jsonForOutput, validateAgentResourceInput, writeJsonArtifact } from "./io.js";
@@ -555,11 +558,64 @@ export const captureTizenLogs = Effect.fn("captureTizenLogs")(function* (
 });
 
 const resolveTizenCli = Effect.fn("resolveTizenCli")(function* (env: TaiznEnv) {
-  return yield* requireFile(env.tizenCli ?? (yield* defaultTizenCli()), "Tizen CLI");
+  const path = yield* requireFile(env.tizenCli ?? (yield* defaultTizenCli()), "Tizen CLI");
+  yield* requireRunnableArchitecture(path, "Tizen CLI");
+  return path;
 });
 
 const resolveSdb = Effect.fn("resolveSdb")(function* (env: TaiznEnv) {
-  return yield* requireFile(env.sdb ?? (yield* defaultSdb()), "sdb");
+  const path = yield* requireFile(env.sdb ?? (yield* defaultSdb()), "sdb");
+  yield* requireRunnableArchitecture(path, "sdb");
+  return path;
+});
+
+// The Tizen Studio `tizen` wrapper is a shell script that runs the bundled JDK
+// at <tizen-studio>/jdk relative to tools/ide/bin.
+const bundledJava = (realToolPath: string) =>
+  join(dirname(realToolPath), "../../../jdk/Contents/Home/bin/java");
+
+const requireRunnableArchitecture = Effect.fn("requireRunnableArchitecture")(function* (
+  path: string,
+  label: string,
+) {
+  const system = yield* TaiznSystem;
+
+  if (yield* system.canRunX86_64) {
+    return;
+  }
+
+  const fs = yield* FileSystem.FileSystem;
+  const readBytes = (file: string) =>
+    fs
+      .readFile(file)
+      .pipe(
+        Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "read", path: file })),
+      );
+  const bytes = yield* readBytes(path);
+
+  if (isX86_64OnlyMachO(bytes)) {
+    return yield* new RosettaRequired({ label, path });
+  }
+
+  if (bytes[0] !== 0x23 || bytes[1] !== 0x21) {
+    return;
+  }
+
+  const realPath = yield* fs
+    .realPath(path)
+    .pipe(
+      Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "realPath", path })),
+    );
+  const java = bundledJava(realPath);
+  const javaExists = yield* fs
+    .exists(java)
+    .pipe(
+      Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "exists", path: java })),
+    );
+
+  if (javaExists && isX86_64OnlyMachO(yield* readBytes(java))) {
+    return yield* new RosettaRequired({ label, path: java });
+  }
 });
 
 const getVariant = (config: TizenConfig, variant: "development" | "production") =>
