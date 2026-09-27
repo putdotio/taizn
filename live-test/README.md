@@ -46,20 +46,8 @@ LIVE_TEST_REQUIRE_REMOTE=0
 
 ## Commands
 
-```bash
-vp run live:test:setup -- --from ../consumer-app --target <tv-ip>
-vp run live:test:profile
-vp run live:test
-vp run live:test:doctor
-vp run live:test:doctor:connect
-vp run live:test:install
-vp run live:test:prove
-vp run live:test:remote
-vp run live:test:roundtrip
-vp run live:test:smoke
-vp run live:test:tv-assets
-vp run live:test:tv-assets:production
-```
+Run each script with `vp run <script>`; the `live:test:*` entries in
+[`package.json`](../package.json) map each one to its harness flags.
 
 - `live:test:profile` imports the fixture signing profile.
 - `live:test` packages the fixture app.
@@ -99,11 +87,10 @@ The fixture writes `live-test/app/taizn.json` from
 `taizn-live-test`. Proof uses `TAIZN_LIVE_PROVE_APP` when set, otherwise the
 configured `TAIZN_VARIANT` application ID from the fixture template.
 
-The `check`, `apps`, and `prove` CLI steps have a two-minute wrapper watchdog.
-The CLI applies its own shorter deadlines to finite SDB/Tizen subprocesses.
-Packaging, signing, installation, and uninstall steps retain their existing
-duration behavior. Remote doctor and key-sequence steps retain their own timeout
-and delay contracts.
+The `check`, `apps`, and `prove` steps run under a two-minute watchdog on top of
+the CLI's own 30-second subprocess deadlines. Packaging, signing, installation,
+and uninstall have no deadline; remote steps use `TAIZN_TV_TIMEOUT_MS` and
+`LIVE_TEST_REMOTE_DELAY_MS`.
 
 ## Roundtrip Proof
 

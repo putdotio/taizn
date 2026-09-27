@@ -124,16 +124,12 @@ pnpm exec taizn tv doctor --connect --json --artifact .taizn/tv-doctor.json
 ```
 
 Use `--dry-run` before mutating platform state when the command supports it.
-Artifact paths must stay inside the app directory; `.taizn/...` is the normal
-home for local proof state. Existing parent and destination symlinks must resolve
-inside the physical app directory; dangling links are rejected. Symlinked app
-checkouts and internal links are supported. This checks the filesystem before
-writing; it does not isolate writes from concurrent filesystem changes.
+Artifact paths must resolve inside the physical app directory, symlinks
+included; `.taizn/` is the normal home for proof state. The check runs before
+writing and does not guard against concurrent filesystem changes.
 
-Finite SDB queries, target connections, and captured launch commands have a
-30-second deadline per subprocess. Timeout errors identify the command and its
-target arguments. Cleanup sends SIGTERM, then SIGKILL after one second if needed.
-Builds, signing, and installs keep their existing duration behavior.
+Finite SDB queries, target connections, and captured launch commands time out
+after 30 seconds per subprocess; builds, signing, and installs have no deadline.
 
 ## Command Surface
 
@@ -164,8 +160,7 @@ limits.
 
 ## Environment
 
-Copy [.env.example](./.env.example) into `.taizn/.env` or export values in the
-shell:
+Set these in `.taizn/.env` or export them in the shell:
 
 ```bash
 TAIZN_CERT_PASSWORD=...
@@ -180,6 +175,9 @@ TAIZN_TV_PORT=8002
 TAIZN_TV_PROTOCOL=wss
 TAIZN_TV_TOKEN=<paired-remote-token>
 ```
+
+[Samsung TV Remote](./docs/TV_REMOTE.md#environment) lists the remaining
+`TAIZN_TV_*` settings.
 
 `taizn tv` uses `TAIZN_TV_HOST`, or the host part of `TAIZN_TARGET` when no TV
 host is set. `taizn tv pair` writes the paired remote token to
@@ -204,7 +202,7 @@ read-only discovery.
 
 - [Contributing](./CONTRIBUTING.md)
 - [Distribution](./docs/DISTRIBUTION.md)
-- [Live Test](./live-test/README.md)
+- [Live Test](https://github.com/putdotio/taizn/blob/main/live-test/README.md)
 - [Samsung TV Remote](./docs/TV_REMOTE.md)
 - [Seller Office](./docs/SELLER_OFFICE.md)
 - [Security](./SECURITY.md)

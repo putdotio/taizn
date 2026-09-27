@@ -15,7 +15,7 @@ Read only what the current task needs:
 - Samsung TV remote pairing, key scripts, and boundaries:
   [docs/TV_REMOTE.md](docs/TV_REMOTE.md)
 - Live Tizen fixture harness setup and device checks:
-  [live-test/README.md](live-test/README.md)
+  [live-test/README.md](https://github.com/putdotio/taizn/blob/main/live-test/README.md)
 - Agent-facing command workflow shipped with the package:
   [skills/taizn/SKILL.md](skills/taizn/SKILL.md)
 
@@ -132,4 +132,4 @@ vp run skills:lint
 
 Live Tizen checks when the local toolchain/certs/device exist: each
 `vp run live:test:*` script and its `LIVE_TEST_*` knobs are described in
-[Live Test commands](live-test/README.md#commands).
+[Live Test commands](https://github.com/putdotio/taizn/blob/main/live-test/README.md#commands).

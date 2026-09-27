@@ -13,7 +13,7 @@ vp install
 vp run hooks:install
 ```
 
-Use the Node.js version in [`.node-version`](./.node-version).
+Use the Node.js version in [`.node-version`](https://github.com/putdotio/taizn/blob/main/.node-version).
 The hook setup makes the full verification gate run before pushes.
 
 ## Run Locally
@@ -48,7 +48,7 @@ vp run smoke
 vp run test
 ```
 
-Live checks for a local Tizen toolchain and device: [Live Test](./live-test/README.md)
+Live checks for a local Tizen toolchain and device: [Live Test](https://github.com/putdotio/taizn/blob/main/live-test/README.md)
 owns the `vp run live:test:*` scripts, signing profile setup, beacon
 configuration, remote diagnostics, and hosted asset checks.
 

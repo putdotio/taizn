@@ -11,8 +11,8 @@ Start with the live command contract:
 taizn describe
 ```
 
-Use `README.md` for the public command overview. Use `src/describe.ts` when the
-runtime contract and docs disagree.
+Use `README.md` for the public command overview. When the docs and
+`taizn describe` disagree, trust `describe`.
 
 ## Packaging And Proof
 

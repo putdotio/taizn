@@ -17,14 +17,15 @@ with `[skip ci]`.
 Verify jobs can cancel stale runs; release jobs queue so package publishing is
 not interrupted.
 
-The release job calls the [shared frontend release workflow](https://github.com/putdotio/.github) from `putdotio/.github`, pinned to a tagged commit; the semantic-release action and plugin pins live there. [`scan.yml`](../.github/workflows/scan.yml) calls the shared frontend scan workflow from the same repository: Gitleaks, TruffleHog, Actionlint, and Zizmor on pull requests, weekly, and on manual dispatch.
+The release job calls the [shared frontend release workflow](https://github.com/putdotio/.github) from `putdotio/.github`, pinned to a tagged commit; the semantic-release action and plugin pins live there. [`scan.yml`](https://github.com/putdotio/taizn/blob/main/.github/workflows/scan.yml) calls the shared frontend scan workflow from the same repository: Gitleaks, TruffleHog, Actionlint, and Zizmor on pull requests, weekly, and on manual dispatch.
 
 ## Package Contents
 
-The npm package includes `dist`, `README.md`, `docs`, `skills`, `AGENTS.md`,
-`CONTRIBUTING.md`, and `SECURITY.md` so package consumers can follow the
-README's support, contribution, and automation links without cloning extra
-context.
+`files` in [`package.json`](../package.json)
+lists what the npm package ships. It carries the docs and skill so consumers
+can follow the README's support, contribution, and automation links without
+cloning the repository. Packaged docs link files outside the tarball by
+absolute GitHub URL.
 
 The published dependencies pin Effect, platform-node, and platform-node-shared to
 the same prerelease. Keep these aligned: consumers do not inherit the repository
