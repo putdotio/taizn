@@ -21,7 +21,7 @@ The release job calls the [shared frontend release workflow](https://github.com/
 
 ## Package Contents
 
-`files` in [`package.json`](https://github.com/putdotio/taizn/blob/main/package.json)
+`files` in [`package.json`](../package.json)
 lists what the npm package ships. It carries the docs and skill so consumers
 can follow the README's support, contribution, and automation links without
 cloning the repository. Packaged docs link files outside the tarball by
