@@ -135,7 +135,7 @@ after 30 seconds per subprocess; builds, signing, and installs have no deadline.
 
 | Command                              | Purpose                                            |
 | ------------------------------------ | -------------------------------------------------- |
-| `describe`                           | Print the machine-readable command surface         |
+| `describe`                           | Print the command surface as JSON (no flags)       |
 | `check`                              | Verify Tizen CLI, `sdb`, and target readiness      |
 | `apps`                               | List installed target applications                 |
 | `launch`                             | Start an already-installed app                     |
