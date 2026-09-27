@@ -11,7 +11,8 @@ consumer app repo.
 
 ## Agent Defaults
 
-1. Prefer `--json` for command-to-command use.
+1. Prefer `--json` for command-to-command use. `taizn describe` is the
+   exception: it always prints JSON and takes no flags.
 2. Prefer `--fields` to keep outputs small.
 3. Prefer `--artifact .taizn/<name>.json` for proof that should survive the
    terminal.
