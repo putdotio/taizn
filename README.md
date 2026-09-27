@@ -160,10 +160,24 @@ limits.
 
 ## Environment
 
-Copy [.env.example](https://github.com/putdotio/taizn/blob/main/.env.example)
-into `.taizn/.env` or export the values in the shell. It lists every `TAIZN_*`
-variable with a placeholder or default; `TAIZN_LIVE_*` and `LIVE_TEST_*` only
-matter for this repository's [Live Test](https://github.com/putdotio/taizn/blob/main/live-test/README.md).
+Set these in `.taizn/.env` or export them in the shell:
+
+```bash
+TAIZN_CERT_PASSWORD=...
+TAIZN_DIST_PASSWORD=...
+TAIZN_VARIANT=development
+TAIZN_TARGET=<tv-ip>:26101
+TAIZN_TIZEN_CLI=~/tizen-studio/tools/ide/bin/tizen
+TAIZN_SDB=~/tizen-studio/tools/sdb
+TAIZN_SELLER_BROWSER=/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome
+TAIZN_TV_HOST=<tv-ip>
+TAIZN_TV_PORT=8002
+TAIZN_TV_PROTOCOL=wss
+TAIZN_TV_TOKEN=<paired-remote-token>
+```
+
+[Samsung TV Remote](./docs/TV_REMOTE.md#environment) lists the remaining
+`TAIZN_TV_*` settings.
 
 `taizn tv` uses `TAIZN_TV_HOST`, or the host part of `TAIZN_TARGET` when no TV
 host is set. `taizn tv pair` writes the paired remote token to
