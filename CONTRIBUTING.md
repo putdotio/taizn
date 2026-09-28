@@ -54,7 +54,7 @@ configuration, remote diagnostics, and hosted asset checks.
 
 ## Development Notes
 
-- `src/cli.ts` owns command parsing with `effect/unstable/cli`.
+- `src/cli.ts` owns command parsing with `effect/cli`.
 - `src/config.ts` and `src/env.ts` parse external inputs with Effect Schema.
 - `src/runtime.ts` owns the Node service layer and runtime boundary helpers.
 - `src/tizen.ts` owns Effectful Tizen side effects.

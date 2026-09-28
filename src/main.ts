@@ -1,4 +1,4 @@
-import { CliError, Command } from "effect/unstable/cli";
+import { CliError, Command } from "effect/cli";
 import { Console, Effect, FileSystem, Schema } from "effect";
 import { fileURLToPath } from "node:url";
 import { command } from "./cli.js";
