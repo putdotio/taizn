@@ -95,7 +95,7 @@ touches, and search `node_modules/effect/src` for anything it does not cover.
 - CLI tests default to the in-process harness (`runTaiznInProcess` over
   `runTaiznCli` from `src/main.ts`) so V8 coverage attributes them. Spawn
   `dist/taizn.mjs` only when the process boundary itself is under test; those
-  runs are invisible to coverage on vitest 4 (see `vite.config.ts`).
+  runs are not attributed to coverage (see `vite.config.ts`).
 
 ## When Contracts Change
 

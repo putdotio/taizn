@@ -1,4 +1,4 @@
-import { Argument, Command, Flag } from "effect/unstable/cli";
+import { Argument, Command, Flag } from "effect/cli";
 import { Effect, Option } from "effect";
 import { loadContext, type TaiznContext } from "./context.js";
 import { loadEnv } from "./env.js";
@@ -26,6 +26,8 @@ import {
 } from "./tizen.js";
 import { runTvScript } from "./tv-script.js";
 
+const booleanFlag = (name: string) => Flag.Boolean(name).pipe(Flag.withDefault(false));
+
 const withContext = <E, R>(operation: (context: TaiznContext) => Effect.Effect<void, E, R>) =>
   Effect.gen(function* () {
     const context = yield* loadContext();
@@ -39,9 +41,9 @@ const taizn = Command.make("taizn", {}, () =>
 const check = Command.make(
   "check",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
   },
   ({ artifact, fields, json }) =>
     Effect.gen(function* () {
@@ -57,10 +59,10 @@ const check = Command.make(
 const apps = Command.make(
   "apps",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
-    query: Argument.string("query").pipe(Argument.optional),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
+    query: Argument.String("query").pipe(Argument.optional),
   },
   ({ artifact, fields, json, query }) =>
     Effect.gen(function* () {
@@ -75,7 +77,7 @@ const apps = Command.make(
 
 const launch = Command.make(
   "launch",
-  { dryRun: Flag.boolean("dry-run"), query: Argument.string("query") },
+  { dryRun: booleanFlag("dry-run"), query: Argument.String("query") },
   ({ dryRun, query }) =>
     Effect.gen(function* () {
       const env = yield* loadEnv();
@@ -86,11 +88,11 @@ const launch = Command.make(
 const prove = Command.make(
   "prove",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    dryRun: Flag.boolean("dry-run"),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
-    query: Argument.string("query"),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    dryRun: booleanFlag("dry-run"),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
+    query: Argument.String("query"),
   },
   ({ artifact, dryRun, fields, json, query }) =>
     Effect.gen(function* () {
@@ -104,23 +106,23 @@ const prove = Command.make(
     }),
 );
 
-const profile = Command.make("profile", { dryRun: Flag.boolean("dry-run") }, ({ dryRun }) =>
+const profile = Command.make("profile", { dryRun: booleanFlag("dry-run") }, ({ dryRun }) =>
   withContext((context) => createProfile(context, { dryRun })),
 );
 
-const pack = Command.make("package", { dryRun: Flag.boolean("dry-run") }, ({ dryRun }) =>
+const pack = Command.make("package", { dryRun: booleanFlag("dry-run") }, ({ dryRun }) =>
   withContext((context) => packageWidget(context, { dryRun }).pipe(Effect.asVoid)),
 );
 
-const install = Command.make("install", { dryRun: Flag.boolean("dry-run") }, ({ dryRun }) =>
+const install = Command.make("install", { dryRun: booleanFlag("dry-run") }, ({ dryRun }) =>
   withContext((context) => installWidget(context, { dryRun })),
 );
 
-const run = Command.make("run", { dryRun: Flag.boolean("dry-run") }, ({ dryRun }) =>
+const run = Command.make("run", { dryRun: booleanFlag("dry-run") }, ({ dryRun }) =>
   withContext((context) => runWidget(context, { dryRun })),
 );
 
-const tvPair = Command.make("pair", { dryRun: Flag.boolean("dry-run") }, ({ dryRun }) =>
+const tvPair = Command.make("pair", { dryRun: booleanFlag("dry-run") }, ({ dryRun }) =>
   Effect.gen(function* () {
     const env = yield* loadEnv();
     yield* pairSamsungTvRemote(env, { dryRun });
@@ -130,10 +132,10 @@ const tvPair = Command.make("pair", { dryRun: Flag.boolean("dry-run") }, ({ dryR
 const tvDoctor = Command.make(
   "doctor",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    connect: Flag.boolean("connect"),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    connect: booleanFlag("connect"),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
   },
   ({ artifact, connect, fields, json }) =>
     Effect.gen(function* () {
@@ -150,12 +152,12 @@ const tvDoctor = Command.make(
 const tvPress = Command.make(
   "press",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    delayMs: Flag.integer("delay-ms").pipe(Flag.withDefault(250)),
-    dryRun: Flag.boolean("dry-run"),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
-    keys: Argument.string("key").pipe(Argument.variadic({ min: 1 })),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    delayMs: Flag.Int("delay-ms").pipe(Flag.withDefault(250)),
+    dryRun: booleanFlag("dry-run"),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
+    keys: Argument.String("key").pipe(Argument.variadic({ min: 1 })),
   },
   ({ artifact, delayMs, dryRun, fields, json, keys }) =>
     Effect.gen(function* () {
@@ -173,10 +175,10 @@ const tvPress = Command.make(
 const tvScript = Command.make(
   "script",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    dryRun: Flag.boolean("dry-run"),
-    file: Flag.string("file"),
-    json: Flag.boolean("json"),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    dryRun: booleanFlag("dry-run"),
+    file: Flag.String("file"),
+    json: booleanFlag("json"),
   },
   ({ artifact, dryRun, file, json }) =>
     Effect.gen(function* () {
@@ -192,9 +194,9 @@ const tvScript = Command.make(
 const tvInfo = Command.make(
   "info",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
   },
   ({ artifact, fields, json }) =>
     Effect.gen(function* () {
@@ -214,11 +216,11 @@ const tv = Command.make("tv", {}).pipe(
 const probeHosted = Command.make(
   "hosted-assets",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    dryRun: Flag.boolean("dry-run"),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
-    urls: Argument.string("url").pipe(Argument.variadic({ min: 0 })),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    dryRun: booleanFlag("dry-run"),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
+    urls: Argument.String("url").pipe(Argument.variadic({ min: 0 })),
   },
   ({ artifact, dryRun, fields, json, urls }) =>
     withContext((context) =>
@@ -236,10 +238,10 @@ const probe = Command.make("probe", {}).pipe(Command.withSubcommands([probeHoste
 const inspectWgt = Command.make(
   "wgt",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
-    path: Argument.string("path"),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
+    path: Argument.String("path"),
   },
   ({ artifact, fields, json, path }) =>
     inspectWidgetArchive(path, {
@@ -254,10 +256,10 @@ const inspect = Command.make("inspect", {}).pipe(Command.withSubcommands([inspec
 const prepareSubmissionCommand = Command.make(
   "submission",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
-    path: Argument.string("path"),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
+    path: Argument.String("path"),
   },
   ({ artifact, fields, json, path }) =>
     prepareSubmission(path, {
@@ -274,10 +276,10 @@ const prepare = Command.make("prepare", {}).pipe(
 const validateSubmissionCommand = Command.make(
   "submission",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
-    path: Argument.string("path").pipe(Argument.optional),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
+    path: Argument.String("path").pipe(Argument.optional),
   },
   ({ artifact, fields, json, path }) =>
     withContext((context) =>
@@ -296,12 +298,12 @@ const validate = Command.make("validate", {}).pipe(
 const logsCapture = Command.make(
   "capture",
   {
-    app: Flag.string("app").pipe(Flag.optional),
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    durationMs: Flag.integer("duration-ms").pipe(Flag.withDefault(0)),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
-    output: Flag.string("output").pipe(Flag.withDefault("text")),
+    app: Flag.String("app").pipe(Flag.optional),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    durationMs: Flag.Int("duration-ms").pipe(Flag.withDefault(0)),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
+    output: Flag.String("output").pipe(Flag.withDefault("text")),
   },
   ({ app, artifact, durationMs, fields, json, output }) =>
     Effect.gen(function* () {
@@ -322,9 +324,9 @@ const logs = Command.make("logs", {}).pipe(Command.withSubcommands([logsCapture]
 const targetsList = Command.make(
   "list",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
   },
   ({ artifact, fields, json }) =>
     Effect.gen(function* () {
@@ -340,9 +342,9 @@ const targetsList = Command.make(
 const targetsCurrent = Command.make(
   "current",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
   },
   ({ artifact, fields, json }) =>
     Effect.gen(function* () {
@@ -362,8 +364,8 @@ const targets = Command.make("targets", {}).pipe(
 const sellerLogin = Command.make(
   "login",
   {
-    dryRun: Flag.boolean("dry-run"),
-    json: Flag.boolean("json"),
+    dryRun: booleanFlag("dry-run"),
+    json: booleanFlag("json"),
   },
   ({ dryRun, json }) =>
     Effect.gen(function* () {
@@ -375,9 +377,9 @@ const sellerLogin = Command.make(
 const sellerAppsList = Command.make(
   "list",
   {
-    artifact: Flag.string("artifact").pipe(Flag.optional),
-    fields: Flag.string("fields").pipe(Flag.optional),
-    json: Flag.boolean("json"),
+    artifact: Flag.String("artifact").pipe(Flag.optional),
+    fields: Flag.String("fields").pipe(Flag.optional),
+    json: booleanFlag("json"),
   },
   ({ artifact, fields, json }) =>
     listSellerApplications({

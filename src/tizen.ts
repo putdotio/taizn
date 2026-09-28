@@ -1,6 +1,6 @@
 import { Console, Context, DateTime, Effect, FileSystem, Stream } from "effect";
-import { ChildProcess } from "effect/unstable/process";
-import { ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcess } from "effect/process";
+import { ChildProcessSpawner } from "effect/process";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import type { TaiznContext } from "./context.js";
