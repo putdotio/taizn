@@ -1,10 +1,10 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runInNewContext } from "node:vm";
 import { NodeServices } from "@effect/platform-node";
-import { assert, describe, it } from "@effect/vitest";
+import { afterAll, assert, describe, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import {
   SellerAuthenticationRequired,
@@ -79,8 +79,22 @@ const systemFor = (dir: string) =>
     readSecret: () => Effect.succeed(""),
   });
 
+const tempDirs: string[] = [];
+
+afterAll(() => {
+  for (const dir of tempDirs) {
+    rmSync(dir, { force: true, recursive: true });
+  }
+});
+
+const tempDir = (prefix: string) => {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+};
+
 const sellerStateFixture = (state?: string) => {
-  const dir = mkdtempSync(join(tmpdir(), "taizn-seller-state-"));
+  const dir = tempDir("taizn-seller-state-");
 
   if (state !== undefined) {
     mkdirSync(join(dir, ".taizn"), { recursive: true });
@@ -372,7 +386,7 @@ describe("readSellerBrowserState", () => {
 
 describe("waitForDevToolsPort", () => {
   it("resolves once the port file names a live DevTools endpoint", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-devtools-port-"));
+    const dir = tempDir("taizn-devtools-port-");
     const server = createServer((_request, response) => {
       response.setHeader("content-type", "application/json");
       response.end(JSON.stringify({ Browser: "Fixture/1.0" }));
