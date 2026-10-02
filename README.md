@@ -21,6 +21,8 @@
 pnpm add -D @putdotio/taizn
 ```
 
+Only the latest npm release is supported.
+
 Node: `engines.node` in [`package.json`](./package.json)
 
 Install the Tizen command-line tools separately and make sure `tizen` and `sdb`
@@ -205,7 +207,7 @@ read-only discovery.
 - [Live Test](https://github.com/putdotio/taizn/blob/main/live-test/README.md)
 - [Samsung TV Remote](./docs/TV_REMOTE.md)
 - [Seller Office](./docs/SELLER_OFFICE.md)
-- [Security](./SECURITY.md)
+- [Security](https://github.com/putdotio/.github/blob/main/SECURITY.md)
 
 ## Repo Internals
 
