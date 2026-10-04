@@ -17,7 +17,7 @@ with `[skip ci]`.
 Verify jobs can cancel stale runs; release jobs queue so package publishing is
 not interrupted.
 
-The release job calls the [shared frontend release workflow](https://github.com/putdotio/.github) from `putdotio/.github`, pinned to a tagged commit; the semantic-release action and plugin pins live there. [`scan.yml`](https://github.com/putdotio/taizn/blob/main/.github/workflows/scan.yml) calls the shared frontend scan workflow from the same repository: Gitleaks, TruffleHog, Actionlint, and Zizmor on pull requests, weekly, and on manual dispatch.
+The release job calls the [shared frontend release workflow](https://github.com/putdotio/.github) from `putdotio/.github`, pinned to a reviewed commit SHA; the semantic-release action and plugin pins live there. [`scan.yml`](https://github.com/putdotio/taizn/blob/main/.github/workflows/scan.yml) calls the shared frontend scan workflow from the same repository: Gitleaks, TruffleHog, Actionlint, and Zizmor on pull requests, weekly, and on manual dispatch.
 
 ## Package Contents
 
@@ -37,8 +37,8 @@ The release job uses the GitHub Environment named `release`.
 
 Environment entries:
 
-- secrets: `PUTIO_RELEASE_BOT_PRIVATE_KEY`
-- variables: `PUTIO_RELEASE_BOT_CLIENT_ID`
+- secrets: `PUTIO_CI_APP_PRIVATE_KEY`
+- variables: `PUTIO_CI_APP_CLIENT_ID`
 - approval: none
 - branch policy: `main`
 - deployment records: disabled with `deployment: false`
@@ -47,7 +47,7 @@ The npm package uses Trusted Publishing from GitHub Actions. On npm, configure o
 
 During the `@semantic-release/npm` publish step, npm detects the GitHub OIDC identity, mints short-lived publish credentials, and publishes provenance for the release job.
 
-Release GitHub writes use `putio-releaser`, and the release bot token is minted only after dependencies are installed.
+Release GitHub writes use `putio-ci`, and the release bot token is minted only after dependencies are installed.
 
 ## Versioning
 
