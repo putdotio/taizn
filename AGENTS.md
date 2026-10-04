@@ -19,6 +19,20 @@ Read only what the current task needs:
 - Agent-facing command workflow shipped with the package:
   [skills/taizn/SKILL.md](skills/taizn/SKILL.md)
 
+## Ways To Hurt Yourself
+
+- **Merging publishes.** A `feat`, `fix`, `perf` or breaking commit on `main`
+  publishes `@putdotio/taizn` to npm, and a published version number can never
+  be reused, so the commit type is the release decision.
+- **Taking over someone's TV.** A Samsung TV on the network may be someone's
+  set in use. `install`, `launch`, `prove` and the matching live tests change
+  what the TV runs, and roundtrip may uninstall an existing fixture package;
+  `tv press` and `tv script` send remote keys; `tv pair` and `--connect` can
+  raise an allow/deny prompt on the TV. `check`, `apps`, `tv info`
+  and `tv doctor` without `--connect` only read.
+- **Acting in Seller Office.** `seller` commands ride a human-owned Samsung
+  seller session, so they stay read-only; the rules are under Sharp Edges.
+
 ## Generic Tool Boundary
 
 - Keep `taizn` free of put.io product behavior. Do not add put.io app IDs,
@@ -102,8 +116,6 @@ touches, and search `node_modules/effect/src` for anything it does not cover.
 - Config/env/command/output changes: update `README.md` and CLI tests; command-surface guardrail changes also update `skills/taizn/SKILL.md`.
 - CI/release/publishing changes: update `docs/DISTRIBUTION.md`.
 - Keep `CLAUDE.md` as a symlink to this file.
-- Finish edits, `vp run verify`, and fixes without pausing; ask before publishing and before live runs against a TV someone else may be using.
-- Done means `vp run verify` passed and, for device-facing changes, the matching `live:test:*` proof ran or the gap is reported.
 
 ## Worktrees
 
@@ -133,3 +145,19 @@ vp run skills:lint
 Live Tizen checks when the local toolchain/certs/device exist: each
 `vp run live:test:*` script and its `LIVE_TEST_*` knobs are described in
 [Live Test commands](https://github.com/putdotio/taizn/blob/main/live-test/README.md#commands).
+
+Which proof a change needs:
+
+- Docs only: `vp run check`, plus `vp run skills:lint` for `skills/`; no
+  device run.
+- Source, config, env, command or output changes: `vp run verify`.
+- Device-facing behavior: `verify`, then the matching `vp run live:test:*`
+  script; `live:test:smoke` reads state, `live:test:roundtrip` proves package,
+  install, launch and on-TV JavaScript.
+
+## Delivery
+
+Open a pull request; CI runs `vp run verify` on pull requests and on `main`.
+On `main`, semantic-release publishes releasable commits to npm and GitHub
+Releases. Commit types and release mechanics:
+[Contributing](CONTRIBUTING.md#release), [Distribution](docs/DISTRIBUTION.md).
