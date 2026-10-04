@@ -21,9 +21,9 @@ Read only what the current task needs:
 
 ## Ways To Hurt Yourself
 
-- **Merging publishes.** A `feat`, `fix`, `perf` or breaking commit on `main`
-  publishes `@putdotio/taizn` to npm, and a published version number can never
-  be reused, so the commit type is the release decision.
+- **Merging publishes.** A `feat`, `fix`, `perf`, revert or breaking commit on
+  `main` publishes `@putdotio/taizn` to npm, and a published version number can
+  never be reused, so the commit type is the release decision.
 - **Taking over someone's TV.** A Samsung TV on the network may be someone's
   set in use. `install`, `launch`, `prove` and the matching live tests change
   what the TV runs, and roundtrip may uninstall an existing fixture package;
@@ -152,8 +152,8 @@ Which proof a change needs:
   device run.
 - Source, config, env, command or output changes: `vp run verify`.
 - Device-facing behavior: `verify`, then the matching `vp run live:test:*`
-  script; `live:test:smoke` reads state, `live:test:roundtrip` proves package,
-  install, launch and on-TV JavaScript.
+  script; `live:test:smoke` checks tooling and launches the installed app,
+  `live:test:roundtrip` proves package, install, launch and on-TV JavaScript.
 
 ## Delivery
 
