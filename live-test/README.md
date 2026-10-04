@@ -13,7 +13,7 @@ If another local consumer app already has `.taizn/.env` and certificates,
 bootstrap the fixture from that app without copying unrelated app config:
 
 ```bash
-vp run live:test:setup -- --from ../consumer-app --target <tv-ip>
+pnpm exec vp run live:test:setup -- --from ../consumer-app --target <tv-ip>
 ```
 
 The setup command writes only allowlisted harness keys and certificate files into
@@ -46,7 +46,7 @@ LIVE_TEST_REQUIRE_REMOTE=0
 
 ## Commands
 
-Run each script with `vp run <script>`; the `live:test:*` entries in
+Run each script with `pnpm exec vp run <script>`; the `live:test:*` entries in
 [`package.json`](../package.json) map each one to its harness flags.
 
 - `live:test:profile` imports the fixture signing profile.

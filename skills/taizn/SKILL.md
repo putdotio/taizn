@@ -74,8 +74,8 @@ taizn tv script --dry-run --json --file .taizn/remote-script.json
 Use the repo guardrail after changing Taizn:
 
 ```bash
-vp run verify
+pnpm exec vp run verify
 ```
 
-Only `vp run live:test:*` proves real Tizen/TV behavior. Static tests and dry
-runs prove command contracts, not hardware behavior.
+Only `pnpm exec vp run live:test:*` proves real Tizen/TV behavior. Static tests
+and dry runs prove command contracts, not hardware behavior.

@@ -9,8 +9,8 @@ Install the required toolchain and then install dependencies:
 ```bash
 git clone https://github.com/putdotio/taizn.git
 cd taizn
-vp install
-vp run hooks:install
+pnpm install
+pnpm exec vp run hooks:install
 ```
 
 Use the Node.js version in [`.node-version`](https://github.com/putdotio/taizn/blob/main/.node-version).
@@ -21,13 +21,13 @@ The hook setup makes the full verification gate run before pushes.
 Build the CLI and run the fast smoke check:
 
 ```bash
-vp run smoke
+pnpm exec vp run smoke
 ```
 
 For watch mode while editing:
 
 ```bash
-vp run dev
+pnpm exec vp run dev
 ```
 
 ## Validation
@@ -35,21 +35,21 @@ vp run dev
 Run the full repo checks before opening or updating a pull request:
 
 ```bash
-vp run verify
+pnpm exec vp run verify
 ```
 
 Focused commands for iteration:
 
 ```bash
-vp run check
-vp run typecheck
-vp run build
-vp run smoke
-vp run test
+pnpm exec vp run check
+pnpm exec vp run typecheck
+pnpm exec vp run build
+pnpm exec vp run smoke
+pnpm exec vp run test
 ```
 
 Live checks for a local Tizen toolchain and device: [Live Test](https://github.com/putdotio/taizn/blob/main/live-test/README.md)
-owns the `vp run live:test:*` scripts, signing profile setup, beacon
+owns the `pnpm exec vp run live:test:*` scripts, signing profile setup, beacon
 configuration, remote diagnostics, and hosted asset checks.
 
 ## Development Notes
