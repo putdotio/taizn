@@ -76,7 +76,7 @@ if (existsSync(envPath)) {
 applyCliEnvOverrides();
 
 if (!existsSync(cliPath)) {
-  console.error("Packed CLI not found. Run `vp run build` first.");
+  console.error("Packed CLI not found. Run `pnpm exec vp run build` first.");
   process.exit(1);
 }
 
