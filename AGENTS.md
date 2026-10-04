@@ -105,7 +105,7 @@ touches, and search `node_modules/effect/src` for anything it does not cover.
   the app directory.
 - Mutating platform commands should expose `--dry-run` unless a dry run would
   be misleading. If a dry run is not real proof, say what it validates.
-- Unit tests use `@effect/vitest` through `vp run test`; only `vp run live:test:*` proves real Tizen behavior.
+- Unit tests use `@effect/vitest` through `pnpm exec vp run test`; only `pnpm exec vp run live:test:*` proves real Tizen behavior.
 - CLI tests default to the in-process harness (`runTaiznInProcess` over
   `runTaiznCli` from `src/main.ts`) so V8 coverage attributes them. Spawn
   `dist/taizn.mjs` only when the process boundary itself is under test; those
@@ -120,40 +120,45 @@ touches, and search `node_modules/effect/src` for anything it does not cover.
 ## Worktrees
 
 `.worktreeinclude` carries local env files into managed worktrees. Run
-`vp install`, `vp run hooks:install`, and `vp run verify`. If live-test env is missing, run
-`vp run live:test:setup -- --from <consumer-app> --target <tv-ip>`.
+`pnpm install`, `pnpm exec vp run hooks:install`, and `pnpm exec vp run verify`.
+If live-test env is missing, run
+`pnpm exec vp run live:test:setup -- --from <consumer-app> --target <tv-ip>`.
 
 ## Checks
 
+Vite+ is the pinned `vite-plus` devDependency, so run it as `pnpm exec vp`; no
+global install is needed.
+
 ```bash
-vp install
-vp run hooks:install
-vp run verify
+pnpm install
+pnpm exec vp run hooks:install
+pnpm exec vp run verify
 ```
 
 Fast loops:
 
 ```bash
-vp run check
-vp run typecheck
-vp run smoke
-vp run test
-vp run test:coverage
-vp run skills:lint
+pnpm exec vp run check
+pnpm exec vp run typecheck
+pnpm exec vp run smoke
+pnpm exec vp run test
+pnpm exec vp run test:coverage
+pnpm exec vp run skills:lint
 ```
 
 Live Tizen checks when the local toolchain/certs/device exist: each
-`vp run live:test:*` script and its `LIVE_TEST_*` knobs are described in
-[Live Test commands](https://github.com/putdotio/taizn/blob/main/live-test/README.md#commands).
+`pnpm exec vp run live:test:*` script and its `LIVE_TEST_*` knobs are described
+in [Live Test commands](https://github.com/putdotio/taizn/blob/main/live-test/README.md#commands).
 
 Which proof a change needs:
 
-- Docs only: `vp run check`, plus `vp run skills:lint` for `skills/`; no
-  device run.
-- Source, config, env, command or output changes: `vp run verify`.
-- Device-facing behavior: `verify`, then the matching `vp run live:test:*`
-  script; `live:test:smoke` checks tooling and launches the installed app,
-  `live:test:roundtrip` proves package, install, launch and on-TV JavaScript.
+- Docs only: `pnpm exec vp run check`, plus `pnpm exec vp run skills:lint`
+  for `skills/`; no device run.
+- Source, config, env, command or output changes: `pnpm exec vp run verify`.
+- Device-facing behavior: `verify`, then the matching
+  `pnpm exec vp run live:test:*` script; `live:test:smoke` checks tooling and
+  launches the installed app, `live:test:roundtrip` proves package, install,
+  launch and on-TV JavaScript.
 
 ## Delivery
 
