@@ -14,8 +14,10 @@ The release workflow publishes the scoped `@putdotio/taizn` package to npm, crea
 GitHub release, and commits the released `package.json` version back to `main`
 with `[skip ci]`.
 
-A new push cancels a stale pull-request run; `main` runs queue, so each pushed
-range is scanned and package publishing is not interrupted.
+A new push cancels a stale pull-request run. Every `main` push and manual
+dispatch gets its own run, so each pushed range is scanned. Releases run one at
+a time in the shared workflow's own concurrency group, which never cancels a
+running publish.
 
 The release job calls the [shared frontend release workflow](https://github.com/putdotio/.github) from `putdotio/.github`, pinned to a reviewed commit SHA; the semantic-release action and plugin pins live there. The `verify` job ends with the shared [links](https://github.com/putdotio/.github#actionslinks) and [scan](https://github.com/putdotio/.github#actionsscan) actions from the same repository: an offline Markdown link and anchor check on every run, and an Actionlint and Zizmor audit when a `main` push changes workflows, or of the full history on manual dispatch.
 
