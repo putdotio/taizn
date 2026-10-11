@@ -70,6 +70,7 @@ export class FileSystemFailure extends Schema.TaggedError<FileSystemFailure>()(
 export class CommandFailed extends Schema.TaggedError<CommandFailed>()("CommandFailed", {
   command: Schema.String,
   args: Schema.Array(Schema.String),
+  stderr: Schema.optionalKey(Schema.String),
 }) {
   override get message(): string {
     return `Command failed: ${this.command} ${this.args.join(" ")}`;
@@ -374,6 +375,7 @@ export const renderError = (error: TaiznError) => error.message;
 export const renderErrorJson = (error: TaiznError) =>
   JSON.stringify({
     error: {
+      cause: error._tag === "CommandFailed" ? error.stderr : undefined,
       message: error.message,
       type: error._tag,
     },

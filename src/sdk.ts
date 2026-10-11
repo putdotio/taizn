@@ -1,4 +1,13 @@
-import { Console, DateTime, Effect, FileSystem, Option } from "effect";
+import {
+  Console,
+  DateTime,
+  Effect,
+  FileSystem,
+  Option,
+  PlatformError,
+  Predicate,
+  Stream,
+} from "effect";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
   ArchiveExists,
@@ -263,23 +272,26 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
     return yield* new NothingToArchive({ home, mode });
   }
 
-  const requireOutsideRoots = Effect.fn("requireOutsideRoots")(function* (directory: string) {
-    for (const root of included) {
-      const rootPath = join(home, root);
-      const resolvedRoot = yield* fs
-        .realPath(rootPath)
-        .pipe(Effect.mapError(fsFailure("realpath", rootPath)));
+  const outputDir = dirname(output);
+  const resolvedOutputDir = yield* resolveExisting(outputDir);
 
-      if (isInside(rootPath, directory) || isInside(resolvedRoot, directory)) {
-        return yield* new InvalidInput({
-          details: `output must be outside the archived ${rootPath}. Received: ${output}`,
-          label: "backup output",
-        });
-      }
+  for (const root of included) {
+    const rootPath = join(home, root);
+    const resolvedRoot = yield* fs
+      .realPath(rootPath)
+      .pipe(Effect.mapError(fsFailure("realpath", rootPath)));
+
+    if (isInside(resolvedRoot, resolvedOutputDir)) {
+      return yield* new InvalidInput({
+        details: `output must be outside the archived ${rootPath}. Received: ${output}`,
+        label: "backup output",
+      });
     }
-  });
+  }
 
-  yield* requireOutsideRoots(dirname(output));
+  // Restore rejects links that leave the backup roots, so refuse to write an
+  // archive it could not restore.
+  yield* validateTree(home, included);
   const result = {
     archive: output,
     dryRun: options.dryRun === true,
@@ -289,15 +301,12 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
   };
 
   if (!result.dryRun) {
-    const outputDir = dirname(output);
     yield* fs
       .makeDirectory(outputDir, { recursive: true })
       .pipe(Effect.mapError(fsFailure("mkdir", outputDir)));
-    yield* requireOutsideRoots(
-      yield* fs.realPath(outputDir).pipe(Effect.mapError(fsFailure("realpath", outputDir))),
-    );
-    // Stage privately beside the output, then hard-link into place: link() never
-    // replaces an existing entry and a failed tar never leaves a partial archive.
+    // Stage in a private directory beside the output, then hard-link into place:
+    // link() never replaces an existing entry and a failed tar never leaves a
+    // partial archive.
     yield* Effect.scoped(
       Effect.gen(function* () {
         const staging = yield* fs
@@ -305,18 +314,17 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
           .pipe(Effect.mapError(fsFailure("mkdtemp", outputDir)));
         yield* fs.chmod(staging, 0o700).pipe(Effect.mapError(fsFailure("chmod", staging)));
         const archive = join(staging, "archive.tar.gz");
-        yield* fs
-          .writeFileString(archive, "", { flag: "wx", mode: 0o600 })
-          .pipe(Effect.mapError(fsFailure("write", archive)));
         yield* run("tar", ["-C", home, "-czf", archive, ...included], { quiet: options.json });
         yield* fs.chmod(archive, 0o600).pipe(Effect.mapError(fsFailure("chmod", archive)));
         yield* fs
           .link(archive, output)
           .pipe(
-            Effect.mapError((cause) =>
+            Effect.catch((cause) =>
               cause.reason._tag === "AlreadyExists"
-                ? new ArchiveExists({ path: output })
-                : new FileSystemFailure({ cause, operation: "link", path: output }),
+                ? Effect.fail(new ArchiveExists({ path: output }))
+                : hardLinksUnsupported(cause)
+                  ? copyExclusive(archive, output)
+                  : Effect.fail(new FileSystemFailure({ cause, operation: "link", path: output })),
             ),
           );
       }),
@@ -368,7 +376,25 @@ export const restoreSdk = Effect.fn("restoreSdk")(function* (
         .pipe(Effect.mapError(fsFailure("mkdtemp", home)));
       yield* fs.chmod(staging, 0o700).pipe(Effect.mapError(fsFailure("chmod", staging)));
       yield* run("tar", ["-C", staging, "-xzf", archive], { quiet: options.json });
-      const roots = yield* validateStagedTree(staging);
+      const roots = yield* fs
+        .readDirectory(staging)
+        .pipe(Effect.mapError(fsFailure("readdir", staging)));
+
+      if (roots.length === 0) {
+        return yield* invalidArchive("archive is empty");
+      }
+
+      yield* validateTree(staging, roots);
+
+      if (
+        roots.includes("tizen-studio") &&
+        (yield* pathKind(join(home, "tizen-studio"))) !== "missing"
+      ) {
+        return yield* invalidArchive(
+          `${join(home, "tizen-studio")} already exists; move it aside before restoring a full backup`,
+        );
+      }
+
       const moves = yield* planMoves(staging, home, roots);
 
       if (!options.dryRun) {
@@ -379,7 +405,7 @@ export const restoreSdk = Effect.fn("restoreSdk")(function* (
         }
       }
 
-      return roots;
+      return [...roots].sort();
     }),
   );
   const result = { archive, dryRun: options.dryRun === true, home, paths: roots };
@@ -428,27 +454,22 @@ const pathKind = Effect.fn("pathKind")(function* (path: string) {
 
 const invalidArchive = (details: string) => new InvalidInput({ details, label: "SDK archive" });
 
-// Only regular files, directories, and symlinks that stay inside the restored
-// roots are allowed; devices, FIFOs, sockets, and escaping links are rejected.
-// The walk never descends through symlinks.
-const validateStagedTree = Effect.fn("validateStagedTree")(function* (staging: string) {
+// Walks `roots` under `base` without following links. Only regular files,
+// directories, and relative symlinks that stay inside the backup roots pass.
+const validateTree = Effect.fn("validateTree")(function* (base: string, roots: readonly string[]) {
   const fs = yield* FileSystem.FileSystem;
-  const roots = yield* fs
-    .readDirectory(staging)
-    .pipe(Effect.mapError(fsFailure("readdir", staging)));
   const pending = [...roots];
-
-  for (const root of roots) {
-    if (!restorableRoots.has(root)) {
-      return yield* invalidArchive(
-        `unexpected entry ${JSON.stringify(root)}; only ${fullRoots.join(", ")} are restored`,
-      );
-    }
-  }
 
   while (pending.length > 0) {
     const entry = pending.pop() ?? "";
-    const path = join(staging, entry);
+    const path = join(base, entry);
+
+    if (!restorableRoots.has(entry.split(sep)[0] ?? "")) {
+      return yield* invalidArchive(
+        `unexpected entry ${JSON.stringify(entry)}; only ${fullRoots.join(", ")} are restored`,
+      );
+    }
+
     const kind = yield* pathKind(path);
 
     if (kind === "Directory") {
@@ -458,10 +479,10 @@ const validateStagedTree = Effect.fn("validateStagedTree")(function* (staging: s
       pending.push(...children.map((child) => join(entry, child)));
     } else if (kind === "SymbolicLink") {
       const target = yield* fs.readLink(path).pipe(Effect.mapError(fsFailure("readlink", path)));
-      const resolved = resolve(dirname(path), target);
+      const resolved = relative(base, resolve(dirname(path), target));
 
-      if (!restorableRoots.has(relative(staging, resolved).split(sep)[0] ?? "")) {
-        return yield* invalidArchive(`symlink ${entry} points outside the restored paths`);
+      if (isAbsolute(target) || !restorableRoots.has(resolved.split(sep)[0] ?? "")) {
+        return yield* invalidArchive(`symlink ${entry} points outside the backup paths`);
       }
     } else if (kind !== "File") {
       return yield* invalidArchive(
@@ -469,18 +490,56 @@ const validateStagedTree = Effect.fn("validateStagedTree")(function* (staging: s
       );
     }
   }
+});
 
-  if (roots.length === 0) {
-    return yield* invalidArchive("archive is empty");
+const resolveExisting = Effect.fn("resolveExisting")(function* (
+  path: string,
+): Effect.fn.Return<string, FileSystemFailure, FileSystem.FileSystem> {
+  const fs = yield* FileSystem.FileSystem;
+  const resolved = yield* fs.realPath(path).pipe(Effect.option);
+
+  if (Option.isSome(resolved)) {
+    return resolved.value;
   }
 
-  return [...roots].sort();
+  const parent = dirname(path);
+  return parent === path ? path : join(yield* resolveExisting(parent), relative(parent, path));
+});
+
+// FAT and exFAT volumes have no hard links.
+const hardLinksUnsupported = (error: PlatformError.PlatformError) => {
+  const cause = Predicate.hasProperty(error.reason, "cause") ? error.reason.cause : undefined;
+  const code = Predicate.hasProperty(cause, "code") ? cause.code : undefined;
+  return code === "EXDEV" || code === "EPERM" || code === "ENOTSUP";
+};
+
+// Fallback publish: O_EXCL create never replaces an entry; a failed copy
+// removes only the file this call created.
+const copyExclusive = Effect.fn("copyExclusive")(function* (from: string, to: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const file = yield* fs
+    .open(to, { flag: "wx", mode: 0o600 })
+    .pipe(
+      Effect.mapError((cause) =>
+        cause.reason._tag === "AlreadyExists"
+          ? new ArchiveExists({ path: to })
+          : new FileSystemFailure({ cause, operation: "create", path: to }),
+      ),
+    );
+
+  yield* fs.stream(from).pipe(
+    Stream.runForEach((chunk) => file.writeAll(chunk)),
+    Effect.andThen(fs.chmod(to, 0o600)),
+    Effect.mapError(fsFailure("copy", to)),
+    Effect.onError(() => fs.remove(to).pipe(Effect.ignore)),
+  );
 });
 
 // Plans the renames that publish the staged tree into home. Missing destinations
-// take the whole staged subtree; existing directories are merged. Any existing
-// symlink on a destination path, or a file/directory clash, stops the restore
-// before anything moves.
+// take the whole staged subtree; existing directories are merged. rename()
+// replaces an existing file or symlink without following it, but a staged
+// directory over an existing symlink or a file/directory clash stops the
+// restore before anything moves.
 const planMoves = Effect.fn("planMoves")(function* (
   staging: string,
   home: string,
@@ -500,18 +559,18 @@ const planMoves = Effect.fn("planMoves")(function* (
       continue;
     }
 
-    if (existing === "SymbolicLink") {
+    const staged = yield* pathKind(join(staging, path));
+
+    if (existing === "SymbolicLink" && staged === "Directory") {
       return yield* invalidArchive(`refusing to extract through symlinked ${target}`);
     }
-
-    const staged = yield* pathKind(join(staging, path));
 
     if (staged === "Directory" && existing === "Directory") {
       const children = yield* fs
         .readDirectory(join(staging, path))
         .pipe(Effect.mapError(fsFailure("readdir", join(staging, path))));
       moves.push(...(yield* planMoves(staging, home, children, path)));
-    } else if (staged !== "Directory" && existing === "File") {
+    } else if (staged !== "Directory" && (existing === "File" || existing === "SymbolicLink")) {
       moves.push(path);
     } else {
       return yield* invalidArchive(`${target} exists as a ${existing}; it cannot be replaced`);

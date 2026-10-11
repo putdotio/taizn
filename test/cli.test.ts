@@ -2356,6 +2356,58 @@ describe("taizn cli", () => {
     });
   }
 
+  it("restores a full backup twice and refuses to merge into an existing SDK", async () => {
+    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-full-"));
+    const source = join(root, "source");
+    const home = join(root, "home");
+    for (const dir of ["tizen-studio/lib", "tizen-studio-data/lib"]) {
+      mkdirSync(join(source, dir), { recursive: true });
+      writeFileSync(join(source, dir, "libz.so.1"), "zlib");
+      symlinkSync("libz.so.1", join(source, dir, "libz.so"));
+    }
+    mkdirSync(home);
+    const archive = join(root, "full.tar.gz");
+    const backup = await runTaiznInProcess(["sdk", "backup", "--full", archive], root, {
+      HOME: source,
+    });
+    assert.strictEqual(backup.status, 0, backup.stderr);
+    const restore = () => runTaiznInProcess(["sdk", "restore", archive], root, { HOME: home });
+
+    assert.strictEqual((await restore()).status, 0);
+    const again = await restore();
+    assert.strictEqual(again.status, 1);
+    assert.include(again.stderr, "move it aside");
+    rmSync(join(home, "tizen-studio"), { recursive: true });
+    const merged = await restore();
+    assert.strictEqual(merged.status, 0, merged.stderr);
+    assert.strictEqual(readFileSync(join(home, "tizen-studio-data/lib/libz.so"), "utf8"), "zlib");
+
+    symlinkSync("/etc/hosts", join(source, "tizen-studio/lib/hosts"));
+    const absolute = await runTaiznInProcess(
+      ["sdk", "backup", "--full", join(root, "absolute.tar.gz")],
+      root,
+      { HOME: source },
+    );
+    assert.strictEqual(absolute.status, 1);
+    assert.include(absolute.stderr, "points outside the backup paths");
+    assert.isFalse(existsSync(join(root, "absolute.tar.gz")));
+  });
+
+  it("reports tar's error as the cause of structured SDK failures", async () => {
+    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-cause-"));
+    const archive = join(root, "broken.tar.gz");
+    writeFileSync(archive, "not an archive");
+    const result = await runTaiznInProcess(["sdk", "restore", "--json", archive], root, {
+      HOME: root,
+    });
+
+    assert.strictEqual(result.status, 1);
+    const error = JSON.parse(result.stderr).error;
+    assert.strictEqual(error.type, "CommandFailed");
+    assert.isString(error.cause);
+    assert.isNotEmpty(error.cause);
+  });
+
   it("restores in-archive relative symlinks", async () => {
     const root = mkdtempSync(join(tmpdir(), "taizn-sdk-symlink-"));
     const home = join(root, "home");

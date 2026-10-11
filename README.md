@@ -71,11 +71,12 @@ releases use a different installer name, so pass `--installer-url`),
 Backups hold signing certificates and device keys. Archives are staged
 privately, written with mode `0600`, and never replace an existing path; pick a
 new output outside the archived paths for each backup and keep it out of
-version control. Restore extracts into a private staging directory, accepts
-only files, directories, and symlinks that stay inside the backup paths, then
-moves the result into home, refusing to write through any existing symlink.
-Backup refuses symlinked source paths, since tar would store only the link, and
-runs on macOS and Linux only.
+version control. Both commands accept only files, directories, and relative
+symlinks that stay inside the backup paths. Restore extracts into a private
+staging directory, then moves the result into home, merging existing folders
+but never writing through an existing symlink; a full restore refuses to run
+while `~/tizen-studio` exists, so move it aside first. Backup refuses symlinked
+source folders and runs on macOS and Linux only.
 
 ## Quick Start
 
