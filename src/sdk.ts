@@ -1,13 +1,4 @@
-import {
-  Console,
-  DateTime,
-  Effect,
-  FileSystem,
-  Option,
-  PlatformError,
-  Predicate,
-  Stream,
-} from "effect";
+import { Console, DateTime, Effect, FileSystem, Option } from "effect";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
   ArchiveExists,
@@ -304,9 +295,12 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
     yield* fs
       .makeDirectory(outputDir, { recursive: true })
       .pipe(Effect.mapError(fsFailure("mkdir", outputDir)));
-    // Stage in a private directory beside the output, then hard-link into place:
-    // link() never replaces an existing entry and a failed tar never leaves a
-    // partial archive.
+    // Stage in a private directory beside the output, then rename into place so
+    // a failed tar never leaves a partial archive.
+    if ((yield* pathKind(output)) !== "missing") {
+      return yield* new ArchiveExists({ path: output });
+    }
+
     yield* Effect.scoped(
       Effect.gen(function* () {
         const staging = yield* fs
@@ -316,17 +310,7 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
         const archive = join(staging, "archive.tar.gz");
         yield* run("tar", ["-C", home, "-czf", archive, ...included], { quiet: options.json });
         yield* fs.chmod(archive, 0o600).pipe(Effect.mapError(fsFailure("chmod", archive)));
-        yield* fs
-          .link(archive, output)
-          .pipe(
-            Effect.catch((cause) =>
-              cause.reason._tag === "AlreadyExists"
-                ? Effect.fail(new ArchiveExists({ path: output }))
-                : hardLinksUnsupported(cause)
-                  ? copyExclusive(archive, output)
-                  : Effect.fail(new FileSystemFailure({ cause, operation: "link", path: output })),
-            ),
-          );
+        yield* fs.rename(archive, output).pipe(Effect.mapError(fsFailure("rename", output)));
       }),
     );
   }
@@ -504,35 +488,6 @@ const resolveExisting = Effect.fn("resolveExisting")(function* (
 
   const parent = dirname(path);
   return parent === path ? path : join(yield* resolveExisting(parent), relative(parent, path));
-});
-
-// FAT and exFAT volumes have no hard links.
-const hardLinksUnsupported = (error: PlatformError.PlatformError) => {
-  const cause = Predicate.hasProperty(error.reason, "cause") ? error.reason.cause : undefined;
-  const code = Predicate.hasProperty(cause, "code") ? cause.code : undefined;
-  return code === "EXDEV" || code === "EPERM" || code === "ENOTSUP";
-};
-
-// Fallback publish: O_EXCL create never replaces an entry; a failed copy
-// removes only the file this call created.
-const copyExclusive = Effect.fn("copyExclusive")(function* (from: string, to: string) {
-  const fs = yield* FileSystem.FileSystem;
-  const file = yield* fs
-    .open(to, { flag: "wx", mode: 0o600 })
-    .pipe(
-      Effect.mapError((cause) =>
-        cause.reason._tag === "AlreadyExists"
-          ? new ArchiveExists({ path: to })
-          : new FileSystemFailure({ cause, operation: "create", path: to }),
-      ),
-    );
-
-  yield* fs.stream(from).pipe(
-    Stream.runForEach((chunk) => file.writeAll(chunk)),
-    Effect.andThen(fs.chmod(to, 0o600)),
-    Effect.mapError(fsFailure("copy", to)),
-    Effect.onError(() => fs.remove(to).pipe(Effect.ignore)),
-  );
 });
 
 // Plans the renames that publish the staged tree into home. Missing destinations

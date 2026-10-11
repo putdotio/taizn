@@ -74,8 +74,8 @@ touches, and search `node_modules/effect/src` for anything it does not cover.
 - `prove` should produce a compact installed-and-launched proof transcript
   without requiring a consumer `taizn.json`.
 - `sdk` commands do not require a consumer `taizn.json`. `sdk backup` stages
-  privately, publishes with mode `0600` through a hard link, and never replaces
-  an existing output; `sdk restore` extracts into private staging, validates
+  privately, renames the mode `0600` archive into place, and refuses an
+  existing output; `sdk restore` extracts into private staging, validates
   the extracted tree, and only then moves backup roots into the home directory.
   `--json` runs keep tar's output off the terminal and report its stderr as the
   error `cause`. Keep machine-specific paths and secret-store integrations out.
