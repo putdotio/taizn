@@ -16,6 +16,7 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { gzipSync } from "node:zlib";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it, vi } from "@effect/vitest";
 import { Console, Effect, Fiber, Layer, Schema } from "effect";
@@ -2152,6 +2153,8 @@ describe("taizn cli", () => {
     const home = join(root, "home");
     mkdirSync(join(home, "SamsungCertificate"), { recursive: true });
     writeFileSync(join(home, "SamsungCertificate", "fixture.txt"), "fixture certificate");
+    mkdirSync(join(home, "tizen-studio-data", "keystore", "author"), { recursive: true });
+    writeFileSync(join(home, "tizen-studio-data", "keystore", "author", "author.p12"), "author");
     const output = join(root, "backup.tar.gz");
     const backup = () => runTaiznInProcess(["sdk", "backup", output], root, { HOME: home });
 
@@ -2193,6 +2196,12 @@ describe("taizn cli", () => {
     });
     assert.strictEqual(content.status, 0, content.stderr);
     assert.strictEqual(content.stdout, "fixture certificate");
+    const keystore = spawnSync(
+      "tar",
+      ["-xOzf", output, "tizen-studio-data/keystore/author/author.p12"],
+      { encoding: "utf8" },
+    );
+    assert.strictEqual(keystore.stdout, "author", keystore.stderr);
 
     const original = readFileSync(output);
     const repeated = await backup();
@@ -2287,14 +2296,143 @@ describe("taizn cli", () => {
     assert.isFalse(existsSync(join(outside, "key.p12")));
     rmSync(join(home, "SamsungCertificate"), { recursive: true });
 
+    mkdirSync(join(home, "SamsungCertificate"));
+    writeFileSync(join(home, "SamsungCertificate", "kept.txt"), "kept");
     const restored = await runTaiznInProcess(["sdk", "restore", archive], root, { HOME: home });
     assert.strictEqual(restored.status, 0, restored.stderr);
     assert.strictEqual(
       readFileSync(join(home, "SamsungCertificate", "fixture.txt"), "utf8"),
       "fixture certificate",
     );
+    assert.strictEqual(readFileSync(join(home, "SamsungCertificate", "kept.txt"), "utf8"), "kept");
+    assert.deepStrictEqual(readdirSync(home), ["SamsungCertificate"]);
+  });
+
+  const unsafeArchives: ReadonlyArray<{
+    readonly entries: readonly TarEntry[];
+    readonly kind: string;
+    readonly leaked: string;
+  }> = [
+    {
+      entries: [{ linkname: "secret", name: "SamsungCertificate/leak", type: "hardlink" }],
+      kind: "a hard link outside the backup roots",
+      leaked: "SamsungCertificate/leak",
+    },
+    {
+      entries: [{ content: "padded", name: " SamsungCertificate/file", type: "file" }],
+      kind: "a padded member name",
+      leaked: " SamsungCertificate",
+    },
+    {
+      entries: [{ name: "SamsungCertificate/pipe", type: "fifo" }],
+      kind: "a FIFO",
+      leaked: "SamsungCertificate/pipe",
+    },
+    {
+      entries: [{ linkname: "/tmp", name: "SamsungCertificate/out", type: "symlink" }],
+      kind: "an absolute symlink",
+      leaked: "SamsungCertificate/out",
+    },
+    {
+      entries: [{ linkname: "../secret", name: "SamsungCertificate/up", type: "symlink" }],
+      kind: "a symlink leaving the backup roots",
+      leaked: "SamsungCertificate/up",
+    },
+  ];
+
+  for (const unsafe of unsafeArchives) {
+    it(`rejects SDK archives with ${unsafe.kind}`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "taizn-sdk-unsafe-"));
+      const home = join(root, "home");
+      mkdirSync(home);
+      writeFileSync(join(home, "secret"), "secret");
+      const archive = join(root, "unsafe.tar.gz");
+      writeFileSync(archive, makeTarGz(unsafe.entries));
+      const result = await runTaiznInProcess(["sdk", "restore", archive], root, { HOME: home });
+
+      assert.strictEqual(result.status, 1);
+      assert.isFalse(existsSync(join(home, unsafe.leaked)));
+      assert.deepStrictEqual(readdirSync(home), ["secret"]);
+    });
+  }
+
+  it("restores in-archive relative symlinks", async () => {
+    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-symlink-"));
+    const home = join(root, "home");
+    mkdirSync(home);
+    const archive = join(root, "linked.tar.gz");
+    writeFileSync(
+      archive,
+      makeTarGz([
+        { content: "author", name: "SamsungCertificate/author.p12", type: "file" },
+        { linkname: "author.p12", name: "SamsungCertificate/current.p12", type: "symlink" },
+      ]),
+    );
+    const result = await runTaiznInProcess(["sdk", "restore", archive], root, { HOME: home });
+
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.strictEqual(
+      readFileSync(join(home, "SamsungCertificate/current.p12"), "utf8"),
+      "author",
+    );
+  });
+
+  it("keeps tar diagnostics out of structured SDK restore errors", () => {
+    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-json-"));
+    const home = join(root, "home");
+    mkdirSync(home);
+    const archive = join(root, "parent.tar.gz");
+    writeFileSync(
+      archive,
+      makeTarGz([{ content: "foreign", name: "../SamsungCertificate/file", type: "file" }]),
+    );
+    const result = spawnTaizn(["sdk", "restore", "--json", archive], root, { HOME: home });
+
+    assert.strictEqual(result.status, 1);
+    assert.strictEqual(JSON.parse(result.stderr).ok, false);
+    assert.isFalse(existsSync(join(root, "SamsungCertificate")));
   });
 });
+
+type TarEntry = {
+  readonly content?: string;
+  readonly linkname?: string;
+  readonly name: string;
+  readonly type: "fifo" | "file" | "hardlink" | "symlink";
+};
+
+// Hand-rolled ustar records, because system tar refuses to create the unsafe
+// members these tests need.
+const makeTarGz = (entries: readonly TarEntry[]) => {
+  const typeFlags = { fifo: "6", file: "0", hardlink: "1", symlink: "2" } as const;
+  const blocks: Buffer[] = [];
+
+  for (const entry of entries) {
+    const content = Buffer.from(entry.content ?? "");
+    const header = Buffer.alloc(512);
+    const field = (value: string, offset: number, length: number) =>
+      header.write(value, offset, length, "utf8");
+    const octal = (value: number, offset: number, length: number) =>
+      field(`${value.toString(8).padStart(length - 1, "0")}\0`, offset, length);
+
+    field(entry.name, 0, 100);
+    octal(0o644, 100, 8);
+    octal(0, 108, 8);
+    octal(0, 116, 8);
+    octal(content.length, 124, 12);
+    octal(0, 136, 12);
+    field("        ", 148, 8);
+    field(typeFlags[entry.type], 156, 1);
+    field(entry.linkname ?? "", 157, 100);
+    field("ustar\0", 257, 6);
+    field("00", 263, 2);
+    const checksum = header.reduce((sum, byte) => sum + byte, 0);
+    field(`${checksum.toString(8).padStart(6, "0")}\0 `, 148, 8);
+    blocks.push(header, content, Buffer.alloc((512 - (content.length % 512)) % 512));
+  }
+
+  return gzipSync(Buffer.concat([...blocks, Buffer.alloc(1024)]));
+};
 
 const createPackageFixture = () => {
   const dir = mkdtempSync(join(tmpdir(), "taizn-package-config-"));

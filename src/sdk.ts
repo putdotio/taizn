@@ -1,5 +1,5 @@
 import { Console, DateTime, Effect, FileSystem, Option } from "effect";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
   ArchiveExists,
   FileSystemFailure,
@@ -10,7 +10,7 @@ import {
   UnsupportedPlatform,
 } from "./errors.js";
 import { getPaths, requireFile, TaiznSystem } from "./runtime.js";
-import { capture, requireNativeOrRosetta, run } from "./tizen.js";
+import { requireNativeOrRosetta, run } from "./tizen.js";
 
 export type SdkInstallOptions = {
   readonly downloadDir?: string;
@@ -36,7 +36,12 @@ export type SdkRestoreOptions = {
 
 // Tizen Studio's default home-relative layout. Certificate mode keeps signing
 // state only; full mode adds the SDK, its data, extensions, and workspace.
-const certificateRoots = ["SamsungCertificate", ".tizen", "tizen-studio-data/profile"];
+const certificateRoots = [
+  "SamsungCertificate",
+  ".tizen",
+  "tizen-studio-data/keystore",
+  "tizen-studio-data/profile",
+];
 const fullRoots = [
   "SamsungCertificate",
   ".tizen",
@@ -226,17 +231,19 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
     ? resolve(paths.appDir, requestedOutput)
     : join(home, `tizen-${options.full ? "full" : "certs"}-${timestamp}.tar.gz`);
   const included: string[] = [];
+  const skipped: string[] = [];
 
   for (const root of options.full ? fullRoots : certificateRoots) {
     const path = join(home, root);
+    const kind = yield* pathKind(path);
 
-    if (!(yield* fs.exists(path).pipe(Effect.mapError(fsFailure("exists", path))))) {
-      yield* Console.error(`skip missing ${path}`);
+    if (kind === "missing") {
+      skipped.push(root);
       continue;
     }
 
     // tar stores a symlinked root as the link itself, not the signing state behind it.
-    if ((yield* pathKind(path)) === "link") {
+    if (kind === "SymbolicLink") {
       return yield* new InvalidInput({
         details: `${path} is a symlink; the archive would hold only the link`,
         label: "backup source",
@@ -244,6 +251,12 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
     }
 
     included.push(root);
+  }
+
+  if (!options.json) {
+    for (const root of skipped) {
+      yield* Console.error(`skip missing ${join(home, root)}`);
+    }
   }
 
   if (included.length === 0) {
@@ -267,64 +280,63 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
   });
 
   yield* requireOutsideRoots(dirname(output));
+  const result = {
+    archive: output,
+    dryRun: options.dryRun === true,
+    mode,
+    paths: included,
+    skipped,
+  };
 
-  if (options.dryRun) {
-    const plan = { archive: output, dryRun: true, mode, paths: included };
-    yield* Console.log(
-      options.json
-        ? JSON.stringify(plan)
-        : [`Would create ${output} (${mode}):`, ...included.map((root) => `- ${root}`)].join("\n"),
+  if (!result.dryRun) {
+    const outputDir = dirname(output);
+    yield* fs
+      .makeDirectory(outputDir, { recursive: true })
+      .pipe(Effect.mapError(fsFailure("mkdir", outputDir)));
+    yield* requireOutsideRoots(
+      yield* fs.realPath(outputDir).pipe(Effect.mapError(fsFailure("realpath", outputDir))),
     );
-    return;
+    // Stage privately beside the output, then hard-link into place: link() never
+    // replaces an existing entry and a failed tar never leaves a partial archive.
+    yield* Effect.scoped(
+      Effect.gen(function* () {
+        const staging = yield* fs
+          .makeTempDirectoryScoped({ directory: outputDir, prefix: ".taizn-sdk-backup." })
+          .pipe(Effect.mapError(fsFailure("mkdtemp", outputDir)));
+        yield* fs.chmod(staging, 0o700).pipe(Effect.mapError(fsFailure("chmod", staging)));
+        const archive = join(staging, "archive.tar.gz");
+        yield* fs
+          .writeFileString(archive, "", { flag: "wx", mode: 0o600 })
+          .pipe(Effect.mapError(fsFailure("write", archive)));
+        yield* run("tar", ["-C", home, "-czf", archive, ...included], { quiet: options.json });
+        yield* fs.chmod(archive, 0o600).pipe(Effect.mapError(fsFailure("chmod", archive)));
+        yield* fs
+          .link(archive, output)
+          .pipe(
+            Effect.mapError((cause) =>
+              cause.reason._tag === "AlreadyExists"
+                ? new ArchiveExists({ path: output })
+                : new FileSystemFailure({ cause, operation: "link", path: output }),
+            ),
+          );
+      }),
+    );
   }
-
-  const outputDir = dirname(output);
-  yield* fs
-    .makeDirectory(outputDir, { recursive: true })
-    .pipe(Effect.mapError(fsFailure("mkdir", outputDir)));
-  yield* requireOutsideRoots(
-    yield* fs.realPath(outputDir).pipe(Effect.mapError(fsFailure("realpath", outputDir))),
-  );
-  // Stage privately beside the output, then hard-link into place: link() never
-  // replaces an existing entry and a failed tar never leaves a partial archive.
-  yield* Effect.scoped(
-    Effect.gen(function* () {
-      const staging = yield* fs
-        .makeTempDirectoryScoped({ directory: outputDir, prefix: ".taizn-sdk-backup." })
-        .pipe(Effect.mapError(fsFailure("mkdtemp", outputDir)));
-      yield* fs.chmod(staging, 0o700).pipe(Effect.mapError(fsFailure("chmod", staging)));
-      const archive = join(staging, "archive.tar.gz");
-      yield* fs
-        .writeFileString(archive, "", { flag: "wx", mode: 0o600 })
-        .pipe(Effect.mapError(fsFailure("write", archive)));
-      yield* run("tar", ["-C", home, "-czf", archive, ...included], {});
-      yield* fs.chmod(archive, 0o600).pipe(Effect.mapError(fsFailure("chmod", archive)));
-      yield* fs
-        .link(archive, output)
-        .pipe(
-          Effect.mapError((cause) =>
-            cause.reason._tag === "AlreadyExists"
-              ? new ArchiveExists({ path: output })
-              : new FileSystemFailure({ cause, operation: "link", path: output }),
-          ),
-        );
-    }),
-  );
 
   if (options.json) {
-    yield* Console.log(JSON.stringify({ archive: output, dryRun: false, mode, paths: included }));
+    yield* Console.log(JSON.stringify(result));
     return;
   }
 
-  yield* Console.log(`Created ${output}`);
-  yield* Console.log(`mode: ${mode}`);
-  yield* Console.log("contains:");
+  yield* Console.log(`${result.dryRun ? "Would create" : "Created"} ${output} (${mode}):`);
 
   for (const root of included) {
     yield* Console.log(`- ${root}`);
   }
 
-  yield* Console.log("This archive holds signing certificates and device keys. Keep it private.");
+  if (!result.dryRun) {
+    yield* Console.log("This archive holds signing certificates and device keys. Keep it private.");
+  }
 });
 
 export const restoreSdk = Effect.fn("restoreSdk")(function* (
@@ -342,21 +354,29 @@ export const restoreSdk = Effect.fn("restoreSdk")(function* (
     return yield* new MissingFile({ label: "SDK archive", path: archive });
   }
 
-  // Validate and extract one private copy so the archive cannot change in between.
+  // Extract into a fresh private directory, validate what tar actually wrote,
+  // then rename it into home. Names, link targets, and entry types are checked
+  // on disk, so nothing tar does on extraction can reach outside the staging tree.
+  // Real restores stage inside home so the final renames stay on one filesystem.
   const roots = yield* Effect.scoped(
     Effect.gen(function* () {
       const staging = yield* fs
-        .makeTempDirectoryScoped({ prefix: "taizn-sdk-restore-" })
-        .pipe(Effect.mapError(fsFailure("mkdtemp", "taizn-sdk-restore-")));
-      const copy = join(staging, "archive.tar.gz");
-      yield* fs.copyFile(archive, copy).pipe(Effect.mapError(fsFailure("copy", archive)));
-      const listing = yield* capture("tar", ["-tzf", copy], { unbounded: true });
-      const entries = yield* archiveEntries(listing);
-      yield* requireNoSymlinkedTargets(home, entries);
-      const roots = [...new Set(entries.map((entry) => entry.split("/")[0] ?? ""))];
+        .makeTempDirectoryScoped({
+          directory: options.dryRun ? undefined : home,
+          prefix: ".taizn-sdk-restore.",
+        })
+        .pipe(Effect.mapError(fsFailure("mkdtemp", home)));
+      yield* fs.chmod(staging, 0o700).pipe(Effect.mapError(fsFailure("chmod", staging)));
+      yield* run("tar", ["-C", staging, "-xzf", archive], { quiet: options.json });
+      const roots = yield* validateStagedTree(staging);
+      const moves = yield* planMoves(staging, home, roots);
 
       if (!options.dryRun) {
-        yield* run("tar", ["-C", home, "-xzf", copy], {});
+        for (const path of moves) {
+          const from = join(staging, path);
+          const to = join(home, path);
+          yield* fs.rename(from, to).pipe(Effect.mapError(fsFailure("rename", to)));
+        }
       }
 
       return roots;
@@ -364,93 +384,139 @@ export const restoreSdk = Effect.fn("restoreSdk")(function* (
   );
   const result = { archive, dryRun: options.dryRun === true, home, paths: roots };
 
-  yield* Console.log(options.json ? JSON.stringify(result) : describeRestore(result));
-});
+  if (options.json) {
+    yield* Console.log(JSON.stringify(result));
+    return;
+  }
 
-const describeRestore = (result: {
-  readonly archive: string;
-  readonly dryRun: boolean;
-  readonly home: string;
-  readonly paths: readonly string[];
-}) =>
-  [
-    `${result.dryRun ? "Would restore" : "Restored"} ${result.archive} into ${result.home}:`,
-    ...result.paths.map((path) => `- ${path}`),
-  ].join("\n");
+  yield* Console.log(
+    [
+      `${result.dryRun ? "Would restore" : "Restored"} ${archive} into ${home}:`,
+      ...roots.map((root) => `- ${root}`),
+    ].join("\n"),
+  );
+});
 
 const isInside = (parent: string, path: string) => {
   const fromParent = relative(parent, path);
   return !fromParent.startsWith("..") && !isAbsolute(fromParent);
 };
 
+type PathKind = "missing" | FileSystem.File.Type;
+
+// FileSystem has no lstat: readLink tells links apart, stat types everything else.
 const pathKind = Effect.fn("pathKind")(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
-  return yield* fs.readLink(path).pipe(
+  const link = yield* fs.readLink(path).pipe(
     Effect.as("link" as const),
     Effect.catch((cause) =>
-      cause.reason._tag === "NotFound"
-        ? Effect.succeed("missing" as const)
-        : Effect.succeed("other" as const),
+      Effect.succeed(cause.reason._tag === "NotFound" ? ("missing" as const) : ("other" as const)),
     ),
   );
+
+  if (link === "link") {
+    return "SymbolicLink" satisfies PathKind;
+  }
+
+  if (link === "missing") {
+    return "missing" satisfies PathKind;
+  }
+
+  const info = yield* fs.stat(path).pipe(Effect.mapError(fsFailure("stat", path)));
+  return info.type satisfies PathKind;
 });
 
-// tar writes through existing symlinks on the extraction path, so refuse any
-// existing destination component that is one.
-const requireNoSymlinkedTargets = Effect.fn("requireNoSymlinkedTargets")(function* (
-  home: string,
-  entries: readonly string[],
-) {
-  const kinds = new Map<string, "link" | "missing" | "other">();
+const invalidArchive = (details: string) => new InvalidInput({ details, label: "SDK archive" });
 
-  for (const entry of entries) {
-    const segments = entry.split("/").filter(Boolean);
+// Only regular files, directories, and symlinks that stay inside the restored
+// roots are allowed; devices, FIFOs, sockets, and escaping links are rejected.
+// The walk never descends through symlinks.
+const validateStagedTree = Effect.fn("validateStagedTree")(function* (staging: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const roots = yield* fs
+    .readDirectory(staging)
+    .pipe(Effect.mapError(fsFailure("readdir", staging)));
+  const pending = [...roots];
 
-    for (let index = 1; index <= segments.length; index++) {
-      const path = segments.slice(0, index).join("/");
-      const kind = kinds.get(path) ?? (yield* pathKind(join(home, path)));
-      kinds.set(path, kind);
-
-      if (kind === "link") {
-        return yield* new InvalidInput({
-          details: `refusing to extract through symlinked ${join(home, path)}`,
-          label: "SDK archive",
-        });
-      }
-
-      if (kind === "missing") {
-        break;
-      }
+  for (const root of roots) {
+    if (!restorableRoots.has(root)) {
+      return yield* invalidArchive(
+        `unexpected entry ${JSON.stringify(root)}; only ${fullRoots.join(", ")} are restored`,
+      );
     }
   }
+
+  while (pending.length > 0) {
+    const entry = pending.pop() ?? "";
+    const path = join(staging, entry);
+    const kind = yield* pathKind(path);
+
+    if (kind === "Directory") {
+      const children = yield* fs
+        .readDirectory(path)
+        .pipe(Effect.mapError(fsFailure("readdir", path)));
+      pending.push(...children.map((child) => join(entry, child)));
+    } else if (kind === "SymbolicLink") {
+      const target = yield* fs.readLink(path).pipe(Effect.mapError(fsFailure("readlink", path)));
+      const resolved = resolve(dirname(path), target);
+
+      if (!restorableRoots.has(relative(staging, resolved).split(sep)[0] ?? "")) {
+        return yield* invalidArchive(`symlink ${entry} points outside the restored paths`);
+      }
+    } else if (kind !== "File") {
+      return yield* invalidArchive(
+        `${entry} is a ${kind}; only files, directories, and symlinks are restored`,
+      );
+    }
+  }
+
+  if (roots.length === 0) {
+    return yield* invalidArchive("archive is empty");
+  }
+
+  return [...roots].sort();
 });
 
-const archiveEntries = Effect.fn("archiveEntries")(function* (listing: string) {
-  const entries: string[] = [];
+// Plans the renames that publish the staged tree into home. Missing destinations
+// take the whole staged subtree; existing directories are merged. Any existing
+// symlink on a destination path, or a file/directory clash, stops the restore
+// before anything moves.
+const planMoves = Effect.fn("planMoves")(function* (
+  staging: string,
+  home: string,
+  names: readonly string[],
+  prefix = "",
+): Effect.fn.Return<readonly string[], FileSystemFailure | InvalidInput, FileSystem.FileSystem> {
+  const fs = yield* FileSystem.FileSystem;
+  const moves: string[] = [];
 
-  for (const line of listing.split("\n")) {
-    const entry = line.trim().replace(/^(\.\/)+/u, "");
+  for (const name of names) {
+    const path = join(prefix, name);
+    const target = join(home, path);
+    const existing = yield* pathKind(target);
 
-    if (entry === "" || entry === ".") {
+    if (existing === "missing") {
+      moves.push(path);
       continue;
     }
 
-    const segments = entry.split("/");
-    const root = segments[0] ?? "";
-
-    if (isAbsolute(entry) || segments.includes("..") || !restorableRoots.has(root)) {
-      return yield* new InvalidInput({
-        details: `unexpected entry ${line}; only ${fullRoots.join(", ")} are restored`,
-        label: "SDK archive",
-      });
+    if (existing === "SymbolicLink") {
+      return yield* invalidArchive(`refusing to extract through symlinked ${target}`);
     }
 
-    entries.push(entry);
+    const staged = yield* pathKind(join(staging, path));
+
+    if (staged === "Directory" && existing === "Directory") {
+      const children = yield* fs
+        .readDirectory(join(staging, path))
+        .pipe(Effect.mapError(fsFailure("readdir", join(staging, path))));
+      moves.push(...(yield* planMoves(staging, home, children, path)));
+    } else if (staged !== "Directory" && existing === "File") {
+      moves.push(path);
+    } else {
+      return yield* invalidArchive(`${target} exists as a ${existing}; it cannot be replaced`);
+    }
   }
 
-  if (entries.length === 0) {
-    return yield* new InvalidInput({ details: "archive is empty", label: "SDK archive" });
-  }
-
-  return entries;
+  return moves;
 });

@@ -69,6 +69,7 @@ type WidgetStageOptions = WidgetIndexOptions & {
 
 type RunOptions = {
   readonly finite?: boolean;
+  readonly quiet?: boolean;
   readonly cwd?: string;
   readonly env?: ChildEnv;
 };
@@ -1069,9 +1070,9 @@ export const run = Effect.fn("run")(function* (
         cwd: options.cwd ?? paths.appDir,
         forceKillAfter: options.finite ? "1 second" : undefined,
         env,
-        stderr: "inherit",
+        stderr: options.quiet ? "ignore" : "inherit",
         stdin: "inherit",
-        stdout: "inherit",
+        stdout: options.quiet ? "ignore" : "inherit",
       }),
     )
     .pipe(Effect.mapError(() => new CommandFailed({ args: redactCommandArgs(args), command })));
@@ -1091,13 +1092,9 @@ export const run = Effect.fn("run")(function* (
   }
 });
 
-export const capture = Effect.fn("capture")(function* (
-  command: string,
-  args: ReadonlyArray<string>,
-  options: { readonly unbounded?: boolean } = {},
-) {
+const capture = Effect.fn("capture")(function* (command: string, args: ReadonlyArray<string>) {
   const timeoutMs = yield* CommandTimeoutMs;
-  const captured = Effect.scoped(
+  const output = yield* Effect.scoped(
     Effect.gen(function* () {
       const paths = yield* getPaths();
       const env = yield* withTizenPath(yield* baseChildEnv());
@@ -1116,16 +1113,13 @@ export const capture = Effect.fn("capture")(function* (
 
       return { exitCode, output };
     }),
+  ).pipe(
+    Effect.timeoutOrElse({
+      duration: timeoutMs,
+      orElse: () =>
+        Effect.fail(new CommandTimeout({ args: redactCommandArgs(args), command, timeoutMs })),
+    }),
   );
-  const output = yield* options.unbounded
-    ? captured
-    : captured.pipe(
-        Effect.timeoutOrElse({
-          duration: timeoutMs,
-          orElse: () =>
-            Effect.fail(new CommandTimeout({ args: redactCommandArgs(args), command, timeoutMs })),
-        }),
-      );
 
   if (output.exitCode !== 0) {
     return yield* new CommandFailed({ args: redactCommandArgs(args), command });

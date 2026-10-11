@@ -75,8 +75,9 @@ touches, and search `node_modules/effect/src` for anything it does not cover.
   without requiring a consumer `taizn.json`.
 - `sdk` commands do not require a consumer `taizn.json`. `sdk backup` stages
   privately, publishes with mode `0600` through a hard link, and never replaces
-  an existing output; `sdk restore` extracts only the backup roots into the
-  home directory. Keep machine-specific paths and secret-store integrations out.
+  an existing output; `sdk restore` extracts into private staging, validates
+  the extracted tree, and only then moves backup roots into the home directory.
+  `--json` runs keep tar's own output off stdout and stderr. Keep machine-specific paths and secret-store integrations out.
 - Do not leak `TAIZN_*`, `TIZEN_*`, or `SDB` into the consumer build command.
 - Redact password args when reporting failed Tizen commands.
 - Missing config/env/files and child-command failures should not print stack traces.
