@@ -67,6 +67,8 @@ releases use a different installer name, so pass `--installer-url`),
 `--packages`, `--proxy` (package-manager proxy mode, default `direct`), and
 `--show-packages` (Samsung's catalog download can hang). With a non-default
 `--studio-dir`, set `TAIZN_TIZEN_CLI` and `TAIZN_SDB` to the installed tools.
+Samsung's installer only accepts a `--studio-dir` inside the home directory,
+without spaces or non-ASCII characters.
 
 Backups hold signing certificates and device keys. Archives are staged
 privately, written with mode `0600`, and never replace an existing path; pick a

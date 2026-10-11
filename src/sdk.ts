@@ -102,6 +102,14 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
     return yield* new TizenStudioIncomplete({ path: studioDir });
   }
 
+  // Samsung's installer rejects these destinations but still exits 0.
+  if (!installed && (!isInside(home, studioDir) || /[^\x21-\x7e]/.test(studioDir))) {
+    return yield* new InvalidInput({
+      details: `Samsung's installer needs a path inside ${home} without spaces or non-ASCII characters. Received: ${studioDir}`,
+      label: "studio dir",
+    });
+  }
+
   if (options.dryRun) {
     yield* Console.log(
       JSON.stringify({
