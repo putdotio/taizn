@@ -1,6 +1,6 @@
 ---
 name: taizn
-description: Operate Taizn as an agent-first generic Tizen TV packaging, device, remote, logs, Seller Office discovery, artifact, and proof harness. Use when packaging or proving a Tizen widget, inspecting a .wgt, preparing or validating generic submission metadata, reading sanitized Seller Office application status through a human-owned browser, collecting Samsung TV diagnostics, driving Samsung remote keys, or using Taizn's agent-facing JSON/artifact surfaces. Do not use for product journeys, content or visual assertions, Seller Office mutations such as uploads or submissions, CI-driven portal login, or non-Tizen platforms.
+description: Operate Taizn as an agent-first generic Tizen TV packaging, device, remote, logs, Seller Office discovery, artifact, and proof harness. Use when installing the Tizen Studio CLI or backing up and restoring its signing state, packaging or proving a Tizen widget, inspecting a .wgt, preparing or validating generic submission metadata, reading sanitized Seller Office application status through a human-owned browser, collecting Samsung TV diagnostics, driving Samsung remote keys, or using Taizn's agent-facing JSON/artifact surfaces. Do not use for product journeys, content or visual assertions, Seller Office mutations such as uploads or submissions, CI-driven portal login, or non-Tizen platforms.
 ---
 
 # Taizn
@@ -43,7 +43,8 @@ consumer app repo.
 
 Read only the reference needed for the current task:
 
-- packaging, inspection, submission checks, logs, and artifacts:
+- Tizen SDK install, backup, restore, packaging, inspection, submission checks,
+  logs, and artifacts:
   [`references/commands.md`](references/commands.md)
 - Samsung TV remote diagnostics, pairing, key scripts, and safety boundaries:
   [`references/tv-remote.md`](references/tv-remote.md)
@@ -54,6 +55,8 @@ Read only the reference needed for the current task:
 
 ```bash
 taizn describe
+taizn sdk install --dry-run
+taizn sdk restore --dry-run --json ~/tizen-certs.tar.gz
 taizn check --json --fields targets,tools.sdb
 taizn apps --json --fields applications
 taizn prove --dry-run --json --fields application.id,target Example.app

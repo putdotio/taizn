@@ -39,12 +39,14 @@ taizn probe hosted-assets --dry-run --json
 - `sdk install` installs Tizen Studio into `~/tizen-studio` and verifies
   `tizen` and `sdb`; dry-run it first.
 - `sdk backup` writes a new private archive of signing certificates and
-  profiles; `--full` adds SDK state. It refuses to replace an existing path.
+  profiles; `--full` adds SDK state. It refuses to replace an existing path;
+  dry-run it to see the output and included paths.
 - `sdk restore` extracts a backup into the home directory; dry-run it to list
   the restored paths. Treat archives as secrets and never commit them.
 
 ```bash
 taizn sdk install --dry-run
+taizn sdk backup --dry-run --json ~/tizen-certs.tar.gz
 taizn sdk backup ~/tizen-certs.tar.gz
 taizn sdk restore --dry-run --json ~/tizen-certs.tar.gz
 ```

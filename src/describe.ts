@@ -239,10 +239,10 @@ const commandDescriptions = [
     arguments: ["output?"],
     artifacts: false,
     command: "sdk backup",
-    dryRun: false,
+    dryRun: true,
     env: [],
     fieldMask: false,
-    flags: ["--json", "--full"],
+    flags: ["--json", "--dry-run", "--full"],
     mutates: true,
     outputs: ["text", "json"],
     purpose:

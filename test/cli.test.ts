@@ -2143,6 +2143,17 @@ describe("taizn cli", () => {
     const output = join(root, "backup.tar.gz");
     const backup = () => runTaiznInProcess(["sdk", "backup", output], root, { HOME: home });
 
+    const plan = await runTaiznInProcess(["sdk", "backup", "--dry-run", output], root, {
+      HOME: home,
+    });
+    assert.strictEqual(plan.status, 0, plan.stderr);
+    assert.isFalse(existsSync(output));
+    const nested = join(home, "SamsungCertificate", "backup.tar.gz");
+    const inside = await runTaiznInProcess(["sdk", "backup", nested], root, { HOME: home });
+    assert.strictEqual(inside.status, 1);
+    assert.include(inside.stderr, "output must be outside the archived");
+    assert.isFalse(existsSync(nested));
+
     const created = await backup();
     assert.strictEqual(created.status, 0, created.stderr);
     assert.strictEqual(statSync(output).mode & 0o777, 0o600);
@@ -2210,6 +2221,15 @@ describe("taizn cli", () => {
     assert.strictEqual(rejected.status, 1);
     assert.include(rejected.stderr, "Invalid SDK archive");
     assert.isFalse(existsSync(join(home, ".ssh")));
+
+    const outside = join(root, "outside");
+    mkdirSync(outside);
+    symlinkSync(outside, join(home, "SamsungCertificate"));
+    const redirected = await runTaiznInProcess(["sdk", "restore", archive], root, { HOME: home });
+    assert.strictEqual(redirected.status, 1);
+    assert.include(redirected.stderr, "refusing to extract through symlinked");
+    assert.isFalse(existsSync(join(outside, "fixture.txt")));
+    rmSync(join(home, "SamsungCertificate"));
 
     const restored = await runTaiznInProcess(["sdk", "restore", archive], root, { HOME: home });
     assert.strictEqual(restored.status, 0, restored.stderr);

@@ -1,6 +1,5 @@
 import { Console, DateTime, Effect, FileSystem, Option } from "effect";
-import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import {
   ArchiveExists,
   FileSystemFailure,
@@ -25,6 +24,7 @@ export type SdkInstallOptions = {
 };
 
 export type SdkBackupOptions = {
+  readonly dryRun?: boolean;
   readonly full?: boolean;
   readonly json?: boolean;
 };
@@ -77,10 +77,7 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
   const installerUrl =
     options.installerUrl ??
     `https://download.tizen.org/sdk/Installer/tizen-sdk_${options.sdkVersion}/${installerName}`;
-  const downloadDir = options.downloadDir
-    ? resolve(paths.appDir, options.downloadDir)
-    : join(tmpdir(), "taizn-tizen-sdk");
-  const installerPath = join(downloadDir, installerName);
+  const downloadDir = options.downloadDir ? resolve(paths.appDir, options.downloadDir) : undefined;
   const defaultStudioDir = join(home, "tizen-studio");
   const studioDir = options.studioDir ? resolve(paths.appDir, options.studioDir) : defaultStudioDir;
   const packageManager = join(studioDir, "package-manager/package-manager-cli.bin");
@@ -100,7 +97,7 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
     yield* Console.log(
       JSON.stringify({
         dryRun: true,
-        installer: installed ? undefined : { path: installerPath, url: installerUrl },
+        installer: installed ? undefined : { downloadDir, url: installerUrl },
         packages: packages?.split(",") ?? [],
         proxy: options.proxy,
         studioDir,
@@ -114,36 +111,50 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
   if (installed) {
     yield* Console.log(`Tizen Studio already installed at ${studioDir}`);
   } else {
-    yield* fs
-      .makeDirectory(downloadDir, { recursive: true })
-      .pipe(Effect.mapError(fsFailure("mkdir", downloadDir)));
-    yield* Console.log(`Downloading ${installerUrl}`);
-    yield* run(
-      "curl",
-      [
-        "-fL",
-        "-C",
-        "-",
-        "--retry",
-        "20",
-        "--retry-delay",
-        "5",
-        "--retry-all-errors",
-        "-o",
-        installerPath,
-        installerUrl,
-      ],
-      {},
+    // Without --download-dir the installer lands in a private mkdtemp directory
+    // so nobody else can swap it between download and execution.
+    yield* Effect.scoped(
+      Effect.gen(function* () {
+        const directory =
+          downloadDir ??
+          (yield* fs
+            .makeTempDirectoryScoped({ prefix: "taizn-tizen-sdk-" })
+            .pipe(Effect.mapError(fsFailure("mkdtemp", "taizn-tizen-sdk-"))));
+        const installerPath = join(directory, installerName);
+        yield* fs
+          .makeDirectory(directory, { recursive: true })
+          .pipe(Effect.mapError(fsFailure("mkdir", directory)));
+        yield* Console.log(`Downloading ${installerUrl}`);
+        yield* run(
+          "curl",
+          [
+            "-fL",
+            "-C",
+            "-",
+            "--retry",
+            "20",
+            "--retry-delay",
+            "5",
+            "--retry-all-errors",
+            "-o",
+            installerPath,
+            installerUrl,
+          ],
+          {},
+        );
+        yield* fs
+          .chmod(installerPath, 0o755)
+          .pipe(Effect.mapError(fsFailure("chmod", installerPath)));
+
+        if (platform === "darwin") {
+          yield* run("xattr", ["-c", installerPath], {}).pipe(Effect.ignore);
+        }
+
+        yield* requireNativeOrRosetta(installerPath, "Tizen SDK installer");
+        yield* Console.log(`Installing Tizen SDK ${options.sdkVersion} into ${studioDir}`);
+        yield* run(installerPath, ["--accept-license", "--no-java-check", studioDir], {});
+      }),
     );
-    yield* fs.chmod(installerPath, 0o755).pipe(Effect.mapError(fsFailure("chmod", installerPath)));
-
-    if (platform === "darwin") {
-      yield* run("xattr", ["-c", installerPath], {}).pipe(Effect.ignore);
-    }
-
-    yield* requireNativeOrRosetta(installerPath, "Tizen SDK installer");
-    yield* Console.log(`Installing Tizen SDK ${options.sdkVersion} into ${studioDir}`);
-    yield* run(installerPath, ["--accept-license", "--no-java-check", studioDir], {});
 
     if (!(yield* isExecutableFile(packageManager))) {
       return yield* new MissingFile({ label: "Tizen package manager", path: packageManager });
@@ -171,7 +182,6 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
   yield* requireNativeOrRosetta(sdb, "sdb");
   yield* run(tizenCli, ["version"], { finite: true });
   yield* run(sdb, ["version"], { finite: true });
-  yield* capture(packageManager, ["show-info"]);
 
   if (options.showPackages) {
     yield* Console.error("Samsung's package catalog download can be slow or hang.");
@@ -216,6 +226,27 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
     return yield* new NothingToArchive({ home, mode });
   }
 
+  for (const root of included) {
+    const fromRoot = relative(join(home, root), output);
+
+    if (!fromRoot.startsWith("..") && !isAbsolute(fromRoot)) {
+      return yield* new InvalidInput({
+        details: `output must be outside the archived ${join(home, root)}. Received: ${output}`,
+        label: "backup output",
+      });
+    }
+  }
+
+  if (options.dryRun) {
+    const plan = { archive: output, dryRun: true, mode, paths: included };
+    yield* Console.log(
+      options.json
+        ? JSON.stringify(plan)
+        : [`Would create ${output} (${mode}):`, ...included.map((root) => `- ${root}`)].join("\n"),
+    );
+    return;
+  }
+
   const outputDir = dirname(output);
   yield* fs
     .makeDirectory(outputDir, { recursive: true })
@@ -247,7 +278,7 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
   );
 
   if (options.json) {
-    yield* Console.log(JSON.stringify({ archive: output, mode, paths: included }));
+    yield* Console.log(JSON.stringify({ archive: output, dryRun: false, mode, paths: included }));
     return;
   }
 
@@ -277,14 +308,36 @@ export const restoreSdk = Effect.fn("restoreSdk")(function* (
     return yield* new MissingFile({ label: "SDK archive", path: archive });
   }
 
-  const listing = yield* capture("tar", ["-tzf", archive], { unbounded: true });
-  const roots = yield* archiveRoots(listing);
+  // Validate and extract one private copy so the archive cannot change in between.
+  const roots = yield* Effect.scoped(
+    Effect.gen(function* () {
+      const staging = yield* fs
+        .makeTempDirectoryScoped({ prefix: "taizn-sdk-restore-" })
+        .pipe(Effect.mapError(fsFailure("mkdtemp", "taizn-sdk-restore-")));
+      const copy = join(staging, "archive.tar.gz");
+      yield* fs.copyFile(archive, copy).pipe(Effect.mapError(fsFailure("copy", archive)));
+      const listing = yield* capture("tar", ["-tzf", copy], { unbounded: true });
+      const roots = yield* archiveRoots(listing);
 
+      for (const root of roots) {
+        const target = join(home, root);
+
+        if (Option.isSome(yield* fs.readLink(target).pipe(Effect.option))) {
+          return yield* new InvalidInput({
+            details: `refusing to extract through symlinked ${target}`,
+            label: "SDK archive",
+          });
+        }
+      }
+
+      if (!options.dryRun) {
+        yield* run("tar", ["-C", home, "-xzf", copy], {});
+      }
+
+      return roots;
+    }),
+  );
   const result = { archive, dryRun: options.dryRun === true, home, paths: roots };
-
-  if (!result.dryRun) {
-    yield* run("tar", ["-C", home, "-xzf", archive], {});
-  }
 
   yield* Console.log(options.json ? JSON.stringify(result) : describeRestore(result));
 });

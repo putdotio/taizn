@@ -422,11 +422,13 @@ const sdkInstall = Command.make(
 const sdkBackup = Command.make(
   "backup",
   {
+    dryRun: booleanFlag("dry-run"),
     full: booleanFlag("full"),
     json: booleanFlag("json"),
     output: Argument.String("output").pipe(Argument.optional),
   },
-  ({ full, json, output }) => backupSdk(Option.getOrUndefined(output), { full, json }),
+  ({ dryRun, full, json, output }) =>
+    backupSdk(Option.getOrUndefined(output), { dryRun, full, json }),
 );
 
 const sdkRestore = Command.make(

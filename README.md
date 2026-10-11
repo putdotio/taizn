@@ -48,6 +48,7 @@ None of these commands need a `taizn.json`.
 ```bash
 pnpm exec taizn sdk install --dry-run
 pnpm exec taizn sdk install --packages <package1,package2>
+pnpm exec taizn sdk backup --dry-run [--full] [OUTPUT]
 pnpm exec taizn sdk backup [--full] [OUTPUT]
 pnpm exec taizn sdk restore --dry-run <archive.tar.gz>
 pnpm exec taizn sdk restore <archive.tar.gz>
@@ -59,15 +60,19 @@ pnpm exec taizn sdk restore <archive.tar.gz>
 | `sdk backup`  | Archives `~/SamsungCertificate`, `~/.tizen`, and `~/tizen-studio-data/profile`; `--full` adds the SDK, its data, extensions, and workspace. Defaults to `~/tizen-certs-<timestamp>.tar.gz` (`tizen-full-` with `--full`). |
 | `sdk restore` | Extracts a backup into the home directory. Rejects archives with entries outside the backup paths above.                                                                                                                  |
 
-`sdk install` flags: `--sdk-version` (default `10.0`), `--studio-dir`,
-`--download-dir` (default: the OS temp directory), `--installer-url`,
+`sdk install` flags: `--sdk-version` (default `10.0`; older Tizen Studio
+releases use a different installer name, so pass `--installer-url`),
+`--studio-dir`, `--download-dir` (default: a private temporary directory),
+`--installer-url`,
 `--packages`, `--proxy` (package-manager proxy mode, default `direct`), and
 `--show-packages` (Samsung's catalog download can hang). With a non-default
 `--studio-dir`, set `TAIZN_TIZEN_CLI` and `TAIZN_SDB` to the installed tools.
 
 Backups hold signing certificates and device keys. Archives are staged
 privately, written with mode `0600`, and never replace an existing path; pick a
-new output for each backup and keep it out of version control.
+new output outside the archived paths for each backup and keep it out of
+version control. Restore validates and extracts a private copy of the archive
+and refuses to write through a symlinked backup path.
 
 ## Quick Start
 
