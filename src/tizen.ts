@@ -569,7 +569,7 @@ const resolveSdb = Effect.fn("resolveSdb")(function* (env: TaiznEnv) {
   return path;
 });
 
-const requireNativeOrRosetta = Effect.fn("requireNativeOrRosetta")(function* (
+export const requireNativeOrRosetta = Effect.fn("requireNativeOrRosetta")(function* (
   path: string,
   label: string,
   options: { readonly bundledJava?: boolean } = {},
@@ -1055,7 +1055,7 @@ const launchApplication = Effect.fn("launchApplication")(function* (
   return "";
 });
 
-const run = Effect.fn("run")(function* (
+export const run = Effect.fn("run")(function* (
   command: string,
   args: ReadonlyArray<string>,
   options: RunOptions,
@@ -1091,9 +1091,13 @@ const run = Effect.fn("run")(function* (
   }
 });
 
-const capture = Effect.fn("capture")(function* (command: string, args: ReadonlyArray<string>) {
+export const capture = Effect.fn("capture")(function* (
+  command: string,
+  args: ReadonlyArray<string>,
+  options: { readonly unbounded?: boolean } = {},
+) {
   const timeoutMs = yield* CommandTimeoutMs;
-  const output = yield* Effect.scoped(
+  const captured = Effect.scoped(
     Effect.gen(function* () {
       const paths = yield* getPaths();
       const env = yield* withTizenPath(yield* baseChildEnv());
@@ -1112,13 +1116,16 @@ const capture = Effect.fn("capture")(function* (command: string, args: ReadonlyA
 
       return { exitCode, output };
     }),
-  ).pipe(
-    Effect.timeoutOrElse({
-      duration: timeoutMs,
-      orElse: () =>
-        Effect.fail(new CommandTimeout({ args: redactCommandArgs(args), command, timeoutMs })),
-    }),
   );
+  const output = yield* options.unbounded
+    ? captured
+    : captured.pipe(
+        Effect.timeoutOrElse({
+          duration: timeoutMs,
+          orElse: () =>
+            Effect.fail(new CommandTimeout({ args: redactCommandArgs(args), command, timeoutMs })),
+        }),
+      );
 
   if (output.exitCode !== 0) {
     return yield* new CommandFailed({ args: redactCommandArgs(args), command });

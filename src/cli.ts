@@ -11,6 +11,7 @@ import {
 import { describeCli } from "./describe.js";
 import { inspectWidgetArchive, prepareSubmission, validateSubmission } from "./inspect.js";
 import { probeHostedAssets } from "./probe.js";
+import { backupSdk, installSdk, restoreSdk } from "./sdk.js";
 import { listSellerApplications, loginSeller } from "./seller.js";
 import { listTargets, showCurrentTarget } from "./targets.js";
 import {
@@ -393,6 +394,55 @@ const sellerApps = Command.make("apps", {}).pipe(Command.withSubcommands([seller
 
 const seller = Command.make("seller", {}).pipe(Command.withSubcommands([sellerLogin, sellerApps]));
 
+const sdkInstall = Command.make(
+  "install",
+  {
+    downloadDir: Flag.String("download-dir").pipe(Flag.optional),
+    dryRun: booleanFlag("dry-run"),
+    installerUrl: Flag.String("installer-url").pipe(Flag.optional),
+    packages: Flag.String("packages").pipe(Flag.optional),
+    proxy: Flag.String("proxy").pipe(Flag.withDefault("direct")),
+    sdkVersion: Flag.String("sdk-version").pipe(Flag.withDefault("10.0")),
+    showPackages: booleanFlag("show-packages"),
+    studioDir: Flag.String("studio-dir").pipe(Flag.optional),
+  },
+  ({ downloadDir, dryRun, installerUrl, packages, proxy, sdkVersion, showPackages, studioDir }) =>
+    installSdk({
+      downloadDir: Option.getOrUndefined(downloadDir),
+      dryRun,
+      installerUrl: Option.getOrUndefined(installerUrl),
+      packages: Option.getOrUndefined(packages),
+      proxy,
+      sdkVersion,
+      showPackages,
+      studioDir: Option.getOrUndefined(studioDir),
+    }),
+);
+
+const sdkBackup = Command.make(
+  "backup",
+  {
+    full: booleanFlag("full"),
+    json: booleanFlag("json"),
+    output: Argument.String("output").pipe(Argument.optional),
+  },
+  ({ full, json, output }) => backupSdk(Option.getOrUndefined(output), { full, json }),
+);
+
+const sdkRestore = Command.make(
+  "restore",
+  {
+    archive: Argument.String("archive"),
+    dryRun: booleanFlag("dry-run"),
+    json: booleanFlag("json"),
+  },
+  ({ archive, dryRun, json }) => restoreSdk(archive, { dryRun, json }),
+);
+
+const sdk = Command.make("sdk", {}).pipe(
+  Command.withSubcommands([sdkInstall, sdkBackup, sdkRestore]),
+);
+
 const describe = Command.make("describe", {}, () => describeCli());
 
 export const command = taizn.pipe(
@@ -410,6 +460,7 @@ export const command = taizn.pipe(
     pack,
     install,
     run,
+    sdk,
     seller,
     targets,
     tv,

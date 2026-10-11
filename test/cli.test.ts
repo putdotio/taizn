@@ -3,8 +3,11 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   realpathSync,
+  rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -53,8 +56,9 @@ const runTaiznInProcess = async (
     canRunX86_64: Effect.succeed(canRunX86_64),
     cwd: Effect.sync(() => realpathSync(cwd)),
     env: Effect.succeed({ ...process.env, ...env }),
-    homeDir: Effect.sync(() => homedir()),
+    homeDir: Effect.sync(() => env.HOME ?? homedir()),
     loadEnvFile: () => Effect.void,
+    platform: Effect.succeed(process.platform),
     readSecret: () => Effect.fail(new SecretReadInterrupted({})),
   });
   const status = await Effect.runPromise(
@@ -765,6 +769,7 @@ describe("taizn cli", () => {
         }),
         homeDir: Effect.succeed("/Users/tester"),
         loadEnvFile: () => Effect.void,
+        platform: Effect.succeed(process.platform),
         readSecret: () => Effect.succeed("secret"),
       }),
       Effect.map((env) => {
@@ -2109,6 +2114,109 @@ describe("taizn cli", () => {
     assert.notInclude(stagedHtml, 'src="./js/main.js"');
     assert.throws(() => readFileSync(join(dir, ".taizn/build/stage/css/main.css.map")));
     assert.throws(() => readFileSync(join(dir, ".taizn/build/stage/js/main.js.map")));
+  });
+
+  it("dry-runs SDK install and refuses an incomplete Tizen Studio", async () => {
+    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-install-"));
+    const home = join(root, "home");
+    mkdirSync(home);
+    const plan = await runTaiznInProcess(["sdk", "install", "--dry-run"], root, { HOME: home });
+
+    assert.strictEqual(plan.status, 0, plan.stderr);
+    const parsed = JSON.parse(plan.stdout);
+    assert.strictEqual(parsed.studioDir, join(home, "tizen-studio"));
+    assert.isFalse(parsed.studioInstalled);
+    assert.match(parsed.installer.url, /\/tizen-sdk_10\.0\/web-cli_Tizen_SDK_10\.0_\w+-64\.bin$/);
+
+    mkdirSync(join(home, "tizen-studio"));
+    const blocked = await runTaiznInProcess(["sdk", "install", "--dry-run"], root, { HOME: home });
+
+    assert.strictEqual(blocked.status, 1);
+    assert.include(blocked.stderr, "its package manager is missing");
+  });
+
+  it("backs up Tizen certificates privately without replacing existing outputs", async () => {
+    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-backup-"));
+    const home = join(root, "home");
+    mkdirSync(join(home, "SamsungCertificate"), { recursive: true });
+    writeFileSync(join(home, "SamsungCertificate", "fixture.txt"), "fixture certificate");
+    const output = join(root, "backup.tar.gz");
+    const backup = () => runTaiznInProcess(["sdk", "backup", output], root, { HOME: home });
+
+    const created = await backup();
+    assert.strictEqual(created.status, 0, created.stderr);
+    assert.strictEqual(statSync(output).mode & 0o777, 0o600);
+    const content = spawnSync("tar", ["-xOzf", output, "SamsungCertificate/fixture.txt"], {
+      encoding: "utf8",
+    });
+    assert.strictEqual(content.status, 0, content.stderr);
+    assert.strictEqual(content.stdout, "fixture certificate");
+
+    const original = readFileSync(output);
+    const repeated = await backup();
+    assert.strictEqual(repeated.status, 1);
+    assert.include(repeated.stderr, "Refusing to replace existing archive");
+    assert.deepStrictEqual(readFileSync(output), original);
+
+    rmSync(output);
+    const target = join(root, "existing.txt");
+    writeFileSync(target, "retain me");
+    symlinkSync(target, output);
+    assert.strictEqual((await backup()).status, 1);
+    assert.strictEqual(readFileSync(target, "utf8"), "retain me");
+    assert.isFalse(readdirSync(root).some((name) => name.startsWith(".taizn-sdk-backup.")));
+  });
+
+  it("does not publish a partial SDK backup after tar fails", async () => {
+    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-backup-fail-"));
+    const home = join(root, "home");
+    const bin = join(root, "bin");
+    mkdirSync(join(home, "SamsungCertificate"), { recursive: true });
+    mkdirSync(bin);
+    writeFileSync(join(bin, "tar"), '#!/bin/sh\nprintf partial > "$4"\nexit 1\n', { mode: 0o700 });
+    const output = join(root, "backup.tar.gz");
+    const result = await runTaiznInProcess(["sdk", "backup", output], root, {
+      HOME: home,
+      PATH: bin,
+    });
+
+    assert.strictEqual(result.status, 1);
+    assert.isFalse(existsSync(output));
+    assert.isFalse(readdirSync(root).some((name) => name.startsWith(".taizn-sdk-backup.")));
+  });
+
+  it("restores SDK backups into home and rejects foreign archive entries", async () => {
+    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-restore-"));
+    const source = join(root, "source");
+    const home = join(root, "home");
+    mkdirSync(join(source, "SamsungCertificate"), { recursive: true });
+    mkdirSync(join(source, ".ssh"), { recursive: true });
+    mkdirSync(home);
+    writeFileSync(join(source, "SamsungCertificate", "fixture.txt"), "fixture certificate");
+    writeFileSync(join(source, ".ssh", "config"), "foreign");
+    const archive = join(root, "backup.tar.gz");
+    const foreign = join(root, "foreign.tar.gz");
+    spawnSync("tar", ["-C", source, "-czf", archive, "SamsungCertificate"]);
+    spawnSync("tar", ["-C", source, "-czf", foreign, "SamsungCertificate", ".ssh"]);
+
+    const plan = await runTaiznInProcess(["sdk", "restore", "--dry-run", "--json", archive], root, {
+      HOME: home,
+    });
+    assert.strictEqual(plan.status, 0, plan.stderr);
+    assert.deepStrictEqual(JSON.parse(plan.stdout).paths, ["SamsungCertificate"]);
+    assert.isFalse(existsSync(join(home, "SamsungCertificate")));
+
+    const rejected = await runTaiznInProcess(["sdk", "restore", foreign], root, { HOME: home });
+    assert.strictEqual(rejected.status, 1);
+    assert.include(rejected.stderr, "Invalid SDK archive");
+    assert.isFalse(existsSync(join(home, ".ssh")));
+
+    const restored = await runTaiznInProcess(["sdk", "restore", archive], root, { HOME: home });
+    assert.strictEqual(restored.status, 0, restored.stderr);
+    assert.strictEqual(
+      readFileSync(join(home, "SamsungCertificate", "fixture.txt"), "utf8"),
+      "fixture certificate",
+    );
   });
 });
 

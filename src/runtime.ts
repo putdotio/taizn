@@ -27,6 +27,7 @@ export class TaiznSystem extends Context.Service<
     readonly env: Effect.Effect<NodeJS.ProcessEnv>;
     readonly homeDir: Effect.Effect<string>;
     readonly loadEnvFile: (path: string) => Effect.Effect<void>;
+    readonly platform: Effect.Effect<NodeJS.Platform>;
     readonly readSecret: (prompt: string) => Effect.Effect<string, SecretReadInterrupted>;
   }
 >()("taizn/TaiznSystem") {
@@ -46,6 +47,7 @@ export class TaiznSystem extends Context.Service<
           process.loadEnvFile(path);
         }
       }),
+    platform: Effect.sync(() => process.platform),
     readSecret: (prompt) =>
       Effect.tryPromise({
         try: (signal) => readSecret(prompt, signal),

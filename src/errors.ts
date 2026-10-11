@@ -227,6 +227,46 @@ export class TvRemoteUnauthorized extends Schema.TaggedError<TvRemoteUnauthorize
   }
 }
 
+export class UnsupportedPlatform extends Schema.TaggedError<UnsupportedPlatform>()(
+  "UnsupportedPlatform",
+  {
+    operation: Schema.String,
+    platform: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `${this.operation} supports macOS and Linux only. Received platform: ${this.platform}`;
+  }
+}
+
+export class TizenStudioIncomplete extends Schema.TaggedError<TizenStudioIncomplete>()(
+  "TizenStudioIncomplete",
+  {
+    path: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `Tizen Studio exists at ${this.path} but its package manager is missing. Move or remove that directory, then rerun \`taizn sdk install\`.`;
+  }
+}
+
+export class NothingToArchive extends Schema.TaggedError<NothingToArchive>()("NothingToArchive", {
+  home: Schema.String,
+  mode: Schema.String,
+}) {
+  override get message(): string {
+    return `No Tizen ${this.mode} paths found in ${this.home}; nothing to archive.`;
+  }
+}
+
+export class ArchiveExists extends Schema.TaggedError<ArchiveExists>()("ArchiveExists", {
+  path: Schema.String,
+}) {
+  override get message(): string {
+    return `Refusing to replace existing archive: ${this.path}`;
+  }
+}
+
 export class SellerBrowserNotFound extends Schema.TaggedError<SellerBrowserNotFound>()(
   "SellerBrowserNotFound",
   {
@@ -295,6 +335,7 @@ export class SellerPortalProtocolError extends Schema.TaggedError<SellerPortalPr
 
 export type TaiznError =
   | ApplicationNotFound
+  | ArchiveExists
   | CommandFailed
   | CommandTimeout
   | ConfigNotFound
@@ -310,6 +351,7 @@ export type TaiznError =
   | MissingTvRemoteToken
   | MultipleApplicationsMatched
   | MultipleTargetsConnected
+  | NothingToArchive
   | PackageNotProduced
   | RosettaRequired
   | SecretReadInterrupted
@@ -319,10 +361,12 @@ export type TaiznError =
   | SellerPortalDrift
   | SellerPortalProtocolError
   | SellerSessionNotFound
+  | TizenStudioIncomplete
   | TvRemoteConnectionFailed
   | TvRemoteProtocolError
   | TvRemoteTimeout
-  | TvRemoteUnauthorized;
+  | TvRemoteUnauthorized
+  | UnsupportedPlatform;
 
 export const renderError = (error: TaiznError) => error.message;
 

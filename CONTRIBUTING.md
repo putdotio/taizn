@@ -58,6 +58,7 @@ configuration, remote diagnostics, and hosted asset checks.
 - `src/config.ts` and `src/env.ts` parse external inputs with Effect Schema.
 - `src/runtime.ts` owns the Node service layer and runtime boundary helpers.
 - `src/tizen.ts` owns Effectful Tizen side effects.
+- `src/sdk.ts` owns Tizen Studio install, backup, and restore.
 - `src/remote.ts` owns Samsung TV remote-control websocket behavior.
 - Tests in `test/` use `@effect/vitest` and default to the in-process harness; spawn `dist/taizn.mjs` only when the process boundary itself is under test.
 - `live-test/` exercises the packed CLI against local Tizen tools.
