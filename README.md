@@ -56,7 +56,7 @@ pnpm exec taizn sdk restore <archive.tar.gz>
 
 | Command       | Behavior                                                                                                                                                                                                                  |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sdk install` | Downloads the official web CLI installer for macOS or Linux, installs it into `~/tizen-studio`, optionally installs packages, then runs `tizen version` and `sdb version`. Reuses an existing install.                    |
+| `sdk install` | Downloads the official web CLI installer for macOS or x86_64 Linux, installs it into `~/tizen-studio`, optionally installs packages, then runs `tizen version` and `sdb version`. Reuses an existing install.             |
 | `sdk backup`  | Archives `~/SamsungCertificate`, `~/.tizen`, and `~/tizen-studio-data/profile`; `--full` adds the SDK, its data, extensions, and workspace. Defaults to `~/tizen-certs-<timestamp>.tar.gz` (`tizen-full-` with `--full`). |
 | `sdk restore` | Extracts a backup into the home directory. Rejects archives with entries outside the backup paths above.                                                                                                                  |
 
@@ -72,7 +72,9 @@ Backups hold signing certificates and device keys. Archives are staged
 privately, written with mode `0600`, and never replace an existing path; pick a
 new output outside the archived paths for each backup and keep it out of
 version control. Restore validates and extracts a private copy of the archive
-and refuses to write through a symlinked backup path.
+and refuses to write through any existing symlink on the destination path.
+Backup refuses symlinked source paths, since tar would store only the link, and
+runs on macOS and Linux only.
 
 ## Quick Start
 

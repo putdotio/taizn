@@ -69,8 +69,12 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
   const platform = yield* system.platform;
   const installerSuffix = installerPlatforms[platform];
 
-  if (!installerSuffix) {
-    return yield* new UnsupportedPlatform({ operation: "taizn sdk install", platform });
+  if (!installerSuffix || (platform === "linux" && !(yield* system.canRunX86_64))) {
+    return yield* new UnsupportedPlatform({
+      operation: "taizn sdk install",
+      platform,
+      supported: "macOS and x86_64 Linux",
+    });
   }
 
   const installerName = `web-cli_Tizen_SDK_${options.sdkVersion}_${installerSuffix}`;
@@ -203,6 +207,17 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
   const paths = yield* getPaths();
   const fs = yield* FileSystem.FileSystem;
   const home = yield* system.homeDir;
+  const platform = yield* system.platform;
+
+  // Windows ignores POSIX modes, so the archive could not be made owner-only.
+  if (platform === "win32") {
+    return yield* new UnsupportedPlatform({
+      operation: "taizn sdk backup",
+      platform,
+      supported: "macOS and Linux",
+    });
+  }
+
   const mode = options.full ? "full" : "certificates";
   const timestamp = DateTime.formatIso(yield* DateTime.now)
     .replaceAll(/\D/g, "")
@@ -215,27 +230,43 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
   for (const root of options.full ? fullRoots : certificateRoots) {
     const path = join(home, root);
 
-    if (yield* fs.exists(path).pipe(Effect.mapError(fsFailure("exists", path)))) {
-      included.push(root);
-    } else {
+    if (!(yield* fs.exists(path).pipe(Effect.mapError(fsFailure("exists", path))))) {
       yield* Console.error(`skip missing ${path}`);
+      continue;
     }
+
+    // tar stores a symlinked root as the link itself, not the signing state behind it.
+    if ((yield* pathKind(path)) === "link") {
+      return yield* new InvalidInput({
+        details: `${path} is a symlink; the archive would hold only the link`,
+        label: "backup source",
+      });
+    }
+
+    included.push(root);
   }
 
   if (included.length === 0) {
     return yield* new NothingToArchive({ home, mode });
   }
 
-  for (const root of included) {
-    const fromRoot = relative(join(home, root), output);
+  const requireOutsideRoots = Effect.fn("requireOutsideRoots")(function* (directory: string) {
+    for (const root of included) {
+      const rootPath = join(home, root);
+      const resolvedRoot = yield* fs
+        .realPath(rootPath)
+        .pipe(Effect.mapError(fsFailure("realpath", rootPath)));
 
-    if (!fromRoot.startsWith("..") && !isAbsolute(fromRoot)) {
-      return yield* new InvalidInput({
-        details: `output must be outside the archived ${join(home, root)}. Received: ${output}`,
-        label: "backup output",
-      });
+      if (isInside(rootPath, directory) || isInside(resolvedRoot, directory)) {
+        return yield* new InvalidInput({
+          details: `output must be outside the archived ${rootPath}. Received: ${output}`,
+          label: "backup output",
+        });
+      }
     }
-  }
+  });
+
+  yield* requireOutsideRoots(dirname(output));
 
   if (options.dryRun) {
     const plan = { archive: output, dryRun: true, mode, paths: included };
@@ -251,6 +282,9 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
   yield* fs
     .makeDirectory(outputDir, { recursive: true })
     .pipe(Effect.mapError(fsFailure("mkdir", outputDir)));
+  yield* requireOutsideRoots(
+    yield* fs.realPath(outputDir).pipe(Effect.mapError(fsFailure("realpath", outputDir))),
+  );
   // Stage privately beside the output, then hard-link into place: link() never
   // replaces an existing entry and a failed tar never leaves a partial archive.
   yield* Effect.scoped(
@@ -317,18 +351,9 @@ export const restoreSdk = Effect.fn("restoreSdk")(function* (
       const copy = join(staging, "archive.tar.gz");
       yield* fs.copyFile(archive, copy).pipe(Effect.mapError(fsFailure("copy", archive)));
       const listing = yield* capture("tar", ["-tzf", copy], { unbounded: true });
-      const roots = yield* archiveRoots(listing);
-
-      for (const root of roots) {
-        const target = join(home, root);
-
-        if (Option.isSome(yield* fs.readLink(target).pipe(Effect.option))) {
-          return yield* new InvalidInput({
-            details: `refusing to extract through symlinked ${target}`,
-            label: "SDK archive",
-          });
-        }
-      }
+      const entries = yield* archiveEntries(listing);
+      yield* requireNoSymlinkedTargets(home, entries);
+      const roots = [...new Set(entries.map((entry) => entry.split("/")[0] ?? ""))];
 
       if (!options.dryRun) {
         yield* run("tar", ["-C", home, "-xzf", copy], {});
@@ -353,8 +378,55 @@ const describeRestore = (result: {
     ...result.paths.map((path) => `- ${path}`),
   ].join("\n");
 
-const archiveRoots = Effect.fn("archiveRoots")(function* (listing: string) {
-  const roots = new Set<string>();
+const isInside = (parent: string, path: string) => {
+  const fromParent = relative(parent, path);
+  return !fromParent.startsWith("..") && !isAbsolute(fromParent);
+};
+
+const pathKind = Effect.fn("pathKind")(function* (path: string) {
+  const fs = yield* FileSystem.FileSystem;
+  return yield* fs.readLink(path).pipe(
+    Effect.as("link" as const),
+    Effect.catch((cause) =>
+      cause.reason._tag === "NotFound"
+        ? Effect.succeed("missing" as const)
+        : Effect.succeed("other" as const),
+    ),
+  );
+});
+
+// tar writes through existing symlinks on the extraction path, so refuse any
+// existing destination component that is one.
+const requireNoSymlinkedTargets = Effect.fn("requireNoSymlinkedTargets")(function* (
+  home: string,
+  entries: readonly string[],
+) {
+  const kinds = new Map<string, "link" | "missing" | "other">();
+
+  for (const entry of entries) {
+    const segments = entry.split("/").filter(Boolean);
+
+    for (let index = 1; index <= segments.length; index++) {
+      const path = segments.slice(0, index).join("/");
+      const kind = kinds.get(path) ?? (yield* pathKind(join(home, path)));
+      kinds.set(path, kind);
+
+      if (kind === "link") {
+        return yield* new InvalidInput({
+          details: `refusing to extract through symlinked ${join(home, path)}`,
+          label: "SDK archive",
+        });
+      }
+
+      if (kind === "missing") {
+        break;
+      }
+    }
+  }
+});
+
+const archiveEntries = Effect.fn("archiveEntries")(function* (listing: string) {
+  const entries: string[] = [];
 
   for (const line of listing.split("\n")) {
     const entry = line.trim().replace(/^(\.\/)+/u, "");
@@ -373,12 +445,12 @@ const archiveRoots = Effect.fn("archiveRoots")(function* (listing: string) {
       });
     }
 
-    roots.add(root);
+    entries.push(entry);
   }
 
-  if (roots.size === 0) {
+  if (entries.length === 0) {
     return yield* new InvalidInput({ details: "archive is empty", label: "SDK archive" });
   }
 
-  return [...roots];
+  return entries;
 });

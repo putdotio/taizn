@@ -32,12 +32,15 @@ export class TaiznSystem extends Context.Service<
   }
 >()("taizn/TaiznSystem") {
   static readonly Live = Layer.succeed(TaiznSystem)({
-    canRunX86_64: Effect.sync(
-      () =>
-        process.platform !== "darwin" ||
-        process.arch !== "arm64" ||
-        existsSync("/Library/Apple/usr/libexec/oah/libRosettaRuntime"),
-    ),
+    canRunX86_64: Effect.sync(() => {
+      if (process.platform === "darwin") {
+        return (
+          process.arch !== "arm64" || existsSync("/Library/Apple/usr/libexec/oah/libRosettaRuntime")
+        );
+      }
+
+      return process.platform !== "linux" || process.arch === "x64";
+    }),
     cwd: Effect.sync(() => process.cwd()),
     env: Effect.sync(() => process.env),
     homeDir: Effect.sync(() => homedir()),

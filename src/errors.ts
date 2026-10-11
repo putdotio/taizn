@@ -232,10 +232,11 @@ export class UnsupportedPlatform extends Schema.TaggedError<UnsupportedPlatform>
   {
     operation: Schema.String,
     platform: Schema.String,
+    supported: Schema.String,
   },
 ) {
   override get message(): string {
-    return `${this.operation} supports macOS and Linux only. Received platform: ${this.platform}`;
+    return `${this.operation} supports ${this.supported} only. Received platform: ${this.platform}`;
   }
 }
 

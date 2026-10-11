@@ -49,6 +49,7 @@ const runTaiznInProcess = async (
   env: NodeJS.ProcessEnv = {},
   commandTimeoutMs = 30_000,
   canRunX86_64 = true,
+  platform: NodeJS.Platform = process.platform,
 ): Promise<{ readonly status: number; readonly stderr: string; readonly stdout: string }> => {
   const stdout: string[] = [];
   const stderr: string[] = [];
@@ -58,7 +59,7 @@ const runTaiznInProcess = async (
     env: Effect.succeed({ ...process.env, ...env }),
     homeDir: Effect.sync(() => env.HOME ?? homedir()),
     loadEnvFile: () => Effect.void,
-    platform: Effect.succeed(process.platform),
+    platform: Effect.succeed(platform),
     readSecret: () => Effect.fail(new SecretReadInterrupted({})),
   });
   const status = await Effect.runPromise(
@@ -2133,6 +2134,17 @@ describe("taizn cli", () => {
 
     assert.strictEqual(blocked.status, 1);
     assert.include(blocked.stderr, "its package manager is missing");
+
+    const armLinux = await runTaiznInProcess(
+      ["sdk", "install", "--dry-run"],
+      root,
+      { HOME: home },
+      30_000,
+      false,
+      "linux",
+    );
+    assert.strictEqual(armLinux.status, 1);
+    assert.include(armLinux.stderr, "supports macOS and x86_64 Linux only");
   });
 
   it("backs up Tizen certificates privately without replacing existing outputs", async () => {
@@ -2153,6 +2165,25 @@ describe("taizn cli", () => {
     assert.strictEqual(inside.status, 1);
     assert.include(inside.stderr, "output must be outside the archived");
     assert.isFalse(existsSync(nested));
+    symlinkSync(join(home, "SamsungCertificate"), join(root, "linked"));
+    const throughLink = await runTaiznInProcess(
+      ["sdk", "backup", join(root, "linked", "backup.tar.gz")],
+      root,
+      { HOME: home },
+    );
+    assert.strictEqual(throughLink.status, 1);
+    assert.include(throughLink.stderr, "output must be outside the archived");
+    assert.deepStrictEqual(readdirSync(join(home, "SamsungCertificate")), ["fixture.txt"]);
+    const windows = await runTaiznInProcess(
+      ["sdk", "backup", output],
+      root,
+      { HOME: home },
+      30_000,
+      true,
+      "win32",
+    );
+    assert.strictEqual(windows.status, 1);
+    assert.isFalse(existsSync(output));
 
     const created = await backup();
     assert.strictEqual(created.status, 0, created.stderr);
@@ -2176,6 +2207,18 @@ describe("taizn cli", () => {
     assert.strictEqual((await backup()).status, 1);
     assert.strictEqual(readFileSync(target, "utf8"), "retain me");
     assert.isFalse(readdirSync(root).some((name) => name.startsWith(".taizn-sdk-backup.")));
+
+    const linkedHome = join(root, "linked-home");
+    mkdirSync(linkedHome);
+    symlinkSync(join(home, "SamsungCertificate"), join(linkedHome, "SamsungCertificate"));
+    const linkedRoot = await runTaiznInProcess(
+      ["sdk", "backup", join(root, "linked-root.tar.gz")],
+      root,
+      { HOME: linkedHome },
+    );
+    assert.strictEqual(linkedRoot.status, 1);
+    assert.include(linkedRoot.stderr, "is a symlink");
+    assert.isFalse(existsSync(join(root, "linked-root.tar.gz")));
   });
 
   it("does not publish a partial SDK backup after tar fails", async () => {
@@ -2230,6 +2273,19 @@ describe("taizn cli", () => {
     assert.include(redirected.stderr, "refusing to extract through symlinked");
     assert.isFalse(existsSync(join(outside, "fixture.txt")));
     rmSync(join(home, "SamsungCertificate"));
+    mkdirSync(join(source, "SamsungCertificate", "author"));
+    writeFileSync(join(source, "SamsungCertificate", "author", "key.p12"), "nested");
+    const nestedArchive = join(root, "nested.tar.gz");
+    spawnSync("tar", ["-C", source, "-czf", nestedArchive, "SamsungCertificate/author/key.p12"]);
+    mkdirSync(join(home, "SamsungCertificate"));
+    symlinkSync(outside, join(home, "SamsungCertificate", "author"));
+    const nestedLink = await runTaiznInProcess(["sdk", "restore", nestedArchive], root, {
+      HOME: home,
+    });
+    assert.strictEqual(nestedLink.status, 1);
+    assert.include(nestedLink.stderr, "refusing to extract through symlinked");
+    assert.isFalse(existsSync(join(outside, "key.p12")));
+    rmSync(join(home, "SamsungCertificate"), { recursive: true });
 
     const restored = await runTaiznInProcess(["sdk", "restore", archive], root, { HOME: home });
     assert.strictEqual(restored.status, 0, restored.stderr);
