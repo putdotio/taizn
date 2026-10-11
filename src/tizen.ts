@@ -69,6 +69,7 @@ type WidgetStageOptions = WidgetIndexOptions & {
 
 type RunOptions = {
   readonly finite?: boolean;
+  readonly quiet?: boolean;
   readonly cwd?: string;
   readonly env?: ChildEnv;
 };
@@ -569,7 +570,7 @@ const resolveSdb = Effect.fn("resolveSdb")(function* (env: TaiznEnv) {
   return path;
 });
 
-const requireNativeOrRosetta = Effect.fn("requireNativeOrRosetta")(function* (
+export const requireNativeOrRosetta = Effect.fn("requireNativeOrRosetta")(function* (
   path: string,
   label: string,
   options: { readonly bundledJava?: boolean } = {},
@@ -1055,7 +1056,7 @@ const launchApplication = Effect.fn("launchApplication")(function* (
   return "";
 });
 
-const run = Effect.fn("run")(function* (
+export const run = Effect.fn("run")(function* (
   command: string,
   args: ReadonlyArray<string>,
   options: RunOptions,
@@ -1063,21 +1064,36 @@ const run = Effect.fn("run")(function* (
   const paths = yield* getPaths();
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const env = yield* withTizenPath(options.env ?? (yield* baseChildEnv()));
-  const execution = spawner
-    .exitCode(
-      ChildProcess.make(command, args, {
-        cwd: options.cwd ?? paths.appDir,
-        forceKillAfter: options.finite ? "1 second" : undefined,
-        env,
-        stderr: "inherit",
-        stdin: "inherit",
-        stdout: "inherit",
-      }),
-    )
-    .pipe(Effect.mapError(() => new CommandFailed({ args: redactCommandArgs(args), command })));
+  const failed = (stderr = "") =>
+    new CommandFailed({ args: redactCommandArgs(args), command, ...(stderr ? { stderr } : {}) });
+  const child = ChildProcess.make(command, args, {
+    cwd: options.cwd ?? paths.appDir,
+    forceKillAfter: options.finite ? "1 second" : undefined,
+    env,
+    // Quiet runs keep the child's output off the terminal so structured output
+    // stays parseable; stderr is kept for the failure's cause.
+    stderr: options.quiet ? "pipe" : "inherit",
+    stdin: "inherit",
+    stdout: options.quiet ? "ignore" : "inherit",
+  });
+  const execution = options.quiet
+    ? Effect.scoped(
+        Effect.gen(function* () {
+          const process = yield* child;
+          const [stderr, exitCode] = yield* Effect.all(
+            [process.stderr.pipe(Stream.decodeText, Stream.mkString), process.exitCode],
+            { concurrency: 2 },
+          );
+          return { exitCode, stderr: stderr.trim() };
+        }),
+      ).pipe(Effect.mapError(() => failed()))
+    : spawner.exitCode(child).pipe(
+        Effect.map((exitCode) => ({ exitCode, stderr: "" })),
+        Effect.mapError(() => failed()),
+      );
 
   const timeoutMs = yield* CommandTimeoutMs;
-  const exitCode = yield* options.finite
+  const outcome = yield* options.finite
     ? execution.pipe(
         Effect.timeoutOrElse({
           duration: timeoutMs,
@@ -1086,8 +1102,8 @@ const run = Effect.fn("run")(function* (
         }),
       )
     : execution;
-  if (exitCode !== 0) {
-    return yield* new CommandFailed({ args: redactCommandArgs(args), command });
+  if (outcome.exitCode !== 0) {
+    return yield* failed(outcome.stderr);
   }
 });
 

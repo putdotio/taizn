@@ -76,6 +76,7 @@ const systemFor = (dir: string) =>
     env: Effect.succeed({}),
     homeDir: Effect.succeed(dir),
     loadEnvFile: () => Effect.void,
+    platform: Effect.succeed(process.platform),
     readSecret: () => Effect.succeed(""),
   });
 
