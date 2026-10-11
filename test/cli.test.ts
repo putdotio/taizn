@@ -2136,6 +2136,16 @@ describe("taizn cli", () => {
     assert.strictEqual(blocked.status, 1);
     assert.include(blocked.stderr, "its package manager is missing");
 
+    for (const studioDir of [join(root, "outside-home"), join(home, "tizen studio")]) {
+      const rejected = await runTaiznInProcess(
+        ["sdk", "install", "--dry-run", "--studio-dir", studioDir],
+        root,
+        { HOME: home },
+      );
+      assert.strictEqual(rejected.status, 1);
+      assert.include(rejected.stderr, "Samsung's installer needs a path inside");
+    }
+
     const armLinux = await runTaiznInProcess(
       ["sdk", "install", "--dry-run"],
       root,
