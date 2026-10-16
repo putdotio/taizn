@@ -61,7 +61,7 @@ Run each script with `pnpm exec vp run <script>`; the `live:test:*` entries in
 - `live:test:prove` checks that the fixture app, or `TAIZN_LIVE_PROVE_APP`, is
   installed and launchable on the target.
 - `live:test:remote` writes `.taizn/live-remote.json` with `tv doctor
---connect` results. Set `LIVE_TEST_REMOTE_KEYS` to send a key sequence after
+  --connect` results. Set `LIVE_TEST_REMOTE_KEYS` to send a key sequence after
   the remote connection is ready and a token is already configured with
   `taizn tv pair`. Set `LIVE_TEST_REQUIRE_REMOTE=1` when a missing or timed-out
   websocket remote should fail the command.
