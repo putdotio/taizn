@@ -65,14 +65,14 @@
     "verify": "vp check . && tsc --noEmit && vp pack src/taizn.ts && node dist/taizn.mjs --version && node dist/taizn.mjs --help >/dev/null && vp test run --coverage && skillcheck lint && npm pack --dry-run"
   },
   "dependencies": {
-    "@effect/platform-node": "4.0.3",
-    "@effect/platform-node-shared": "4.0.3",
-    "effect": "4.0.3",
+    "@effect/platform-node": "4.0.4",
+    "@effect/platform-node-shared": "4.0.4",
+    "effect": "4.0.4",
     "saxes": "^6.0.0",
     "ws": "^8.21.0"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.3",
+    "@effect/vitest": "4.0.4",
     "@types/node": "^26.1.0",
     "@types/ws": "^8.18.1",
     "@uinaf/skillcheck": "1.7.7",
@@ -85,5 +85,5 @@
   "engines": {
     "node": ">=24.19.0"
   },
-  "packageManager": "pnpm@12.11.2"
+  "packageManager": "pnpm@12.13.0"
 }
