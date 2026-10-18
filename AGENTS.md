@@ -9,11 +9,11 @@ Read only what the current task needs:
 
 - Consumer config, env, command, and output contracts: [README.md](README.md)
 - CI, release, and npm publishing mechanics:
-  [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)
+  [docs/distribution.md](docs/distribution.md)
 - Seller Office login, read-only discovery, and session safety:
-  [docs/SELLER_OFFICE.md](docs/SELLER_OFFICE.md)
+  [docs/seller-office.md](docs/seller-office.md)
 - Samsung TV remote pairing, key scripts, and boundaries:
-  [docs/TV_REMOTE.md](docs/TV_REMOTE.md)
+  [docs/tv-remote.md](docs/tv-remote.md)
 - Live Tizen fixture harness setup and device checks:
   [live-test/README.md](https://github.com/putdotio/taizn/blob/main/live-test/README.md)
 - Agent-facing command workflow shipped with the package:
@@ -120,7 +120,7 @@ touches, and search `node_modules/effect/src` for anything it does not cover.
 ## When Contracts Change
 
 - Config/env/command/output changes: update `README.md` and CLI tests; command-surface guardrail changes also update `skills/taizn/SKILL.md`.
-- CI/release/publishing changes: update `docs/DISTRIBUTION.md`.
+- CI/release/publishing changes: update `docs/distribution.md`.
 - Keep `CLAUDE.md` as a one-line `@AGENTS.md` import of this file.
 
 ## Worktrees
@@ -171,4 +171,4 @@ Which proof a change needs:
 Open a pull request; CI runs `vp run verify` on pull requests and on `main`.
 On `main`, semantic-release publishes releasable commits to npm and GitHub
 Releases. Commit types and release mechanics:
-[Contributing](CONTRIBUTING.md#release), [Distribution](docs/DISTRIBUTION.md).
+[Contributing](CONTRIBUTING.md#release), [Distribution](docs/distribution.md).

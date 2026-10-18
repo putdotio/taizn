@@ -199,7 +199,7 @@ after 30 seconds per subprocess; builds, signing, and installs have no deadline.
 | `tv doctor` / `tv info`              | Inspect Samsung TV remote-control readiness        |
 | `tv pair` / `tv press` / `tv script` | Pair and send Samsung remote-control key sequences |
 
-See [Samsung TV Remote](./docs/TV_REMOTE.md) for pairing, environment, and
+See [Samsung TV Remote](./docs/tv-remote.md) for pairing, environment, and
 limits.
 
 ## Environment
@@ -220,7 +220,7 @@ TAIZN_TV_PROTOCOL=wss
 TAIZN_TV_TOKEN=<paired-remote-token>
 ```
 
-[Samsung TV Remote](./docs/TV_REMOTE.md#environment) lists the remaining
+[Samsung TV Remote](./docs/tv-remote.md#environment) lists the remaining
 `TAIZN_TV_*` settings.
 
 `taizn tv` uses `TAIZN_TV_HOST`, or the host part of `TAIZN_TARGET` when no TV
@@ -229,7 +229,7 @@ host is set. `taizn tv pair` writes the paired remote token to
 
 `taizn seller login` opens a dedicated visible Chrome profile under `.taizn/`
 and stores only its localhost DevTools port in `.taizn/seller.json`; Taizn never
-reads Samsung credentials. See [Seller Office](./docs/SELLER_OFFICE.md) for the
+reads Samsung credentials. See [Seller Office](./docs/seller-office.md) for the
 read-only workflow and recovery steps.
 
 ## Boundaries
@@ -245,10 +245,10 @@ read-only discovery.
 ## Docs
 
 - [Contributing](./CONTRIBUTING.md)
-- [Distribution](./docs/DISTRIBUTION.md)
+- [Distribution](./docs/distribution.md)
 - [Live Test](https://github.com/putdotio/taizn/blob/main/live-test/README.md)
-- [Samsung TV Remote](./docs/TV_REMOTE.md)
-- [Seller Office](./docs/SELLER_OFFICE.md)
+- [Samsung TV Remote](./docs/tv-remote.md)
+- [Seller Office](./docs/seller-office.md)
 - [Security](https://github.com/putdotio/.github/blob/main/SECURITY.md)
 
 ## Repo Internals

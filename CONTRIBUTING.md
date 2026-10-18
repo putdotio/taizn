@@ -73,7 +73,7 @@ configuration, remote diagnostics, and hosted asset checks.
 ## Release
 
 Merges to `main` release automatically when commits are releasable. See
-[Distribution](./docs/DISTRIBUTION.md).
+[Distribution](./docs/distribution.md).
 
 Use Conventional Commits:
 

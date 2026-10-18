@@ -1,7 +1,7 @@
 # Samsung TV Remote
 
 Use this reference when working with `taizn tv ...` commands. The repo-level
-details live in `docs/TV_REMOTE.md`; this file is the agent routing layer.
+details live in `docs/tv-remote.md`; this file is the agent routing layer.
 
 ## Scope
 
