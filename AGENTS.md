@@ -121,7 +121,7 @@ touches, and search `node_modules/effect/src` for anything it does not cover.
 
 - Config/env/command/output changes: update `README.md` and CLI tests; command-surface guardrail changes also update `skills/taizn/SKILL.md`.
 - CI/release/publishing changes: update `docs/DISTRIBUTION.md`.
-- Keep `CLAUDE.md` as a symlink to this file.
+- Keep `CLAUDE.md` as a one-line `@AGENTS.md` import of this file.
 
 ## Worktrees
 
