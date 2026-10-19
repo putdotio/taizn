@@ -6,14 +6,10 @@ and smoke checks against a physical TV or monitor.
 ## Commands
 
 ```bash
-taizn tv doctor
 taizn tv doctor --json
 taizn tv doctor --connect --json
-taizn tv info
 taizn tv info --json
 taizn tv pair --dry-run
-taizn tv press KEY_ENTER
-taizn tv press --json KEY_ENTER
 taizn tv press --dry-run --json KEY_ENTER
 taizn tv press --delay-ms 250 KEY_HOME KEY_DOWN KEY_ENTER
 taizn tv script --file .taizn/remote-script.json --dry-run --json
@@ -24,8 +20,7 @@ taizn tv script --file .taizn/remote-script.json --dry-run --json
   structured diagnostic. Add `--connect` only when you want to test the
   websocket; without a token this can trigger the TV's allow/deny prompt.
 - `info` reads the TV's local `/api/v2/` metadata and reports remote-control
-  support. Add `--json` to emit a structured TV capability snapshot for agents
-  and scripts.
+  support. Add `--json` for a structured capability snapshot.
 - `pair` opens a Samsung remote websocket and waits for the TV to approve the
   client. When pairing succeeds, it stores the token in `.taizn/remote.json`.
   Use `--dry-run` to validate host resolution without opening the websocket.
@@ -71,13 +66,11 @@ is `wss://<tv-ip>:8002`. Use `TAIZN_TV_PROTOCOL=ws` and `TAIZN_TV_PORT=8001`
 only for older TVs or test fixtures that do not support the TLS endpoint.
 `TAIZN_TV_INFO_PORT` controls the HTTP metadata endpoint used by `tv info`.
 
-`TAIZN_TV_TOKEN` overrides `.taizn/remote.json` for one-off runs. Do not commit
-remote tokens. `TAIZN_TV_TIMEOUT_MS` controls websocket pairing/key-press and
-HTTP info request timeouts.
+`TAIZN_TV_TOKEN` overrides `.taizn/remote.json` for one-off runs.
+`TAIZN_TV_TIMEOUT_MS` controls websocket pairing/key-press and HTTP info request
+timeouts.
 
 ## Pairing
-
-Run:
 
 ```bash
 TAIZN_TV_HOST=<tv-ip> taizn tv pair
@@ -86,13 +79,9 @@ TAIZN_TV_HOST=<tv-ip> taizn tv pair
 If the TV shows an allow prompt, approve it. If no prompt appears, check the TV
 settings for IP remote control and device permissions, then retry pairing.
 
-Successful pairing prints the token and writes:
-
-```txt
-.taizn/remote.json
-```
-
-The `.taizn/` directory is local state and must stay ignored.
+Successful pairing prints the token as `TAIZN_TV_TOKEN=...` and saves it to
+`.taizn/remote.json`. Keep `.taizn/` ignored, and keep tokens out of commits
+and logs.
 
 ## Scope
 

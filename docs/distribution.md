@@ -2,9 +2,7 @@
 
 ## Delivery Model
 
-Every merge to `main` should be releasable.
-
-CI runs:
+Keep every merge to `main` releasable. CI runs:
 
 1. `vp install`
 2. `vp run verify`
@@ -19,7 +17,16 @@ dispatch gets its own run, so each pushed range is scanned. Releases run one at
 a time in the shared workflow's own concurrency group, which never cancels a
 running publish or drops a pending one.
 
-The release job calls the [shared frontend release workflow](https://github.com/putdotio/.github) from `putdotio/.github`, pinned to a reviewed commit SHA; the semantic-release action and plugin pins live there. The `verify` job ends with the shared [links](https://github.com/putdotio/.github#actionslinks) and [scan](https://github.com/putdotio/.github#actionsscan) actions from the same repository: an offline Markdown link and anchor check on every run, and an Actionlint and Zizmor audit when a `main` push changes workflows and on manual dispatch. GitHub secret scanning and push protection cover secrets in this public repository.
+The release job calls the
+[shared frontend release workflow](https://github.com/putdotio/.github) from
+`putdotio/.github`, pinned to a reviewed commit SHA; the semantic-release action
+and plugin pins live there. The `verify` job ends with the shared
+[links](https://github.com/putdotio/.github#actionslinks) and
+[scan](https://github.com/putdotio/.github#actionsscan) actions from the same
+repository: an offline Markdown link and anchor check on every run, and an
+Actionlint and Zizmor audit when a `main` push changes workflows and on manual
+dispatch. GitHub secret scanning and push protection cover secrets in this
+public repository.
 
 ## Package Contents
 
@@ -45,11 +52,13 @@ Environment entries:
 - branch policy: `main`
 - deployment records: disabled with `deployment: false`
 
-The npm package uses Trusted Publishing from GitHub Actions. On npm, configure owner `putdotio`, repository `taizn`, workflow `ci.yml`, and Environment named `release` for the package.
+The npm package uses Trusted Publishing from GitHub Actions: on npm, the package
+trusts owner `putdotio`, repository `taizn`, workflow `ci.yml`, and Environment
+`release`. The `@semantic-release/npm` step exchanges the job's GitHub OIDC
+identity for short-lived publish credentials and publishes with provenance.
 
-During the `@semantic-release/npm` publish step, npm detects the GitHub OIDC identity, mints short-lived publish credentials, and publishes provenance for the release job.
-
-Release GitHub writes use `putio-ci`, and the release bot token is minted only after dependencies are installed.
+Release GitHub writes use `putio-ci`; its token is minted only after
+dependencies are installed.
 
 ## Versioning
 

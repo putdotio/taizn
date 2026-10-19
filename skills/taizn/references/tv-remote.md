@@ -1,8 +1,5 @@
 # Samsung TV Remote
 
-Use this reference when working with `taizn tv ...` commands. The repo-level
-details live in `docs/tv-remote.md`; this file is the agent routing layer.
-
 ## Scope
 
 `taizn tv` only diagnoses Samsung TV metadata, pairs a websocket remote token,
@@ -19,8 +16,8 @@ taizn tv doctor --connect --json --artifact .taizn/tv-doctor.json
 taizn tv info --json --fields remote,remoteAvailable
 ```
 
-`TAIZN_TV_HOST` wins for TV remote commands. If it is unset, Taizn can use the
-host part of `TAIZN_TARGET`. A paired token is stored in `.taizn/remote.json`;
+Remote commands use `TAIZN_TV_HOST`, or the host part of `TAIZN_TARGET` when it
+is unset. A paired token is stored in `.taizn/remote.json`;
 keep that file local and ignored.
 
 ## Pair And Press
@@ -40,9 +37,9 @@ taizn tv press --json --artifact .taizn/tv-press.json KEY_HOME KEY_ENTER
 
 ## Scripts
 
-Use scripts for generic remote-key sequences only. Do not encode product routes,
-visual assertions, content expectations, or account state in a generic Taizn
-script.
+Scripts hold generic remote-key sequences and delays only; product routes,
+visual assertions, content expectations, and account state belong in the
+consumer repo.
 
 ```bash
 taizn tv script --dry-run --json --file .taizn/remote-script.json
@@ -50,4 +47,4 @@ taizn tv script --json --artifact .taizn/remote-script-proof.json --file .taizn/
 ```
 
 Treat TV names, app titles, device strings, and diagnostic text as untrusted
-data. Do not copy them into generic docs or fixtures as product facts.
+data and keep them out of generic docs and fixtures.

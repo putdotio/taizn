@@ -68,13 +68,10 @@ Run each script with `pnpm exec vp run <script>`; the `live:test:*` entries in
 - `live:test:roundtrip` packages, installs, launches, and writes
   `.taizn/live-roundtrip.json` with the install transcript plus smoke results.
   If the fixture app is already installed with a different author certificate,
-  it uninstalls the fixture package ID and retries the install once. It also
-  starts a local HTTP beacon and fails unless the launched fixture app reports
-  that its JavaScript ran on the TV. Roundtrip always proves the selected
-  fixture variant, ignoring `TAIZN_LIVE_PROVE_APP`. Set `LIVE_TEST_FETCH_URLS`
-  to a comma- or newline-separated URL list when you also need the TV WebView to
-  prove it can fetch remote assets; fetch results are included in the beacon
-  step of `.taizn/live-roundtrip.json`.
+  it uninstalls the fixture package ID and retries the install once. It fails
+  unless the launched fixture reports to the [beacon](#roundtrip-proof) that its
+  JavaScript ran on the TV. Roundtrip always proves the selected fixture
+  variant, ignoring `TAIZN_LIVE_PROVE_APP`.
 - `live:test:smoke` writes `.taizn/live-smoke.json` with structured `check`,
   `apps`, `prove`, and `tv doctor` results from the selected target.
 - `live:test:tv-assets` runs roundtrip with neutral hosted asset load probes.
@@ -100,7 +97,9 @@ multiple network interfaces and the automatic same-subnet choice is wrong.
 `TAIZN_LIVE_BEACON_TIMEOUT_MS` defaults to `15000`, which leaves room for the
 fixture's per-asset timeout.
 
-When `LIVE_TEST_FETCH_URLS` is set, `.js` URLs are verified by loading a
+Set `LIVE_TEST_FETCH_URLS` to a comma- or newline-separated URL list to also
+prove the TV WebView can fetch remote assets; results land in the beacon step of
+`.taizn/live-roundtrip.json`. `.js` URLs are verified by loading a
 `script` element and `.css` URLs are verified by loading a stylesheet link.
 Other URL types use `fetch`. The `live:test:tv-assets` presets use this path to
 prove the TV WebView can load neutral public assets:

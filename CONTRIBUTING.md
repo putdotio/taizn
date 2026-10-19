@@ -1,10 +1,9 @@
 # Contributing
 
-Thanks for contributing to `taizn`.
-
 ## Setup
 
-Install the required toolchain and then install dependencies:
+Use the Node.js version in [`.node-version`](https://github.com/putdotio/taizn/blob/main/.node-version),
+then install dependencies and the Git hooks:
 
 ```bash
 git clone https://github.com/putdotio/taizn.git
@@ -13,8 +12,7 @@ pnpm install
 pnpm exec vp run hooks:install
 ```
 
-Use the Node.js version in [`.node-version`](https://github.com/putdotio/taizn/blob/main/.node-version).
-The hook setup makes the full verification gate run before pushes.
+The hooks run the full verification gate before each push.
 
 ## Run Locally
 
@@ -24,7 +22,7 @@ Build the CLI and run the fast smoke check:
 pnpm exec vp run smoke
 ```
 
-For watch mode while editing:
+Rebuild on change:
 
 ```bash
 pnpm exec vp run dev
@@ -66,18 +64,16 @@ configuration, remote diagnostics, and hosted asset checks.
 
 ## Pull Requests
 
-- Keep changes focused.
 - Add or update tests when behavior changes.
-- Include the useful local verification command in the pull request.
+- Fill in the pull request template's Verification section with the checks you
+  ran.
 
 ## Release
 
-Merges to `main` release automatically when commits are releasable. See
-[Distribution](./docs/distribution.md).
+Merges to `main` publish to npm when they contain releasable commits; see
+[Distribution](./docs/distribution.md). Use Conventional Commits:
 
-Use Conventional Commits:
-
-- `feat:` for minor releases
-- `fix:` for patch releases
-- `feat!:` or `BREAKING CHANGE:` for major releases
-- `docs:`, `test:`, `refactor:`, `chore:`, `ci:` for non-release changes
+- `feat:` releases a minor version.
+- `fix:`, `perf:`, and `revert:` release a patch version.
+- `feat!:` or a `BREAKING CHANGE:` footer releases a major version.
+- `docs:`, `test:`, `refactor:`, `chore:`, `ci:`, and `deps:` do not release.

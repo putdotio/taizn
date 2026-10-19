@@ -1,8 +1,5 @@
 # Taizn Command Surfaces
 
-Use this reference when the task needs command-specific routing beyond the
-main skill workflow.
-
 ## Discovery
 
 Start with the live command contract:
