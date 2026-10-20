@@ -18,7 +18,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { NodeServices } from "@effect/platform-node";
-import { assert, describe, it, vi } from "@effect/vitest";
+import { afterAll, assert, describe, it, vi } from "@effect/vitest";
 import { Console, Effect, Fiber, Layer, Schema } from "effect";
 import { WebSocketServer } from "ws";
 import { probeAssetUrls } from "../src/assets.js";
@@ -30,6 +30,20 @@ import { appBuildEnv, needsRosetta, redactCommandArgs, TaiznSystem } from "../sr
 import { captureForDuration, CommandTimeoutMs } from "../src/tizen.js";
 
 const cliPath = resolve("dist/taizn.mjs");
+
+const tempDirs: string[] = [];
+
+afterAll(() => {
+  for (const dir of tempDirs) {
+    rmSync(dir, { force: true, recursive: true });
+  }
+});
+
+const tempDir = (prefix: string) => {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+};
 
 // Kept for the boundary tests below that prove the packaged binary itself:
 // boot, stream separation, and exit codes. Everything else runs the same CLI
@@ -165,7 +179,7 @@ describe("taizn cli", () => {
   });
 
   it("dry-runs the human-owned Seller Office login without storing credentials", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-login-"));
+    const dir = tempDir("taizn-seller-login-");
     const result = await runTaiznInProcess(["seller", "login", "--dry-run", "--json"], dir, {
       TAIZN_SELLER_BROWSER: process.execPath,
     });
@@ -183,7 +197,7 @@ describe("taizn cli", () => {
   });
 
   it("reports a missing Seller Office browser session as structured JSON", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-missing-"));
+    const dir = tempDir("taizn-seller-missing-");
     const result = await runTaiznInProcess(["seller", "apps", "list", "--json"], dir);
 
     assert.strictEqual(result.status, 1);
@@ -198,7 +212,7 @@ describe("taizn cli", () => {
   });
 
   it("lists sanitized Seller Office applications through the local browser adapter", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-apps-"));
+    const dir = tempDir("taizn-seller-apps-");
     const fixture = await startFakeSellerBrowser(dir, {
       applications: [
         {
@@ -245,7 +259,7 @@ describe("taizn cli", () => {
   });
 
   it("fails clearly when Seller Office is signed out", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-signed-out-"));
+    const dir = tempDir("taizn-seller-signed-out-");
     const fixture = await startFakeSellerBrowser(dir, { state: "signedOut" });
 
     try {
@@ -260,7 +274,7 @@ describe("taizn cli", () => {
   });
 
   it("fails closed when the Seller Office application layout drifts", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-drift-"));
+    const dir = tempDir("taizn-seller-drift-");
     const fixture = await startFakeSellerBrowser(dir, {
       details: "application card fields are missing",
       state: "drift",
@@ -283,7 +297,7 @@ describe("taizn cli", () => {
   });
 
   it("fails closed when Seller Office leaves a CDP request unanswered", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-seller-cdp-timeout-"));
+    const dir = tempDir("taizn-seller-cdp-timeout-");
     const fixture = await startFakeSellerBrowser(dir, { state: "ready" }, ["Page.navigate"]);
 
     try {
@@ -305,7 +319,7 @@ describe("taizn cli", () => {
   }, 15_000);
 
   it("reports missing config without a stack trace", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-missing-config-"));
+    const dir = tempDir("taizn-missing-config-");
     const result = await runTaiznInProcess(["package"], dir);
 
     assert.strictEqual(result.status, 1);
@@ -314,7 +328,7 @@ describe("taizn cli", () => {
   });
 
   it("checks tooling without requiring a project config", () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-check-"));
+    const dir = tempDir("taizn-check-");
     const result = spawnTaizn(["check"], dir, {
       TAIZN_SDB: "/bin/echo",
       TAIZN_TIZEN_CLI: "/bin/echo",
@@ -671,7 +685,7 @@ describe("taizn cli", () => {
   for (const kind of ["parent", "file", "dangling", "nested"] as const) {
     it(`rejects proof artifacts through an outside ${kind} symlink`, async () => {
       const dir = createToolingFixture();
-      const outside = mkdtempSync(join(tmpdir(), "taizn-outside-"));
+      const outside = tempDir("taizn-outside-");
       const destination = join(outside, "proof.json");
       if (kind !== "dangling") writeFileSync(destination, "untouched");
       mkdirSync(join(dir, ".taizn"), { recursive: true });
@@ -709,7 +723,7 @@ describe("taizn cli", () => {
 
   it("writes artifacts through internal links in a symlinked app checkout", async () => {
     const dir = createToolingFixture();
-    const parent = mkdtempSync(join(tmpdir(), "taizn-checkout-link-"));
+    const parent = tempDir("taizn-checkout-link-");
     const checkout = join(parent, "app");
     symlinkSync(dir, checkout);
     mkdirSync(join(dir, "proofs"));
@@ -745,7 +759,7 @@ describe("taizn cli", () => {
   });
 
   it("reports schema errors with config paths", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-config-"));
+    const dir = tempDir("taizn-invalid-config-");
     writeFileSync(join(dir, "taizn.json"), '{"build":{"command":[]}}\n');
 
     const result = await runTaiznInProcess(["package"], dir);
@@ -794,7 +808,7 @@ describe("taizn cli", () => {
   });
 
   it("rejects partial Samsung TV remote ports", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-port-"));
+    const dir = tempDir("taizn-tv-port-");
     const result = await runTaiznInProcess(["tv", "info"], dir, {
       TAIZN_TV_HOST: "127.0.0.1",
       TAIZN_TV_PORT: "8002abc",
@@ -806,7 +820,7 @@ describe("taizn cli", () => {
   });
 
   it("lets Samsung TV env overrides bypass malformed remote state", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-remote-invalid-"));
+    const dir = tempDir("taizn-tv-remote-invalid-");
     mkdirSync(join(dir, ".taizn"), { recursive: true });
     writeFileSync(join(dir, ".taizn/remote.json"), "{bad\n");
 
@@ -822,7 +836,7 @@ describe("taizn cli", () => {
   });
 
   it("reads Samsung TV info from a configured info port", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-info-port-"));
+    const dir = tempDir("taizn-tv-info-port-");
     const server = createServer((_request, response) => {
       response.setHeader("content-type", "application/json");
       response.end(
@@ -863,7 +877,7 @@ describe("taizn cli", () => {
   });
 
   it("reads Samsung TV info as JSON", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-info-json-"));
+    const dir = tempDir("taizn-tv-info-json-");
     const server = createServer((_request, response) => {
       response.setHeader("content-type", "application/json");
       response.end(
@@ -923,7 +937,7 @@ describe("taizn cli", () => {
   });
 
   it("diagnoses Samsung TV remote state as JSON", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-doctor-json-"));
+    const dir = tempDir("taizn-tv-doctor-json-");
     const infoServer = createServer((_request, response) => {
       response.setHeader("content-type", "application/json");
       response.end(
@@ -1085,7 +1099,7 @@ describe("taizn cli", () => {
   });
 
   it("pairs and sends Samsung TV remote keys", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-remote-"));
+    const dir = tempDir("taizn-tv-remote-");
     const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
     const receivedKeys: string[] = [];
     const requestUrls: string[] = [];
@@ -1246,7 +1260,7 @@ describe("taizn cli", () => {
   });
 
   it("dry-runs Samsung TV remote scripts from JSON", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-script-"));
+    const dir = tempDir("taizn-tv-script-");
     writeFileSync(
       join(dir, "keys.json"),
       JSON.stringify({ delayMs: 1, steps: [{ keys: ["KEY_UP", "KEY_ENTER"] }] }),
@@ -1265,7 +1279,7 @@ describe("taizn cli", () => {
   });
 
   it("dry-runs Samsung TV remote keys without a paired token", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-tv-press-dry-run-"));
+    const dir = tempDir("taizn-tv-press-dry-run-");
     const result = await runTaiznInProcess(
       ["tv", "press", "--dry-run", "--json", "KEY_HOME"],
       dir,
@@ -1367,7 +1381,7 @@ describe("taizn cli", () => {
   });
 
   it("formats output=json errors as structured JSON", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-json-error-"));
+    const dir = tempDir("taizn-json-error-");
     const result = await runTaiznInProcess(["logs", "capture", "--output=json"], dir, {
       TAIZN_SDB: "/bin/echo",
       TAIZN_TARGET: "",
@@ -1385,7 +1399,7 @@ describe("taizn cli", () => {
   });
 
   it("formats output ndjson errors as structured JSON", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-ndjson-error-"));
+    const dir = tempDir("taizn-ndjson-error-");
     const result = await runTaiznInProcess(["logs", "capture", "--output", "ndjson"], dir, {
       TAIZN_SDB: "/bin/echo",
       TAIZN_TARGET: "",
@@ -1506,7 +1520,7 @@ describe("taizn cli", () => {
   }
 
   it("force-closes interrupted log processes that ignore SIGTERM", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-stubborn-log-"));
+    const dir = tempDir("taizn-stubborn-log-");
     const command = join(dir, "stubborn-log.mjs");
     const pidPath = join(dir, "child.pid");
     writeFileSync(
@@ -1577,7 +1591,7 @@ describe("taizn cli", () => {
   });
 
   it("rejects invalid log output mode before resolving device tooling", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-log-output-"));
+    const dir = tempDir("taizn-invalid-log-output-");
     const result = await runTaiznInProcess(["logs", "capture", "--output", "yaml"], dir);
 
     assert.strictEqual(result.status, 1);
@@ -1818,7 +1832,7 @@ describe("taizn cli", () => {
   });
 
   it("rejects WGT archives without a complete ZIP directory", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-wgt-zip-"));
+    const dir = tempDir("taizn-invalid-wgt-zip-");
     const path = join(dir, "fixture.wgt");
     const archive = makeValidSubmissionWgt();
     writeFileSync(path, archive.subarray(0, archive.byteLength - 22));
@@ -1830,7 +1844,7 @@ describe("taizn cli", () => {
   });
 
   it("rejects inconsistent ZIP local headers and missing data descriptors", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-wgt-entries-"));
+    const dir = tempDir("taizn-invalid-wgt-entries-");
     const archive = makeValidSubmissionWgt();
     const badLocalHeader = Buffer.from(archive);
     badLocalHeader.writeUInt32LE(0, 14);
@@ -1864,7 +1878,7 @@ describe("taizn cli", () => {
   });
 
   it("rejects malformed or namespace-invalid config XML", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-invalid-wgt-xml-"));
+    const dir = tempDir("taizn-invalid-wgt-xml-");
     const path = join(dir, "fixture.wgt");
     writeFileSync(
       path,
@@ -1984,7 +1998,7 @@ describe("taizn cli", () => {
   });
 
   it("accepts a ZIP comment containing an EOCD signature sequence", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-wgt-comment-"));
+    const dir = tempDir("taizn-wgt-comment-");
     const path = join(dir, "fixture.wgt");
     writeFileSync(
       path,
@@ -1997,7 +2011,7 @@ describe("taizn cli", () => {
   });
 
   it("prepares a deterministic signed WGT submission manifest", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-prepare-submission-"));
+    const dir = tempDir("taizn-prepare-submission-");
     const path = join(dir, "fixture.wgt");
     const archive = makeValidSubmissionWgt();
     writeFileSync(path, archive);
@@ -2046,7 +2060,7 @@ describe("taizn cli", () => {
   });
 
   it("inspects Tizen widget archive metadata as JSON", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "taizn-inspect-wgt-"));
+    const dir = tempDir("taizn-inspect-wgt-");
     const path = join(dir, "fixture.wgt");
     writeFileSync(
       path,
@@ -2119,7 +2133,7 @@ describe("taizn cli", () => {
   });
 
   it("dry-runs SDK install and refuses an incomplete Tizen Studio", async () => {
-    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-install-"));
+    const root = tempDir("taizn-sdk-install-");
     const home = join(root, "home");
     mkdirSync(home);
     const plan = await runTaiznInProcess(["sdk", "install", "--dry-run"], root, { HOME: home });
@@ -2159,7 +2173,7 @@ describe("taizn cli", () => {
   });
 
   it("backs up Tizen certificates privately without replacing existing outputs", async () => {
-    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-backup-"));
+    const root = tempDir("taizn-sdk-backup-");
     const home = join(root, "home");
     mkdirSync(join(home, "SamsungCertificate"), { recursive: true });
     writeFileSync(join(home, "SamsungCertificate", "fixture.txt"), "fixture certificate");
@@ -2241,7 +2255,7 @@ describe("taizn cli", () => {
   });
 
   it("does not publish a partial SDK backup after tar fails", async () => {
-    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-backup-fail-"));
+    const root = tempDir("taizn-sdk-backup-fail-");
     const home = join(root, "home");
     const bin = join(root, "bin");
     mkdirSync(join(home, "SamsungCertificate"), { recursive: true });
@@ -2259,7 +2273,7 @@ describe("taizn cli", () => {
   });
 
   it("restores SDK backups into home and rejects foreign archive entries", async () => {
-    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-restore-"));
+    const root = tempDir("taizn-sdk-restore-");
     const source = join(root, "source");
     const home = join(root, "home");
     mkdirSync(join(source, "SamsungCertificate"), { recursive: true });
@@ -2352,7 +2366,7 @@ describe("taizn cli", () => {
 
   for (const unsafe of unsafeArchives) {
     it(`rejects SDK archives with ${unsafe.kind}`, async () => {
-      const root = mkdtempSync(join(tmpdir(), "taizn-sdk-unsafe-"));
+      const root = tempDir("taizn-sdk-unsafe-");
       const home = join(root, "home");
       mkdirSync(home);
       writeFileSync(join(home, "secret"), "secret");
@@ -2367,7 +2381,7 @@ describe("taizn cli", () => {
   }
 
   it("restores a full backup twice and refuses to merge into an existing SDK", async () => {
-    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-full-"));
+    const root = tempDir("taizn-sdk-full-");
     const source = join(root, "source");
     const home = join(root, "home");
     for (const dir of ["tizen-studio/lib", "tizen-studio-data/lib"]) {
@@ -2404,7 +2418,7 @@ describe("taizn cli", () => {
   });
 
   it("reports tar's error as the cause of structured SDK failures", async () => {
-    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-cause-"));
+    const root = tempDir("taizn-sdk-cause-");
     const archive = join(root, "broken.tar.gz");
     writeFileSync(archive, "not an archive");
     const result = await runTaiznInProcess(["sdk", "restore", "--json", archive], root, {
@@ -2419,7 +2433,7 @@ describe("taizn cli", () => {
   });
 
   it("restores in-archive relative symlinks", async () => {
-    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-symlink-"));
+    const root = tempDir("taizn-sdk-symlink-");
     const home = join(root, "home");
     mkdirSync(home);
     const archive = join(root, "linked.tar.gz");
@@ -2440,7 +2454,7 @@ describe("taizn cli", () => {
   });
 
   it("keeps tar diagnostics out of structured SDK restore errors", () => {
-    const root = mkdtempSync(join(tmpdir(), "taizn-sdk-json-"));
+    const root = tempDir("taizn-sdk-json-");
     const home = join(root, "home");
     mkdirSync(home);
     const archive = join(root, "parent.tar.gz");
@@ -2497,7 +2511,7 @@ const makeTarGz = (entries: readonly TarEntry[]) => {
 };
 
 const createPackageFixture = () => {
-  const dir = mkdtempSync(join(tmpdir(), "taizn-package-config-"));
+  const dir = tempDir("taizn-package-config-");
 
   mkdirSync(join(dir, "platforms/tizen/icons"), { recursive: true });
 
@@ -2964,7 +2978,7 @@ const machOFat64 = (cpuTypes: readonly number[]) => {
 };
 
 const createToolingFixture = () => {
-  const dir = mkdtempSync(join(tmpdir(), "taizn-tooling-config-"));
+  const dir = tempDir("taizn-tooling-config-");
   writeFakeSdb(dir);
   writeFakeTizen(dir);
   return dir;
