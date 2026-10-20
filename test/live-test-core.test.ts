@@ -1,7 +1,7 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assert, describe, it } from "@effect/vitest";
+import { afterAll, assert, describe, it } from "@effect/vitest";
 import {
   envFlagEnabled,
   failedFetchProbes,
@@ -26,6 +26,20 @@ import {
   readSigningProfileFromConfigSource,
   serializeEnvAssignments,
 } from "../live-test/setup-core.ts";
+
+const tempDirs: string[] = [];
+
+afterAll(() => {
+  for (const dir of tempDirs) {
+    rmSync(dir, { force: true, recursive: true });
+  }
+});
+
+const tempDir = (prefix: string) => {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+};
 
 describe("live test harness core", () => {
   it("keeps roundtrip proof tied to the selected fixture variant", () => {
@@ -294,7 +308,7 @@ function writeTemplate(
     },
   },
 ) {
-  const dir = mkdtempSync(join(tmpdir(), "taizn-live-core-"));
+  const dir = tempDir("taizn-live-core-");
   const templatePath = join(dir, "taizn.template.json");
 
   writeFileSync(templatePath, `${JSON.stringify(template)}\n`);
