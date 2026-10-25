@@ -2,14 +2,8 @@
 
 ## Discovery
 
-Start with the live command contract:
-
-```bash
-taizn describe
-```
-
-Use `README.md` for the public command overview. When the docs and
-`taizn describe` disagree, trust `describe`.
+`taizn describe` is the live command contract: purpose, flags, env, outputs,
+and whether each command mutates. When docs disagree with it, trust `describe`.
 
 ## Packaging And Proof
 
@@ -83,9 +77,3 @@ status. Upload, pre-test, release, and submission remain outside this surface.
 taizn logs capture --output ndjson --app Example
 taizn targets list --json --fields targets
 ```
-
-## Artifacts
-
-Use `--artifact .taizn/<name>.json` for proof that should survive the terminal.
-Taizn rejects artifact paths outside the app directory; keep generated artifacts
-under `.taizn/` or another ignored app-local folder.

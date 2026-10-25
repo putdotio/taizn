@@ -1,7 +1,11 @@
 # Samsung TV Remote
 
-`taizn tv` wraps Samsung's websocket remote-control API for local development
-and smoke checks against a physical TV or monitor.
+`taizn tv` drives Samsung's websocket remote-control API against a physical TV
+or monitor. It reads metadata, diagnoses readiness, pairs, and sends remote
+keys. It does not install widgets, launch apps, or capture screenshots: use
+`taizn install` and `taizn run` for the app lifecycle, and logs, app-level
+probes, Samsung Web Inspector, Remote Test Lab, or external capture for visual
+proof.
 
 ## Commands
 
@@ -15,28 +19,13 @@ taizn tv press --delay-ms 250 KEY_HOME KEY_DOWN KEY_ENTER
 taizn tv script --file .taizn/remote-script.json --dry-run --json
 ```
 
-- `doctor` reports the resolved host, local `.taizn/remote.json` state, token
-  presence, HTTP metadata status, and websocket endpoint. Add `--json` for a
-  structured diagnostic. Add `--connect` only when you want to test the
-  websocket; without a token this can trigger the TV's allow/deny prompt.
-- `info` reads the TV's local `/api/v2/` metadata and reports remote-control
-  support. Add `--json` for a structured capability snapshot.
-- `pair` opens a Samsung remote websocket and waits for the TV to approve the
-  client. When pairing succeeds, it stores the token in `.taizn/remote.json`.
-  Use `--dry-run` to validate host resolution without opening the websocket.
-- `press` reconnects with the paired token and sends a Samsung remote key such
-  as `KEY_HOME`, `KEY_BACK`, `KEY_UP`, `KEY_DOWN`, `KEY_LEFT`, `KEY_RIGHT`, or
-  `KEY_ENTER`. Pass multiple keys to send a navigation sequence on one
-  websocket connection. `--delay-ms` controls the delay between sequence keys.
-  Add `--json` to emit a redacted receipt with the target, delay, and keys sent,
-  or `--artifact .taizn/tv-press.json` to keep that receipt. Use `--dry-run`
-  to validate key input and resolved remote state without sending keys.
-- `script` reads a JSON key recipe, validates it, and sends each step through
-  the paired remote token. Use `--dry-run` while assembling a flow, `--json` for
-  a structured receipt, and `--artifact .taizn/remote-script-proof.json` for a
-  durable proof file.
-
-Script format:
+- `doctor` reports the resolved host, `.taizn/remote.json` state, token
+  presence, metadata status, and websocket endpoint. `--connect` also opens the
+  websocket; without a token, the TV can show an allow/deny prompt.
+- `info` reads the TV's `/api/v2/` metadata and reports remote-control support.
+- `press` sends one or more keys, such as `KEY_HOME` or `KEY_ENTER`, over one
+  connection with the paired token. `--json` emits a redacted receipt.
+- `script` validates a JSON key recipe, then sends each step:
 
 ```json
 {
@@ -47,6 +36,21 @@ Script format:
   ]
 }
 ```
+
+`--dry-run` validates input and resolved remote state without opening the
+websocket. `--artifact .taizn/<name>.json` keeps a receipt.
+
+## Pairing
+
+```bash
+TAIZN_TV_HOST=<tv-ip> taizn tv pair
+```
+
+Approve the prompt on the TV. If no prompt appears, check the TV settings for
+IP remote control and device permissions, then retry.
+
+Pairing prints the token as `TAIZN_TV_TOKEN=...` and saves it to
+`.taizn/remote.json`. Keep `.taizn/` ignored and tokens out of commits and logs.
 
 ## Environment
 
@@ -60,33 +64,9 @@ TAIZN_TV_TIMEOUT_MS=30000
 TAIZN_TV_TOKEN=<paired-remote-token>
 ```
 
-`TAIZN_TV_HOST` is optional when `TAIZN_TARGET=<tv-ip>:26101` is set; `taizn`
-uses the host part of `TAIZN_TARGET` as a fallback. The default remote endpoint
-is `wss://<tv-ip>:8002`. Use `TAIZN_TV_PROTOCOL=ws` and `TAIZN_TV_PORT=8001`
-only for older TVs or test fixtures that do not support the TLS endpoint.
-`TAIZN_TV_INFO_PORT` controls the HTTP metadata endpoint used by `tv info`.
-
-`TAIZN_TV_TOKEN` overrides `.taizn/remote.json` for one-off runs.
-`TAIZN_TV_TIMEOUT_MS` controls websocket pairing/key-press and HTTP info request
-timeouts.
-
-## Pairing
-
-```bash
-TAIZN_TV_HOST=<tv-ip> taizn tv pair
-```
-
-If the TV shows an allow prompt, approve it. If no prompt appears, check the TV
-settings for IP remote control and device permissions, then retry pairing.
-
-Successful pairing prints the token as `TAIZN_TV_TOKEN=...` and saves it to
-`.taizn/remote.json`. Keep `.taizn/` ignored, and keep tokens out of commits
-and logs.
-
-## Scope
-
-Remote commands only inspect metadata, diagnose remote readiness, pair, and send
-key presses. They do not install widgets, launch applications, or capture
-screenshots. Use the regular `taizn install` and Tizen CLI commands for app
-lifecycle work. Use logs, app-level probes, Samsung Web Inspector, Remote Test
-Lab, or external capture when visual proof is needed.
+- Without `TAIZN_TV_HOST`, `taizn tv` uses the host part of `TAIZN_TARGET`.
+- The default endpoint is `wss://<tv-ip>:8002`. Use `TAIZN_TV_PROTOCOL=ws` and
+  `TAIZN_TV_PORT=8001` only for older TVs or fixtures without the TLS endpoint.
+- `TAIZN_TV_INFO_PORT` sets the metadata port for `tv info`.
+- `TAIZN_TV_TOKEN` overrides `.taizn/remote.json` for one run.
+- `TAIZN_TV_TIMEOUT_MS` bounds pairing, key presses, and metadata requests.

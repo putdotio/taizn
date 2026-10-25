@@ -16,8 +16,8 @@ consumer app repo.
 2. Prefer `--fields` to keep outputs small.
 3. Prefer `--artifact .taizn/<name>.json` for proof that should survive the
    terminal.
-4. Keep artifacts under `.taizn/`; Taizn rejects output paths outside the app
-   directory, including paths through symlinks. Dangling output links are rejected.
+4. Keep artifacts under `.taizn/`. Taizn rejects output paths outside the app
+   directory, including symlinked and dangling paths.
 5. Finite SDB queries, target connections, and captured proof launches time out
    after 30 seconds per subprocess, with bounded child cleanup. Builds, signing,
    and installs are not subject to that query deadline.
@@ -41,7 +41,7 @@ consumer app repo.
 
 ## Start Here
 
-Read only the reference needed for the current task:
+Read only the reference the task needs:
 
 - Tizen SDK install, backup, restore, packaging, inspection, submission checks,
   logs, and artifacts:
@@ -74,11 +74,5 @@ taizn tv script --dry-run --json --file .taizn/remote-script.json
 
 ## Verification
 
-Use the repo guardrail after changing Taizn:
-
-```bash
-pnpm exec vp run verify
-```
-
-Only `pnpm exec vp run live:test:*` proves real Tizen/TV behavior. Static tests
-and dry runs prove command contracts, not hardware behavior.
+Dry runs and static checks prove command contracts, not TV behavior. Only a
+real run against the target proves the device side.

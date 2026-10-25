@@ -1,33 +1,24 @@
 # Live Test
 
-Fixture harness for checking `taizn` against a local Tizen toolchain and,
-optionally, a connected device.
+Fixture harness that checks `taizn` against a local Tizen toolchain and,
+optionally, a connected TV.
 
 ## Setup
 
-```bash
-mkdir -p live-test/app/.taizn/certificates
-```
-
-If another local consumer app already has `.taizn/.env` and certificates,
-bootstrap the fixture from that app without copying unrelated app config:
+Bootstrap the fixture from a consumer app that already has `.taizn/.env` and
+certificates:
 
 ```bash
 pnpm exec vp run live:test:setup -- --from ../consumer-app --target <tv-ip>
 ```
 
-The setup command writes only allowlisted harness keys and certificate files into
-ignored `live-test/app/.taizn/` state. It also reads the source app's
-`taizn.json` signing profile into `TAIZN_LIVE_PROFILE`, and it adds default
-local Tizen CLI paths when they exist. Add `--json` for a machine-readable
-summary, or use `--help` to list all overrides.
+It copies only allowlisted harness keys and certificate files into the ignored
+`live-test/app/.taizn/`, reads the source app's signing profile into
+`TAIZN_LIVE_PROFILE`, and adds local Tizen CLI paths it finds. `--help` lists
+the overrides; [`setup-core.ts`](./setup-core.ts) lists the copied keys.
 
-Put signing files here:
-
-- `live-test/app/.taizn/certificates/author.p12`
-- `live-test/app/.taizn/certificates/distributor.p12`
-
-Create `live-test/app/.taizn/.env` when you want local defaults:
+Without a consumer app, put `author.p12` and `distributor.p12` in
+`live-test/app/.taizn/certificates/` and write `live-test/app/.taizn/.env`:
 
 ```bash
 TAIZN_CERT_PASSWORD=...
@@ -44,67 +35,46 @@ LIVE_TEST_REMOTE_KEYS=KEY_UP,KEY_ENTER
 LIVE_TEST_REQUIRE_REMOTE=0
 ```
 
+The harness writes `live-test/app/taizn.json` from
+`live-test/app/taizn.template.json`. Signing uses `TAIZN_LIVE_PROFILE`, then
+the active Tizen profile, then `taizn-live-test`.
+
 ## Commands
 
-Run each script with `pnpm exec vp run <script>`; the `live:test:*` entries in
-[`package.json`](../package.json) map each one to its harness flags.
+Run each with `pnpm exec vp run <script>`; [`package.json`](../package.json)
+maps each to its harness flags.
 
-- `live:test:profile` imports the fixture signing profile.
-- `live:test` packages the fixture app.
-- `live:test:doctor` runs `taizn tv doctor --json` from the fixture app root,
-  using `TAIZN_TARGET`, `TAIZN_TV_HOST`, and local `.taizn/remote.json` state.
-- `live:test:doctor:connect` also passes `--connect` to test the Samsung
-  websocket endpoint. This can trigger the TV allow/deny prompt when no token is
-  configured.
-- `live:test:install` packages and installs it on `TAIZN_TARGET`, or on the
-  single connected `sdb devices` target.
-- `live:test:prove` checks that the fixture app, or `TAIZN_LIVE_PROVE_APP`, is
-  installed and launchable on the target.
-- `live:test:remote` writes `.taizn/live-remote.json` with `tv doctor
-  --connect` results. Set `LIVE_TEST_REMOTE_KEYS` to send a key sequence after
-  the remote connection is ready and a token is already configured with
-  `taizn tv pair`. Set `LIVE_TEST_REQUIRE_REMOTE=1` when a missing or timed-out
-  websocket remote should fail the command.
-- `live:test:roundtrip` packages, installs, launches, and writes
-  `.taizn/live-roundtrip.json` with the install transcript plus smoke results.
-  If the fixture app is already installed with a different author certificate,
-  it uninstalls the fixture package ID and retries the install once. It fails
-  unless the launched fixture reports to the [beacon](#roundtrip-proof) that its
-  JavaScript ran on the TV. Roundtrip always proves the selected fixture
-  variant, ignoring `TAIZN_LIVE_PROVE_APP`.
-- `live:test:smoke` writes `.taizn/live-smoke.json` with structured `check`,
-  `apps`, `prove`, and `tv doctor` results from the selected target.
-- `live:test:tv-assets` runs roundtrip with neutral hosted asset load probes.
-- `live:test:tv-assets:production` runs the same proof against the production
-  fixture variant.
+| Script                           | Touches the TV | Proves                                                                                      |
+| -------------------------------- | -------------- | ------------------------------------------------------------------------------------------- |
+| `live:test:profile`              | no             | Imports the fixture signing profile.                                                        |
+| `live:test`                      | no             | Packages the fixture app.                                                                   |
+| `live:test:doctor`               | reads          | `taizn tv doctor --json` from the fixture root.                                             |
+| `live:test:doctor:connect`       | may prompt     | Adds `--connect`; without a token the TV can show an allow/deny prompt.                     |
+| `live:test:install`              | installs       | Packages and installs on `TAIZN_TARGET` or the single connected `sdb` target.               |
+| `live:test:prove`                | launches       | The fixture app, or `TAIZN_LIVE_PROVE_APP`, is installed and launchable.                    |
+| `live:test:remote`               | sends keys     | Writes `.taizn/live-remote.json`; sends `LIVE_TEST_REMOTE_KEYS` once a paired token exists. |
+| `live:test:smoke`                | launches       | Writes `.taizn/live-smoke.json` with `check`, `apps`, `prove`, and `tv doctor` results.     |
+| `live:test:roundtrip`            | reinstalls     | Package, install, launch, and on-TV JavaScript through the [beacon](#roundtrip-proof).      |
+| `live:test:tv-assets`            | reinstalls     | Roundtrip plus hosted asset loads.                                                          |
+| `live:test:tv-assets:production` | reinstalls     | The same against the production fixture variant.                                            |
 
-The fixture writes `live-test/app/taizn.json` from
-`live-test/app/taizn.template.json`. Package and install use
-`TAIZN_LIVE_PROFILE`, then the active local Tizen profile, then
-`taizn-live-test`. Proof uses `TAIZN_LIVE_PROVE_APP` when set, otherwise the
-configured `TAIZN_VARIANT` application ID from the fixture template.
-
-The `check`, `apps`, and `prove` steps run under a two-minute watchdog on top of
-the CLI's own 30-second subprocess deadlines. Packaging, signing, installation,
-and uninstall have no deadline; remote steps use `TAIZN_TV_TIMEOUT_MS` and
-`LIVE_TEST_REMOTE_DELAY_MS`.
+- `LIVE_TEST_REQUIRE_REMOTE=1` makes a missing or timed-out remote fail
+  `live:test:remote`.
+- Roundtrip ignores `TAIZN_LIVE_PROVE_APP`. If the fixture is installed with a
+  different author certificate, it uninstalls the fixture package and retries
+  once.
+- `check`, `apps`, and `prove` run under a two-minute watchdog. Packaging,
+  signing, install, and uninstall have no deadline.
 
 ## Roundtrip Proof
 
-`live:test:roundtrip` starts a local HTTP beacon and waits for the launched TV
-fixture to report back. Set `TAIZN_LIVE_BEACON_HOST` when the computer has
-multiple network interfaces and the automatic same-subnet choice is wrong.
-`TAIZN_LIVE_BEACON_TIMEOUT_MS` defaults to `15000`, which leaves room for the
-fixture's per-asset timeout.
+Roundtrip starts a local HTTP beacon and waits for the launched fixture to
+report back. Set `TAIZN_LIVE_BEACON_HOST` when the automatic same-subnet choice
+picks the wrong interface. `TAIZN_LIVE_BEACON_TIMEOUT_MS` defaults to `15000`,
+which covers the fixture's per-asset timeout.
 
-Set `LIVE_TEST_FETCH_URLS` to a comma- or newline-separated URL list to also
-prove the TV WebView can fetch remote assets; results land in the beacon step of
-`.taizn/live-roundtrip.json`. `.js` URLs are verified by loading a
-`script` element and `.css` URLs are verified by loading a stylesheet link.
-Other URL types use `fetch`. The `live:test:tv-assets` presets use this path to
-prove the TV WebView can load neutral public assets:
-
-```txt
-https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js
-https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css
-```
+`LIVE_TEST_FETCH_URLS`, comma- or newline-separated, also proves the TV WebView
+can load remote assets: `.js` through a `script` element, `.css` through a
+stylesheet link, anything else through `fetch`. Results land in the beacon step
+of `.taizn/live-roundtrip.json`. The `live:test:tv-assets` presets load the
+public URLs in [`harness-core.ts`](./harness-core.ts).
