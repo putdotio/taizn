@@ -135,7 +135,7 @@ pnpm exec taizn run
 Variant `indexHtml`, `injectWebapis`, and `rewriteAssetUrls` override the
 top-level `widget` values; variant `excludeFiles` add to `widget.excludeFiles`.
 Use them when development packages bundle local assets and production packages
-load hosted asset URLs. [`src/config.ts`](./src/config.ts) owns the full
+load hosted asset URLs. [`src/config.ts`](https://github.com/putdotio/taizn/blob/main/src/config.ts) owns the full
 schema.
 
 ## Automation
