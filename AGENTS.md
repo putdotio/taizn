@@ -11,8 +11,6 @@ Read only what the task needs:
 - Release settings outside the repo: [CONTRIBUTING.md](CONTRIBUTING.md#release)
 - Seller Office session safety: [docs/seller-office.md](docs/seller-office.md)
 - Samsung TV remote pairing and keys: [docs/tv-remote.md](docs/tv-remote.md)
-- Live Tizen fixture harness:
-  [live-test/README.md](https://github.com/putdotio/taizn/blob/main/live-test/README.md)
 - Agent workflow shipped with the package:
   [skills/taizn/SKILL.md](skills/taizn/SKILL.md)
 
@@ -132,6 +130,10 @@ pnpm exec vp run verify
 Focused scripts live in [`package.json`](package.json). If live-test env is
 missing, run
 `pnpm exec vp run live:test:setup -- --from <consumer-app> --target <tv-ip>`.
+Without a consumer app, put `author.p12` and `distributor.p12` in
+`live-test/app/.taizn/certificates/` and the
+[`.env.example`](https://github.com/putdotio/taizn/blob/main/.env.example) keys
+in `live-test/app/.taizn/.env`.
 
 Which proof a change needs:
 
@@ -139,8 +141,8 @@ Which proof a change needs:
   `skills/`. No device run.
 - Source, config, env, command, or output: `pnpm exec vp run verify`.
 - Device-facing behavior: `verify`, then the matching
-  `pnpm exec vp run live:test:*` script ([Live Test](https://github.com/putdotio/taizn/blob/main/live-test/README.md#commands)).
-  Only live tests prove real Tizen behavior.
+  `pnpm exec vp run live:test:*` script. Only live tests prove real Tizen
+  behavior.
 
 ## Delivery
 
