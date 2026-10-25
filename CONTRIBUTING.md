@@ -41,10 +41,13 @@ covers checks against a local Tizen toolchain and TV.
 
 ## Release
 
-Merges to `main` publish to npm when they contain releasable commits; see
-[Distribution](./docs/distribution.md). Use Conventional Commits:
+[`ci.yml`](https://github.com/putdotio/taizn/blob/main/.github/workflows/ci.yml) releases from `main` with
+[`.releaserc.json`](https://github.com/putdotio/taizn/blob/main/.releaserc.json); `feat`, `fix`, `perf`, revert, and
+breaking commits publish to npm. A published version can never be reused.
 
-- `feat:` releases a minor version.
-- `fix:`, `perf:`, and `revert:` release a patch version.
-- `feat!:` or a `BREAKING CHANGE:` footer releases a major version.
-- `docs:`, `test:`, `refactor:`, `chore:`, `ci:`, and `deps:` do not release.
+Settings that live outside the repo:
+
+- GitHub Environment `release`, limited to `main`, holds the `putio-ci` app
+  secret and client ID that [`ci.yml`](https://github.com/putdotio/taizn/blob/main/.github/workflows/ci.yml) passes on.
+- npm Trusted Publishing for `@putdotio/taizn` trusts repository
+  `putdotio/taizn`, workflow `ci.yml`, and Environment `release`.

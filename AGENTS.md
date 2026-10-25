@@ -8,7 +8,7 @@ consumer apps. Keep it a shell-out tool, not an app framework.
 Read only what the task needs:
 
 - Consumer config, env, and command contracts: [README.md](README.md)
-- CI, release, and npm publishing: [docs/distribution.md](docs/distribution.md)
+- Release settings outside the repo: [CONTRIBUTING.md](CONTRIBUTING.md#release)
 - Seller Office session safety: [docs/seller-office.md](docs/seller-office.md)
 - Samsung TV remote pairing and keys: [docs/tv-remote.md](docs/tv-remote.md)
 - Live Tizen fixture harness:
@@ -19,7 +19,8 @@ Read only what the task needs:
 ## Ways To Hurt Yourself
 
 - **Merging publishes.** A `feat`, `fix`, `perf`, revert, or breaking commit on
-  `main` publishes `@putdotio/taizn` to npm. A published version can never be
+  `main` publishes `@putdotio/taizn` to npm
+  ([`.releaserc.json`](https://github.com/putdotio/taizn/blob/main/.releaserc.json)). A published version can never be
   reused, so the commit type is the release decision.
 - **Taking over someone's TV.** A Samsung TV on the network may be someone's
   set in use. `install`, `launch`, `prove`, and the matching live tests change
@@ -112,8 +113,10 @@ the APIs the change touches; search `node_modules/effect/src` for the rest.
 - Command surface: update `src/describe.ts` and CLI tests; guardrail changes
   also update `skills/taizn/SKILL.md`.
 - Config, env, or output: update `README.md` and CLI tests.
-- CI, release, or publishing: update `docs/distribution.md`.
+- Release settings outside the repo: update [CONTRIBUTING.md](CONTRIBUTING.md#release).
 - `CLAUDE.md` stays a one-line `@AGENTS.md` import.
+- `files` in `package.json` ships the docs and skill; they link files outside
+  the tarball by absolute GitHub URL.
 
 ## Checks
 
@@ -141,7 +144,5 @@ Which proof a change needs:
 
 ## Delivery
 
-Open a pull request. CI runs `verify` on pull requests and `main`; on `main`,
-semantic-release publishes releasable commits. See
-[Contributing](CONTRIBUTING.md#release) and
-[Distribution](docs/distribution.md).
+Open a pull request. [`ci.yml`](https://github.com/putdotio/taizn/blob/main/.github/workflows/ci.yml) runs `verify` on
+pull requests and releases from `main`.
