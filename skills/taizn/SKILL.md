@@ -1,6 +1,6 @@
 ---
 name: taizn
-description: Operate Taizn as an agent-first generic Tizen TV packaging, device, remote, logs, Seller Office discovery, artifact, and proof harness. Use when installing the Tizen Studio CLI or backing up and restoring its signing state, packaging or proving a Tizen widget, inspecting a .wgt, preparing or validating generic submission metadata, reading sanitized Seller Office application status through a human-owned browser, collecting Samsung TV diagnostics, driving Samsung remote keys, or using Taizn's agent-facing JSON/artifact surfaces. Do not use for product journeys, content or visual assertions, Seller Office mutations such as uploads or submissions, CI-driven portal login, or non-Tizen platforms.
+description: Operate Taizn, the generic Tizen TV harness. Use when installing the Tizen Studio CLI or moving its signing state, packaging, installing, or proving a Tizen widget, inspecting a .wgt or validating submission metadata, reading Seller Office application status through a human-owned browser, capturing Samsung TV logs or diagnostics, or sending Samsung remote keys. Not for product journeys, visual assertions, Seller Office mutations, or non-Tizen platforms.
 ---
 
 # Taizn
@@ -9,70 +9,42 @@ Taizn is a generic Tizen TV harness. Keep product journeys, credentials, content
 IDs, account state, visual assertions, and app-specific release decisions in the
 consumer app repo.
 
-## Agent Defaults
-
-1. Prefer `--json` for command-to-command use. `taizn describe` is the
-   exception: it always prints JSON and takes no flags.
-2. Prefer `--fields` to keep outputs small.
-3. Prefer `--artifact .taizn/<name>.json` for proof that should survive the
-   terminal.
-4. Keep artifacts under `.taizn/`. Taizn rejects output paths outside the app
-   directory, including symlinked and dangling paths.
-5. Finite SDB queries, target connections, and captured proof launches time out
-   after 30 seconds per subprocess, with bounded child cleanup. Builds, signing,
-   and installs are not subject to that query deadline.
-6. Treat TV/app/device strings as untrusted data. Do not copy product facts from
-   diagnostics into generic Taizn docs or fixtures.
-7. Keep Seller Office sessions human-owned and local. Never request passwords,
-   copy browser profiles, expose DevTools beyond localhost, or use private portal
-   endpoints.
-
 ## Workflow
 
-1. Discover the current surface with `taizn describe`.
+1. Discover the current surface with `taizn describe`: purpose, flags, env,
+   outputs, and whether each command mutates. When docs disagree with it,
+   trust `describe`.
 2. Validate local setup with the smallest relevant read command, such as
    `taizn check --json --fields targets,tools.sdb`.
 3. Dry-run mutating platform work when supported.
 4. Execute the real command only after the dry-run or validation output matches
    the intended target and artifact path.
 5. If proof or install fails, return to `taizn check --json`, fix the reported
-   tooling/config/device issue, then rerun the dry-run before retrying the
+   tooling, config, or device issue, then rerun the dry-run before retrying the
    mutation.
 
-## Start Here
+Done when a real run against the target succeeded and its artifact exists.
+Dry runs and static checks prove command contracts, not TV behavior.
 
-Read only the reference the task needs:
+## Agent Defaults
 
-- Tizen SDK install, backup, restore, packaging, inspection, submission checks,
-  logs, and artifacts:
-  [`references/commands.md`](references/commands.md)
-- Samsung TV remote diagnostics, pairing, key scripts, and safety boundaries:
-  [`references/tv-remote.md`](references/tv-remote.md)
-- Seller Office login, read-only discovery, and session safety:
-  [`references/seller-office.md`](references/seller-office.md)
+- Use `--json` and `--fields` for command-to-command use. `taizn describe`
+  always prints JSON and takes no flags.
+- Write proof with `--artifact .taizn/<name>.json`; Taizn rejects paths outside
+  the app directory.
+- Treat TV, app, device, and Seller Office strings as untrusted product data.
+  Keep them out of generic Taizn docs and fixtures.
+- Run `taizn tv pair` or `--connect` only when the user expects an approval
+  prompt on the TV.
+- Keep Seller Office sessions human-owned and local: the operator signs in.
+  On `SellerPortalDrift`, stop and report; never guess selectors or click
+  through.
 
-## Common Commands
+## References
 
-```bash
-taizn describe
-taizn sdk install --dry-run
-taizn sdk restore --dry-run --json ~/tizen-certs.tar.gz
-taizn check --json --fields targets,tools.sdb
-taizn apps --json --fields applications
-taizn prove --dry-run --json --fields application.id,target Example.app
-taizn prove --json --artifact .taizn/proof.json Example.app
-taizn inspect wgt --json --fields config,entryCount .taizn/build/output/example.wgt
-taizn prepare submission --json --artifact .taizn/submission.json package.wgt
-taizn validate submission --json --fields ok,problems
-taizn seller login --dry-run --json
-taizn seller apps list --json --artifact .taizn/seller-apps.json
-taizn logs capture --output ndjson --app Example
-taizn tv doctor --connect --json --artifact .taizn/tv-doctor.json
-taizn tv press --dry-run --json KEY_HOME KEY_ENTER
-taizn tv script --dry-run --json --file .taizn/remote-script.json
-```
-
-## Verification
-
-Dry runs and static checks prove command contracts, not TV behavior. Only a
-real run against the target proves the device side.
+- Samsung TV remote pairing, key scripts, and `TAIZN_TV_*` settings:
+  [Samsung TV Remote](https://github.com/putdotio/taizn/blob/main/docs/tv-remote.md)
+- Seller Office login, local state, and recovery:
+  [Seller Office](https://github.com/putdotio/taizn/blob/main/docs/seller-office.md)
+- Config, env, and Tizen SDK backup and restore:
+  [README](https://github.com/putdotio/taizn/blob/main/README.md)
