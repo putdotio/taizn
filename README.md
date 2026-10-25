@@ -195,8 +195,6 @@ a human-owned local browser session with sanitized read-only discovery.
 ## Docs
 
 - [Contributing](./CONTRIBUTING.md)
-- [Samsung TV Remote](./docs/tv-remote.md)
-- [Seller Office](./docs/seller-office.md)
 - [Agent guide](./AGENTS.md) and [Taizn skill](./skills/taizn/SKILL.md)
 - [Security](https://github.com/putdotio/.github/blob/main/SECURITY.md)
 

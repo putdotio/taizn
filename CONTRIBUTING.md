@@ -29,14 +29,8 @@ Run the full gate before opening or updating a pull request:
 pnpm exec vp run verify
 ```
 
-Focused scripts (`check`, `typecheck`, `test`, `skills:lint`) live in
-[`package.json`](./package.json); `live:test:*` scripts check against a local
-Tizen toolchain and TV.
-
-## Pull Requests
-
-- Add or update tests when behavior changes.
-- List the checks you ran in the template's Verification section.
+`live:test:*` scripts in [`package.json`](./package.json) need a local Tizen
+toolchain and TV.
 
 ## Release
 

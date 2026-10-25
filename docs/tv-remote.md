@@ -19,12 +19,8 @@ taizn tv press --delay-ms 250 KEY_HOME KEY_DOWN KEY_ENTER
 taizn tv script --file .taizn/remote-script.json --dry-run --json
 ```
 
-- `doctor` reports the resolved host, `.taizn/remote.json` state, token
-  presence, metadata status, and websocket endpoint. `--connect` also opens the
-  websocket; without a token, the TV can show an allow/deny prompt.
-- `info` reads the TV's `/api/v2/` metadata and reports remote-control support.
-- `press` sends one or more keys, such as `KEY_HOME` or `KEY_ENTER`, over one
-  connection with the paired token. `--json` emits a redacted receipt.
+- `doctor --connect` opens the websocket; without a token, the TV can show an
+  allow/deny prompt.
 - `script` validates a JSON key recipe, then sends each step:
 
 ```json
@@ -67,6 +63,5 @@ TAIZN_TV_TOKEN=<paired-remote-token>
 - Without `TAIZN_TV_HOST`, `taizn tv` uses the host part of `TAIZN_TARGET`.
 - The default endpoint is `wss://<tv-ip>:8002`. Use `TAIZN_TV_PROTOCOL=ws` and
   `TAIZN_TV_PORT=8001` only for older TVs or fixtures without the TLS endpoint.
-- `TAIZN_TV_INFO_PORT` sets the metadata port for `tv info`.
 - `TAIZN_TV_TOKEN` overrides `.taizn/remote.json` for one run.
 - `TAIZN_TV_TIMEOUT_MS` bounds pairing, key presses, and metadata requests.
