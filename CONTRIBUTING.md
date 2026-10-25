@@ -30,9 +30,8 @@ pnpm exec vp run verify
 ```
 
 Focused scripts (`check`, `typecheck`, `test`, `skills:lint`) live in
-[`package.json`](./package.json).
-[Live Test](https://github.com/putdotio/taizn/blob/main/live-test/README.md)
-covers checks against a local Tizen toolchain and TV.
+[`package.json`](./package.json); `live:test:*` scripts check against a local
+Tizen toolchain and TV.
 
 ## Pull Requests
 
