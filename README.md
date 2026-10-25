@@ -21,29 +21,27 @@
 pnpm add -D @putdotio/taizn
 ```
 
-Only the latest npm release is supported.
+Only the latest npm release is supported. Node: `engines.node` in
+[`package.json`](./package.json).
 
-Node: `engines.node` in [`package.json`](./package.json)
-
-Taizn drives the Tizen Studio CLI; install it with `taizn sdk` or by hand, then
-make sure `taizn check` finds `tizen` and `sdb`.
+Taizn drives the Tizen Studio CLI. Install it with `taizn sdk install` or by
+hand, then check that `taizn check` finds `tizen` and `sdb`.
 
 Tizen Studio ships `sdb` and the JDK behind `tizen` as x86_64 macOS binaries.
-On Apple Silicon Macs they run through Rosetta 2, which keeps signing on the
-developer's local certificate profile:
+Apple Silicon Macs run them through Rosetta 2:
 
 ```bash
 softwareupdate --install-rosetta --agree-to-license
 ```
 
 Without Rosetta, commands that resolve `tizen` or `sdb` fail with
-`RosettaRequired` before running them. The Tizen TV emulator is x86-only, so
-Apple Silicon Macs prove against a connected TV.
+`RosettaRequired`. The Tizen TV emulator is x86-only, so Apple Silicon Macs
+prove against a connected TV.
 
 ## Tizen SDK
 
 `taizn sdk` installs Tizen Studio and moves its signing state between machines.
-None of these commands need a `taizn.json`.
+It needs no `taizn.json`.
 
 ```bash
 pnpm exec taizn sdk install --dry-run
@@ -54,30 +52,23 @@ pnpm exec taizn sdk restore --dry-run <archive.tar.gz>
 pnpm exec taizn sdk restore <archive.tar.gz>
 ```
 
-| Command       | Behavior                                                                                                                                                                                                                             |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `sdk install` | Downloads the official web CLI installer for macOS or x86_64 Linux, installs it into `~/tizen-studio`, optionally installs packages, then runs `tizen version` and `sdb version`. Reuses an existing install.                        |
-| `sdk backup`  | Archives `~/SamsungCertificate`, `~/.tizen`, and `~/tizen-studio-data/{keystore,profile}`; `--full` adds the SDK, its data, extensions, and workspace. Defaults to `~/tizen-certs-<timestamp>.tar.gz` (`tizen-full-` with `--full`). |
-| `sdk restore` | Extracts a backup into the home directory. Rejects archives with entries outside the backup paths above.                                                                                                                             |
+- `sdk install` puts the official web CLI installer's output in
+  `~/tizen-studio` (macOS or x86_64 Linux) and reuses an existing install.
+  Tizen Studio releases before `10.0` use a different installer name; pass
+  `--installer-url`. Samsung's installer accepts a `--studio-dir` only inside
+  the home directory, without spaces or non-ASCII characters. With a
+  non-default `--studio-dir`, set `TAIZN_TIZEN_CLI` and `TAIZN_SDB`.
+- `sdk backup` archives `~/SamsungCertificate`, `~/.tizen`, and
+  `~/tizen-studio-data/{keystore,profile}`; `--full` adds the SDK, its data,
+  extensions, and workspace. It runs on macOS and Linux only.
+- `sdk restore` extracts a backup into the home directory and rejects entries
+  outside the backup paths. A full restore refuses to run while
+  `~/tizen-studio` exists; move it aside first.
 
-`sdk install` flags: `--sdk-version` (default `10.0`; older Tizen Studio
-releases use a different installer name, so pass `--installer-url`),
-`--studio-dir`, `--download-dir` (default: a private temporary directory),
-`--installer-url`, `--packages`, `--proxy` (package-manager proxy mode, default
-`direct`), and `--show-packages` (Samsung's catalog download can hang). With a non-default
-`--studio-dir`, set `TAIZN_TIZEN_CLI` and `TAIZN_SDB` to the installed tools.
-Samsung's installer only accepts a `--studio-dir` inside the home directory,
-without spaces or non-ASCII characters.
-
-Backups hold signing certificates and device keys. Archives are staged
-privately, written with mode `0600`, and never replace an existing path; pick a
-new output outside the archived paths for each backup and keep it out of
-version control. Both commands accept only files, directories, and relative
-symlinks that stay inside the backup paths. Restore extracts into a private
-staging directory, then moves the result into home, merging existing folders
-but never writing through an existing symlink; a full restore refuses to run
-while `~/tizen-studio` exists, so move it aside first. Backup refuses symlinked
-source folders and runs on macOS and Linux only.
+Backups hold signing certificates and device keys. Each backup needs a new
+output path outside the archived paths; keep it out of version control. Taizn
+writes archives with mode `0600`, never replaces an existing path, and never
+writes through an existing symlink on restore.
 
 ## Quick Start
 
@@ -89,8 +80,6 @@ pnpm exec taizn package
 pnpm exec taizn install
 pnpm exec taizn run
 ```
-
-Common project files:
 
 | Path                   | Purpose                                        |
 | ---------------------- | ---------------------------------------------- |
@@ -143,14 +132,17 @@ Common project files:
 }
 ```
 
-Variant `indexHtml`, `injectWebapis`, and `rewriteAssetUrls` values override
-the top-level `widget` values. Variant `excludeFiles` values are added to
-top-level `widget.excludeFiles`. Use them when development packages should
-bundle local app assets but production packages should load hosted asset URLs.
+Variant `indexHtml`, `injectWebapis`, and `rewriteAssetUrls` override the
+top-level `widget` values; variant `excludeFiles` add to `widget.excludeFiles`.
+Use them when development packages bundle local assets and production packages
+load hosted asset URLs. [`src/config.ts`](https://github.com/putdotio/taizn/blob/main/src/config.ts) owns the full
+schema.
 
 ## Automation
 
-Prefer JSON and artifacts when `taizn` feeds another tool:
+`taizn describe` prints every command as JSON: purpose, flags, env, outputs,
+and whether it mutates. Prefer JSON and artifacts when `taizn` feeds another
+tool:
 
 ```bash
 pnpm exec taizn describe
@@ -159,47 +151,17 @@ pnpm exec taizn prove --dry-run --json --fields application.id,target Example.ap
 pnpm exec taizn prove --json --artifact .taizn/proof.json Example.app
 pnpm exec taizn prepare submission --json --artifact .taizn/submission.json package.wgt
 pnpm exec taizn validate submission --json --fields ok,problems
-pnpm exec taizn seller login --dry-run --json
 pnpm exec taizn seller apps list --json --artifact .taizn/seller-apps.json
 pnpm exec taizn tv doctor --connect --json --artifact .taizn/tv-doctor.json
 ```
 
-Use `--dry-run` before mutating platform state when the command supports it.
-Artifact paths must resolve inside the physical app directory, symlinks
-included; `.taizn/` is the normal home for proof state. The check runs before
-writing and does not guard against concurrent filesystem changes.
-
-Finite SDB queries, target connections, and captured launch commands time out
-after 30 seconds per subprocess; builds, signing, and installs have no deadline.
-
-## Command Surface
-
-| Command                              | Purpose                                            |
-| ------------------------------------ | -------------------------------------------------- |
-| `describe`                           | Print the command surface as JSON (no flags)       |
-| `check`                              | Verify Tizen CLI, `sdb`, and target readiness      |
-| `apps`                               | List installed target applications                 |
-| `launch`                             | Start an already-installed app                     |
-| `prove`                              | Resolve, launch, and record installed-app proof    |
-| `inspect wgt`                        | Read neutral `.wgt` archive metadata               |
-| `prepare submission`                 | Create a deterministic signed-WGT manifest         |
-| `validate submission`                | Check generic package metadata                     |
-| `probe hosted-assets`                | Discover or probe hosted asset URLs                |
-| `logs capture`                       | Record a bounded `sdb dlog -d` snapshot            |
-| `targets list` / `targets current`   | Report configured and connected target state       |
-| `profile`                            | Import local Tizen signing certificates            |
-| `package`                            | Build and sign a `.wgt`                            |
-| `install`                            | Package and sideload the widget                    |
-| `run`                                | Launch the configured variant application          |
-| `sdk install`                        | Install and verify the Tizen Studio CLI            |
-| `sdk backup` / `sdk restore`         | Archive or restore Tizen signing state             |
-| `seller login`                       | Open the human-owned Seller Office browser profile |
-| `seller apps list`                   | Read sanitized Seller Office application status    |
-| `tv doctor` / `tv info`              | Inspect Samsung TV remote-control readiness        |
-| `tv pair` / `tv press` / `tv script` | Pair and send Samsung remote-control key sequences |
-
-See [Samsung TV Remote](./docs/tv-remote.md) for pairing, environment, and
-limits.
+- Run `--dry-run` before mutating platform state when the command supports it.
+- Artifact paths must resolve inside the physical app directory, symlinks
+  included. The check runs before writing and does not guard against
+  concurrent filesystem changes.
+- Finite SDB queries, target connections, and captured launch commands time out
+  after 30 seconds per subprocess. Builds, signing, and installs have no
+  deadline.
 
 ## Environment
 
@@ -214,22 +176,12 @@ TAIZN_TIZEN_CLI=~/tizen-studio/tools/ide/bin/tizen
 TAIZN_SDB=~/tizen-studio/tools/sdb
 TAIZN_SELLER_BROWSER=/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome
 TAIZN_TV_HOST=<tv-ip>
-TAIZN_TV_PORT=8002
-TAIZN_TV_PROTOCOL=wss
 TAIZN_TV_TOKEN=<paired-remote-token>
 ```
 
-[Samsung TV Remote](./docs/tv-remote.md#environment) lists the remaining
-`TAIZN_TV_*` settings.
-
-`taizn tv` uses `TAIZN_TV_HOST`, or the host part of `TAIZN_TARGET` when no TV
-host is set. `taizn tv pair` writes the paired remote token to
-`.taizn/remote.json`; keep `.taizn/` ignored.
-
-`taizn seller login` opens a dedicated visible Chrome profile under `.taizn/`
-and stores only its localhost DevTools port in `.taizn/seller.json`; Taizn never
-reads Samsung credentials. See [Seller Office](./docs/seller-office.md) for the
-read-only workflow and recovery steps.
+[Samsung TV Remote](./docs/tv-remote.md) covers pairing and the other
+`TAIZN_TV_*` settings. [Seller Office](./docs/seller-office.md) covers the
+read-only Seller Office workflow.
 
 ## Boundaries
 
@@ -237,23 +189,17 @@ read-only workflow and recovery steps.
 submission preparation, Samsung remote keys, target inventory, logs,
 hosted-asset probes, and proof artifacts. Consumer apps own product journeys,
 credentials, app IDs, content IDs, account state, visual assertions, release
-decisions, and Samsung TV Seller Office portal mutations. Taizn's Seller Office
-surface is limited to a human-owned local browser session and sanitized
-read-only discovery.
+decisions, and Seller Office portal mutations. Taizn's Seller Office surface is
+a human-owned local browser session with sanitized read-only discovery.
 
 ## Docs
 
 - [Contributing](./CONTRIBUTING.md)
-- [Distribution](./docs/distribution.md)
 - [Live Test](https://github.com/putdotio/taizn/blob/main/live-test/README.md)
 - [Samsung TV Remote](./docs/tv-remote.md)
 - [Seller Office](./docs/seller-office.md)
+- [Agent guide](./AGENTS.md) and [Taizn skill](./skills/taizn/SKILL.md)
 - [Security](https://github.com/putdotio/.github/blob/main/SECURITY.md)
-
-## Repo Internals
-
-- [Agent guide](./AGENTS.md)
-- [Taizn skill](./skills/taizn/SKILL.md)
 
 ## License
 
