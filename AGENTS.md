@@ -57,10 +57,6 @@ consumer apps. Keep it a shell-out tool, not an app framework.
 - New agent-facing commands take `--json`, `--fields`, and, when proof is
   useful, `--artifact`. Mutating platform commands take `--dry-run` unless a
   dry run would mislead; say what a dry run validates when it is not proof.
-- CLI tests default to the in-process harness (`runTaiznInProcess` over
-  `runTaiznCli` from `src/main.ts`) so V8 coverage attributes them. Spawn
-  `dist/taizn.mjs` only when the process boundary is under test; coverage
-  skips those runs (see `vite.config.ts`).
 
 ## Effect
 
@@ -77,14 +73,8 @@ the APIs the change touches; search `node_modules/effect/src` for the rest.
 
 ## Checks
 
-Run Vite+ through the pinned devDependency as `pnpm exec vp`. In a new
-worktree, `.worktreeinclude` copies local env files; then run:
-
-```bash
-pnpm install
-pnpm exec vp run hooks:install
-pnpm exec vp run verify
-```
+Run Vite+ through the pinned devDependency as `pnpm exec vp`.
+Setup and validation: [CONTRIBUTING](CONTRIBUTING.md).
 
 If live-test env is missing, run
 `pnpm exec vp run live:test:setup -- --from <consumer-app> --target <tv-ip>`.
