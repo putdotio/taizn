@@ -63,6 +63,9 @@ consumer apps. Keep it a shell-out tool, not an app framework.
 The installed version's guide is `node_modules/effect/AGENTS.md`. Read it for
 the APIs the change touches; search `node_modules/effect/src` for the rest.
 
+Effect setup and guide routing: `effect-ts` skill. Keep the pinned `effect`
+version; skip its `@latest` install step.
+
 ## When Contracts Change
 
 - Command surface: update `src/describe.ts` and CLI tests; guardrail changes
