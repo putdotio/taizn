@@ -26,8 +26,8 @@ taizn seller apps list --json --artifact .taizn/seller-apps.json
 ```
 
 The result holds a schema version and each application's sanitized name,
-Seller app ID, type, status, and update date. No account, group, cookie, token,
-raw HTML, or raw portal data.
+Seller app ID, type, status, and update date. It leaves out account, group,
+cookie, token, raw HTML, and raw portal data.
 
 ## Local State
 

@@ -24,7 +24,7 @@ consumer app repo.
    mutation.
 
 Done when a real run against the target succeeded and its artifact exists.
-Dry runs and static checks prove command contracts, not TV behavior.
+Dry runs and static checks prove command contracts only.
 
 ## Agent Defaults
 

@@ -1,7 +1,7 @@
 # Agent Guide
 
 `taizn` is a typed Tizen TV packaging and live-device proof harness for
-consumer apps. Keep it a shell-out tool, not an app framework.
+consumer apps. Keep it a tool that shells out to the Tizen CLI.
 
 ## Start Here
 
@@ -33,8 +33,8 @@ consumer apps. Keep it a shell-out tool, not an app framework.
 
 - Keep put.io product behavior out: no put.io app IDs, hosted app URLs,
   content IDs, account data, credentials, journeys, or product assertions.
-- `@putdotio/taizn`, release-bot wiring, copyright, and security contacts are
-  ownership metadata, not permission for product-specific fixtures.
+- The only put.io names here are ownership metadata: `@putdotio/taizn`,
+  release-bot wiring, copyright, and security contacts.
 - Samples use neutral data such as `Example.app`, `Fixture.app`, and public
   third-party asset URLs.
 - Consumer repos own `LIVE_TEST_FETCH_URLS`, launch and proof targets, product
@@ -53,7 +53,7 @@ consumer apps. Keep it a shell-out tool, not an app framework.
 - `process.cwd()` is the consumer app root.
 - `.taizn/` stays consumer-local; it can hold env, certs, generated widgets,
   paired remote tokens, and device state.
-- Prefer small helpers over new framework layers or compatibility modes.
+- Extend with small helpers.
 - New agent-facing commands take `--json`, `--fields`, and, when proof is
   useful, `--artifact`. Mutating platform commands take `--dry-run` unless a
   dry run would mislead; say what a dry run validates when it is not proof.

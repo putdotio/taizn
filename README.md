@@ -141,7 +141,7 @@ schema.
 ## Automation
 
 `taizn describe` prints every command as JSON: purpose, flags, env, outputs,
-and whether it mutates. Prefer JSON and artifacts when `taizn` feeds another
+and whether it mutates. Use JSON and artifacts when `taizn` feeds another
 tool:
 
 ```bash
@@ -187,10 +187,8 @@ read-only Seller Office workflow.
 
 `taizn` owns platform mechanics: Tizen CLI, `sdb`, widget archives, local
 submission preparation, Samsung remote keys, target inventory, logs,
-hosted-asset probes, and proof artifacts. Consumer apps own product journeys,
-credentials, app IDs, content IDs, account state, visual assertions, release
-decisions, and Seller Office portal mutations. Taizn's Seller Office surface is
-a human-owned local browser session with sanitized read-only discovery.
+hosted-asset probes, and proof artifacts. Its Seller Office commands read a
+human-owned local browser session.
 
 ## Docs
 
