@@ -2,10 +2,9 @@
 
 `taizn tv` drives Samsung's websocket remote-control API against a physical TV
 or monitor. It reads metadata, diagnoses readiness, pairs, and sends remote
-keys. It does not install widgets, launch apps, or capture screenshots: use
-`taizn install` and `taizn run` for the app lifecycle, and logs, app-level
-probes, Samsung Web Inspector, Remote Test Lab, or external capture for visual
-proof.
+keys. Use `taizn install` and `taizn run` for the app lifecycle, and logs,
+app-level probes, Samsung Web Inspector, Remote Test Lab, or external capture
+for visual proof.
 
 ## Commands
 
