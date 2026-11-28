@@ -118,7 +118,7 @@ const sellerStateFixture = (state?: string) => {
   return dir;
 };
 
-const withPlatform = (platform: NodeJS.Platform, use: () => void) => {
+const withPlatform = (platform: NodeJS.Platform, run: () => void) => {
   const descriptor = Object.getOwnPropertyDescriptor(process, "platform");
 
   if (!descriptor) {
@@ -128,7 +128,7 @@ const withPlatform = (platform: NodeJS.Platform, use: () => void) => {
   Object.defineProperty(process, "platform", { configurable: true, value: platform });
 
   try {
-    use();
+    run();
   } finally {
     Object.defineProperty(process, "platform", descriptor);
   }
