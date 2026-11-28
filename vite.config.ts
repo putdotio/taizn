@@ -16,7 +16,6 @@ export default defineConfig({
       "anti-slop/require-readable-spacing": "off",
       "anti-slop/require-safety-comment-for-type-assertion": "off",
       "array-callback-return": "off",
-      curly: "off",
       "import/consistent-type-specifier-style": "off",
       "no-console": "off",
       "no-promise-executor-return": "off",

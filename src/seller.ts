@@ -159,8 +159,12 @@ export const loginSeller = Effect.fn("loginSeller")(function* (
               catch: (cause) => SellerBrowserConnectionFailed.make({ cause, target: browser }),
             }).pipe(Effect.result);
 
-            if (Result.isFailure(stateCleanup)) return yield* Effect.fail(stateCleanup.failure);
-            if (Result.isFailure(browserCleanup)) return yield* Effect.fail(browserCleanup.failure);
+            if (Result.isFailure(stateCleanup)) {
+              return yield* Effect.fail(stateCleanup.failure);
+            }
+            if (Result.isFailure(browserCleanup)) {
+              return yield* Effect.fail(browserCleanup.failure);
+            }
           }),
   );
 });
@@ -258,7 +262,9 @@ const browserTreeExists = (pid: number) => {
     process.kill(-pid, 0);
     return true;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") {
+      return false;
+    }
     throw error;
   }
 };
@@ -266,36 +272,48 @@ const browserTreeExists = (pid: number) => {
 const waitForBrowserTreeExit = async (pid: number, timeoutMs: number) => {
   const deadline = Date.now() + timeoutMs;
   while (browserTreeExists(pid)) {
-    if (Date.now() >= deadline) return false;
+    if (Date.now() >= deadline) {
+      return false;
+    }
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   return true;
 };
 
 const stopBrowser = async (child: ChildProcess) => {
-  if (child.pid === undefined) return;
+  if (child.pid === undefined) {
+    return;
+  }
 
   if (process.platform === "win32") {
     const killer = spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
       stdio: "ignore",
     });
     const [code] = (await once(killer, "exit")) as [number | null];
-    if (code !== 0) throw new Error(`Seller Office browser tree ${child.pid} was not verified.`);
+    if (code !== 0) {
+      throw new Error(`Seller Office browser tree ${child.pid} was not verified.`);
+    }
     return;
   }
 
-  if (!browserTreeExists(child.pid)) return;
+  if (!browserTreeExists(child.pid)) {
+    return;
+  }
 
   const signal = (name: NodeJS.Signals) => {
     try {
       process.kill(-child.pid!, name);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+      if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
+        throw error;
+      }
     }
   };
 
   signal("SIGTERM");
-  if (await waitForBrowserTreeExit(child.pid, 2_000)) return;
+  if (await waitForBrowserTreeExit(child.pid, 2_000)) {
+    return;
+  }
   signal("SIGKILL");
   if (!(await waitForBrowserTreeExit(child.pid, 2_000))) {
     throw new Error(`Seller Office browser ${child.pid} did not stop.`);

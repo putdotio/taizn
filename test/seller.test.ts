@@ -41,8 +41,12 @@ const makeCard = (options: {
   querySelector: (selector) =>
     selector === ".appType" && options.type !== undefined ? element(options.type) : null,
   querySelectorAll: (selector) => {
-    if (selector === ".appInfo span") return (options.identity ?? []).map(element);
-    if (selector === ".appStatus span") return (options.status ?? []).map(element);
+    if (selector === ".appInfo span") {
+      return (options.identity ?? []).map(element);
+    }
+    if (selector === ".appStatus span") {
+      return (options.status ?? []).map(element);
+    }
     return [];
   },
 });
@@ -59,8 +63,12 @@ const evaluateSellerPage = (
       runInNewContext(SELLER_APPLICATIONS_EXPRESSION, {
         document: {
           querySelectorAll: (selector: string) => {
-            if (selector === ".appThumb") return options.cards ?? [];
-            if (selector === "h1") return (options.headings ?? []).map(element);
+            if (selector === ".appThumb") {
+              return options.cards ?? [];
+            }
+            if (selector === "h1") {
+              return (options.headings ?? []).map(element);
+            }
             return [];
           },
         },

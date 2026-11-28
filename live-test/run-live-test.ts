@@ -206,7 +206,9 @@ function runTaizn(command: TaiznMode) {
     ...(command === "prove" ? { timeout: 120_000, killSignal: "SIGKILL" as const } : {}),
   });
 
-  if (result.error) console.error(`taizn ${command}: ${result.error.message}`);
+  if (result.error) {
+    console.error(`taizn ${command}: ${result.error.message}`);
+  }
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }

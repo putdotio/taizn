@@ -687,7 +687,9 @@ describe("taizn cli", () => {
       const dir = createToolingFixture();
       const outside = tempDir("taizn-outside-");
       const destination = join(outside, "proof.json");
-      if (kind !== "dangling") writeFileSync(destination, "untouched");
+      if (kind !== "dangling") {
+        writeFileSync(destination, "untouched");
+      }
       mkdirSync(join(dir, ".taizn"), { recursive: true });
       const artifact =
         kind === "parent" || kind === "nested" ? ".taizn/link/new/proof.json" : ".taizn/proof.json";
@@ -716,8 +718,11 @@ describe("taizn cli", () => {
       assert.strictEqual(result.status, 1);
       assert.include(result.stderr, "output path must stay inside the app directory");
       assert.isFalse(existsSync(join(outside, "new")));
-      if (kind === "dangling") assert.isFalse(existsSync(destination));
-      else assert.strictEqual(readFileSync(destination, "utf8"), "untouched");
+      if (kind === "dangling") {
+        assert.isFalse(existsSync(destination));
+      } else {
+        assert.strictEqual(readFileSync(destination, "utf8"), "untouched");
+      }
     });
   }
 
