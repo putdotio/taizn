@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 type LiveTestEnv = Record<string, string | undefined>;
+
 type LiveTestVariant = "development" | "production";
 
 export const hostedAssetProbeUrls = [
@@ -70,10 +71,11 @@ export function resolveSmokeTarget(checkJson: unknown) {
 }
 
 export function selectBeaconHost(
-  interfaceAddresses: readonly string[],
+  interfaceAddresses: ReadonlyArray<string>,
   target: string | undefined,
 ) {
   const targetHost = parseTargetHost(target);
+
   const sameSubnetAddress = targetHost
     ? interfaceAddresses.find((address) => sameIpv4Subnet(address, targetHost))
     : undefined;
@@ -141,7 +143,7 @@ export function parseRemoteDelayMs(value: string | undefined) {
   return parsed;
 }
 
-export function failedFetchProbes(fetches: unknown): readonly FetchProbeFailure[] {
+export function failedFetchProbes(fetches: unknown): ReadonlyArray<FetchProbeFailure> {
   if (fetches === undefined) {
     return [];
   }
@@ -184,7 +186,7 @@ export function envFlagEnabled(value: string | undefined) {
 }
 
 export function jsonForHtmlScript(value: unknown) {
-  return JSON.stringify(value).replaceAll("<", "\\u003c");
+  return JSON.stringify(value).replaceAll("<", String.raw`\u003c`);
 }
 
 export function readTemplateVariantString(

@@ -80,6 +80,7 @@ export const makePaths = (appDir: string): TaiznPaths => {
 export const getPaths = Effect.fn("getPaths")(function* () {
   const system = yield* TaiznSystem;
   const appDir = yield* system.cwd;
+
   return makePaths(appDir);
 });
 
@@ -94,6 +95,7 @@ export const loadLocalEnv = Effect.fn("loadLocalEnv")(function* () {
 
 export const requireFile = Effect.fn("requireFile")(function* (path: string, label: string) {
   const fs = yield* FileSystem.FileSystem;
+
   const exists = yield* fs
     .exists(path)
     .pipe(Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "exists", path })));
@@ -111,6 +113,7 @@ export const baseChildEnv = Effect.fn("baseChildEnv")(function* () {
   const env: ChildEnv = { ...source };
 
   delete env.DYLD_INSERT_LIBRARIES;
+
   return env;
 });
 
@@ -124,6 +127,7 @@ export const appBuildEnv = Effect.fn("appBuildEnv")(function* () {
   }
 
   delete env.SDB;
+
   return env;
 });
 
@@ -142,22 +146,24 @@ export const withTizenPath = Effect.fn("withTizenPath")(function* (env: ChildEnv
 export const defaultTizenCli = Effect.fn("defaultTizenCli")(function* () {
   const system = yield* TaiznSystem;
   const home = yield* system.homeDir;
+
   return join(home, "tizen-studio/tools/ide/bin/tizen");
 });
 
 export const defaultSdb = Effect.fn("defaultSdb")(function* () {
   const system = yield* TaiznSystem;
   const home = yield* system.homeDir;
+
   return join(home, "tizen-studio/tools/sdb");
 });
 
-const machOX86_64 = 0x01000007;
-const machOArm64 = 0x0100000c;
+const machOX86_64 = 0x01_00_00_07;
+const machOArm64 = 0x01_00_00_0c;
 
 const fatArchCpuTypes = (bytes: Uint8Array, view: DataView) => {
   const count = view.getUint32(4);
-  const stride = view.getUint32(0) === 0xcafebabf ? 32 : 20;
-  const cpuTypes: number[] = [];
+  const stride = view.getUint32(0) === 0xca_fe_ba_bf ? 32 : 20;
+  const cpuTypes: Array<number> = [];
 
   for (let index = 0; index < count && 8 + (index + 1) * stride <= bytes.length; index++) {
     cpuTypes.push(view.getUint32(8 + index * stride));
@@ -174,12 +180,13 @@ export const needsRosetta = (bytes: Uint8Array) => {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const bigEndianMagic = view.getUint32(0);
 
-  if (bigEndianMagic === 0xcafebabe || bigEndianMagic === 0xcafebabf) {
+  if (bigEndianMagic === 0xca_fe_ba_be || bigEndianMagic === 0xca_fe_ba_bf) {
     const cpuTypes = fatArchCpuTypes(bytes, view);
+
     return cpuTypes.includes(machOX86_64) && !cpuTypes.includes(machOArm64);
   }
 
-  return view.getUint32(0, true) === 0xfeedfacf && view.getUint32(4, true) === machOX86_64;
+  return view.getUint32(0, true) === 0xfe_ed_fa_cf && view.getUint32(4, true) === machOX86_64;
 };
 
 export const readPassword = Effect.fn("readPassword")(function* (
@@ -191,6 +198,7 @@ export const readPassword = Effect.fn("readPassword")(function* (
   }
 
   const system = yield* TaiznSystem;
+
   return yield* system.readSecret(prompt);
 });
 
@@ -210,6 +218,7 @@ const readSecret = (prompt: string, signal: AbortSignal) =>
   new Promise<string>((resolve, reject) => {
     if (!process.stdin.isTTY) {
       resolve("");
+
       return;
     }
 
@@ -237,6 +246,7 @@ const readSecret = (prompt: string, signal: AbortSignal) =>
         cleanup();
         process.stdout.write("\n");
         reject(new Error("interrupted"));
+
         return;
       }
 
@@ -244,11 +254,13 @@ const readSecret = (prompt: string, signal: AbortSignal) =>
         cleanup();
         process.stdout.write("\n");
         resolve(value);
+
         return;
       }
 
       if (char === "\u007f") {
         value = value.slice(0, -1);
+
         return;
       }
 
@@ -256,9 +268,12 @@ const readSecret = (prompt: string, signal: AbortSignal) =>
     };
 
     signal.addEventListener("abort", onAbort, { once: true });
+
     if (signal.aborted) {
       onAbort();
+
       return;
     }
+
     process.stdin.on("data", onData);
   });

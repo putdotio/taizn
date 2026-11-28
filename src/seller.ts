@@ -1,4 +1,5 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { isAbsolute } from "node:path";
 import { Console, Effect, Exit, FileSystem, Result, Schema } from "effect";
@@ -98,6 +99,7 @@ export const loginSeller = Effect.fn("loginSeller")(function* (
   const paths = yield* getPaths();
   const browser = yield* resolveSellerBrowser(env);
   const args = sellerBrowserArgs(paths.sellerProfileDir);
+
   const result = {
     browser,
     browserProfile: paths.sellerProfileDir,
@@ -109,6 +111,7 @@ export const loginSeller = Effect.fn("loginSeller")(function* (
 
   if (options.dryRun) {
     yield* printLoginResult(result, options.json);
+
     return;
   }
 
@@ -154,13 +157,19 @@ export const loginSeller = Effect.fn("loginSeller")(function* (
                   )
                 : Effect.void
             ).pipe(Effect.result);
+
             const browserCleanup = yield* Effect.tryPromise({
               try: () => stopBrowser(child),
               catch: (cause) => SellerBrowserConnectionFailed.make({ cause, target: browser }),
             }).pipe(Effect.result);
 
-            if (Result.isFailure(stateCleanup)) return yield* Effect.fail(stateCleanup.failure);
-            if (Result.isFailure(browserCleanup)) return yield* Effect.fail(browserCleanup.failure);
+            if (Result.isFailure(stateCleanup)) {
+              return yield* Effect.fail(stateCleanup.failure);
+            }
+
+            if (Result.isFailure(browserCleanup)) {
+              return yield* Effect.fail(browserCleanup.failure);
+            }
           }),
   );
 });
@@ -170,6 +179,7 @@ export const listSellerApplications = Effect.fn("listSellerApplications")(functi
 ) {
   const state = yield* readSellerBrowserState();
   const target = `http://127.0.0.1:${state.port}`;
+
   const result = yield* Effect.tryPromise({
     try: () => readSellerApplications(target),
     catch: (cause) => normalizeSellerError(cause, target),
@@ -181,11 +191,13 @@ export const listSellerApplications = Effect.fn("listSellerApplications")(functi
 
   if (options.json) {
     yield* Console.log(yield* jsonForOutput(result, { fields: options.fields }));
+
     return;
   }
 
   if (result.applications.length === 0) {
     yield* Console.log("Seller Office applications: none");
+
     return;
   }
 
@@ -204,6 +216,7 @@ const resolveSellerBrowser = Effect.fn("resolveSellerBrowser")(function* (env: T
   }
 
   const fs = yield* FileSystem.FileSystem;
+
   const exists = yield* fs
     .exists(browser)
     .pipe(
@@ -225,7 +238,7 @@ export const defaultSellerBrowser = () => {
   }
 
   if (process.platform === "win32") {
-    return "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+    return String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`;
   }
 
   return "google-chrome";
@@ -240,7 +253,7 @@ export const sellerBrowserArgs = (profileDir: string) => [
   SELLER_LOGIN_URL,
 ];
 
-const launchBrowser = (browser: string, args: readonly string[]) =>
+const launchBrowser = (browser: string, args: ReadonlyArray<string>) =>
   new Promise<ChildProcess>((resolve, reject) => {
     const child = spawn(browser, args, {
       detached: process.platform !== "win32",
@@ -256,48 +269,80 @@ const launchBrowser = (browser: string, args: readonly string[]) =>
 const browserTreeExists = (pid: number) => {
   try {
     process.kill(-pid, 0);
+
     return true;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
+    // SAFETY: process.kill throws Node system errors, which carry an errno code.
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") {
+      return false;
+    }
+
     throw error;
   }
 };
 
 const waitForBrowserTreeExit = async (pid: number, timeoutMs: number) => {
   const deadline = Date.now() + timeoutMs;
+
   while (browserTreeExists(pid)) {
-    if (Date.now() >= deadline) return false;
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    if (Date.now() >= deadline) {
+      return false;
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 25);
+    });
   }
+
   return true;
 };
 
 const stopBrowser = async (child: ChildProcess) => {
-  if (child.pid === undefined) return;
+  if (child.pid === undefined) {
+    return;
+  }
 
   if (process.platform === "win32") {
     const killer = spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
       stdio: "ignore",
     });
+
+    // SAFETY: a ChildProcess "exit" event passes the exit code as its first argument.
     const [code] = (await once(killer, "exit")) as [number | null];
-    if (code !== 0) throw new Error(`Seller Office browser tree ${child.pid} was not verified.`);
+
+    if (code !== 0) {
+      throw new Error(`Seller Office browser tree ${child.pid} was not verified.`);
+    }
+
     return;
   }
 
-  if (!browserTreeExists(child.pid)) return;
+  const pid = child.pid;
+
+  if (!browserTreeExists(pid)) {
+    return;
+  }
 
   const signal = (name: NodeJS.Signals) => {
     try {
-      process.kill(-child.pid!, name);
+      process.kill(-pid, name);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+      // SAFETY: process.kill throws Node system errors, which carry an errno code.
+      if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
+        throw error;
+      }
     }
   };
 
   signal("SIGTERM");
-  if (await waitForBrowserTreeExit(child.pid, 2_000)) return;
+
+  if (await waitForBrowserTreeExit(child.pid, 2000)) {
+    return;
+  }
+
   signal("SIGKILL");
-  if (!(await waitForBrowserTreeExit(child.pid, 2_000))) {
+
+  if (!(await waitForBrowserTreeExit(child.pid, 2000))) {
     throw new Error(`Seller Office browser ${child.pid} did not stop.`);
   }
 };
@@ -314,6 +359,7 @@ export const waitForDevToolsPort = Effect.fn("waitForDevToolsPort")(function* (p
         .pipe(
           Effect.mapError((cause) => FileSystemFailure.make({ cause, operation: "read", path })),
         );
+
       const port = Number(source.split(/\r?\n/u)[0]);
 
       if (Number.isInteger(port) && port > 0 && port <= 65_535) {
@@ -322,6 +368,7 @@ export const waitForDevToolsPort = Effect.fn("waitForDevToolsPort")(function* (p
             const response = await fetch(`http://127.0.0.1:${port}/json/version`, {
               signal: AbortSignal.timeout(500),
             });
+
             return response.ok;
           },
           catch: (cause) => cause,
@@ -345,6 +392,7 @@ export const waitForDevToolsPort = Effect.fn("waitForDevToolsPort")(function* (p
 export const readSellerBrowserState = Effect.fn("readSellerBrowserState")(function* () {
   const paths = yield* getPaths();
   const fs = yield* FileSystem.FileSystem;
+
   const exists = yield* fs
     .exists(paths.sellerStatePath)
     .pipe(
@@ -358,6 +406,7 @@ export const readSellerBrowserState = Effect.fn("readSellerBrowserState")(functi
   }
 
   const json = yield* readJsonFile(paths.sellerStatePath);
+
   const state = yield* Schema.decodeUnknownEffect(SellerBrowserState)(json, { errors: "all" }).pipe(
     Effect.mapError((error) =>
       SellerPortalProtocolError.make({ details: `invalid seller session state: ${error.message}` }),
@@ -392,9 +441,9 @@ const readSellerApplications = async (target: string) => {
           expression: SELLER_APPLICATIONS_EXPRESSION,
           returnByValue: true,
         });
-      } catch (cause) {
+      } catch (error) {
         if (attempt === 49) {
-          throw cause;
+          throw error;
         }
 
         await delay(200);
@@ -437,9 +486,11 @@ const findBrowserPage = async (target: string) => {
   }
 
   const json: unknown = await response.json();
+
   const pages = Schema.decodeUnknownSync(Schema.Array(CdpTarget))(json).filter(
     (candidate) => candidate.type === "page",
   );
+
   const page =
     pages.find((candidate) => candidate.url.includes("seller.samsungapps.com/tv")) ?? pages[0];
 
@@ -453,6 +504,7 @@ const findBrowserPage = async (target: string) => {
 export const decodeSellerExtraction = (raw: unknown) => {
   try {
     const evaluated = Schema.decodeUnknownSync(CdpEvaluationResult)(raw);
+
     return Schema.decodeUnknownSync(SellerExtraction)(evaluated.result.value);
   } catch {
     throw SellerPortalProtocolError.make({
@@ -504,11 +556,13 @@ const withCdp = <A>(
 
       return new Promise<unknown>((resolveRequest, rejectRequest) => {
         let requestSettled = false;
+
         const cleanup = () => {
           clearTimeout(timeout);
           socket.off("message", onMessage);
           rejectPendingRequests.delete(failRequest);
         };
+
         const failRequest = (cause: unknown) => {
           if (requestSettled) {
             return;
@@ -518,6 +572,7 @@ const withCdp = <A>(
           cleanup();
           rejectRequest(cause);
         };
+
         const succeedRequest = (result: unknown) => {
           if (requestSettled) {
             return;
@@ -527,6 +582,7 @@ const withCdp = <A>(
           cleanup();
           resolveRequest(result);
         };
+
         const onMessage = (data: WebSocket.RawData) => {
           try {
             const json: unknown = JSON.parse(data.toString());
@@ -542,6 +598,7 @@ const withCdp = <A>(
                   details: `${method}: ${message.error.message}`,
                 }),
               );
+
               return;
             }
 
@@ -550,6 +607,7 @@ const withCdp = <A>(
             failRequest(SellerPortalProtocolError.make({ details: "invalid DevTools response" }));
           }
         };
+
         const timeout = setTimeout(() => {
           const cause = new Error(`DevTools request ${id} did not receive a response`);
           failRequest(
@@ -606,12 +664,14 @@ const printLoginResult = Effect.fn("printLoginResult")(function* (
 ) {
   if (json) {
     yield* Console.log(JSON.stringify(result));
+
     return;
   }
 
   if (result.dryRun) {
     yield* Console.log(`Seller Office login browser: ${result.browser}`);
     yield* Console.log(`Seller Office browser profile: ${result.browserProfile}`);
+
     return;
   }
 

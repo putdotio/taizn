@@ -2,7 +2,8 @@ import { CliError, Command } from "effect/cli";
 import { Console, Effect, FileSystem, Schema } from "effect";
 import { fileURLToPath } from "node:url";
 import { command } from "./cli.js";
-import { type TaiznError, renderError, renderErrorJson } from "./errors.js";
+import { renderError, renderErrorJson } from "./errors.js";
+import type { TaiznError } from "./errors.js";
 import { loadLocalEnv } from "./runtime.js";
 
 class PackageJson extends Schema.Class<PackageJson>("PackageJson")({
@@ -12,13 +13,16 @@ class PackageJson extends Schema.Class<PackageJson>("PackageJson")({
 const getPackageVersion = Effect.fn("getPackageVersion")(
   function* () {
     const fs = yield* FileSystem.FileSystem;
+
     const source = yield* fs.readFileString(
       fileURLToPath(new URL("../package.json", import.meta.url)),
     );
+
     const json = yield* Effect.try({
       try: () => JSON.parse(source),
       catch: () => undefined,
     });
+
     const parsed = yield* Schema.decodeUnknownEffect(PackageJson)(json).pipe(
       Effect.catch(() => Effect.succeed(PackageJson.make({ version: "0.0.0" }))),
     );
@@ -39,6 +43,7 @@ export const runTaiznCli = (args: ReadonlyArray<string>) =>
     }
 
     yield* runCommand;
+
     return 0;
   }).pipe(Effect.catch(handleMainError(args)));
 
@@ -59,8 +64,8 @@ const handleMainError =
 
 type BufferedConsole = {
   readonly console: Console.Console;
-  readonly stderr: readonly string[];
-  readonly stdout: readonly string[];
+  readonly stderr: ReadonlyArray<string>;
+  readonly stdout: ReadonlyArray<string>;
 };
 
 const runWithBufferedConsole = <R>(
@@ -125,10 +130,11 @@ const flushBufferedConsole = (buffered: BufferedConsole, outerConsole: Console.C
     }
   });
 
+const format = (args: ReadonlyArray<unknown>) => args.map(String).join(" ");
+
 const makeBufferedConsole = (realConsole: Console.Console): BufferedConsole => {
-  const stdout: string[] = [];
-  const stderr: string[] = [];
-  const format = (args: ReadonlyArray<unknown>) => args.map(String).join(" ");
+  const stdout: Array<string> = [];
+  const stderr: Array<string> = [];
 
   return {
     console: {

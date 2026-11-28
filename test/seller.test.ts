@@ -30,19 +30,25 @@ const element = (textContent: string | null): FakeElement => ({ textContent });
 
 type FakeCard = {
   readonly querySelector: (selector: string) => FakeElement | null;
-  readonly querySelectorAll: (selector: string) => readonly FakeElement[];
+  readonly querySelectorAll: (selector: string) => ReadonlyArray<FakeElement>;
 };
 
 const makeCard = (options: {
-  readonly identity?: readonly (string | null)[];
-  readonly status?: readonly (string | null)[];
+  readonly identity?: ReadonlyArray<string | null>;
+  readonly status?: ReadonlyArray<string | null>;
   readonly type?: string;
 }): FakeCard => ({
   querySelector: (selector) =>
     selector === ".appType" && options.type !== undefined ? element(options.type) : null,
   querySelectorAll: (selector) => {
-    if (selector === ".appInfo span") return (options.identity ?? []).map(element);
-    if (selector === ".appStatus span") return (options.status ?? []).map(element);
+    if (selector === ".appInfo span") {
+      return (options.identity ?? []).map(element);
+    }
+
+    if (selector === ".appStatus span") {
+      return (options.status ?? []).map(element);
+    }
+
     return [];
   },
 });
@@ -50,8 +56,8 @@ const makeCard = (options: {
 const evaluateSellerPage = (
   pathname: string,
   options: {
-    readonly cards?: readonly FakeCard[];
-    readonly headings?: readonly string[];
+    readonly cards?: ReadonlyArray<FakeCard>;
+    readonly headings?: ReadonlyArray<string>;
   } = {},
 ): unknown =>
   JSON.parse(
@@ -59,8 +65,14 @@ const evaluateSellerPage = (
       runInNewContext(SELLER_APPLICATIONS_EXPRESSION, {
         document: {
           querySelectorAll: (selector: string) => {
-            if (selector === ".appThumb") return options.cards ?? [];
-            if (selector === "h1") return (options.headings ?? []).map(element);
+            if (selector === ".appThumb") {
+              return options.cards ?? [];
+            }
+
+            if (selector === "h1") {
+              return (options.headings ?? []).map(element);
+            }
+
             return [];
           },
         },
@@ -80,7 +92,7 @@ const systemFor = (dir: string) =>
     readSecret: () => Effect.succeed(""),
   });
 
-const tempDirs: string[] = [];
+const tempDirs: Array<string> = [];
 
 afterAll(() => {
   for (const dir of tempDirs) {
@@ -91,6 +103,7 @@ afterAll(() => {
 const tempDir = (prefix: string) => {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   tempDirs.push(dir);
+
   return dir;
 };
 
@@ -105,7 +118,7 @@ const sellerStateFixture = (state?: string) => {
   return dir;
 };
 
-const withPlatform = (platform: NodeJS.Platform, use: () => void) => {
+const withPlatform = (platform: NodeJS.Platform, run: () => void) => {
   const descriptor = Object.getOwnPropertyDescriptor(process, "platform");
 
   if (!descriptor) {
@@ -115,7 +128,7 @@ const withPlatform = (platform: NodeJS.Platform, use: () => void) => {
   Object.defineProperty(process, "platform", { configurable: true, value: platform });
 
   try {
-    use();
+    run();
   } finally {
     Object.defineProperty(process, "platform", descriptor);
   }
@@ -178,6 +191,7 @@ describe("seller applications extraction", () => {
   });
 
   it("omits updatedAt when the card has no date field", () => {
+    // SAFETY: the fixture builds one card whose fields are all strings.
     const result = evaluateSellerPage("/tv/tizen-application", {
       cards: [
         makeCard({
@@ -187,7 +201,7 @@ describe("seller applications extraction", () => {
         }),
       ],
       headings: ["Applications"],
-    }) as { readonly applications: readonly Record<string, string>[] };
+    }) as { readonly applications: ReadonlyArray<Record<string, string>> };
 
     assert.notProperty(result.applications[0], "updatedAt");
     assert.strictEqual(result.applications[0]?.status, "Registering");
@@ -275,7 +289,7 @@ describe("normalizeSellerError", () => {
 
     assert.instanceOf(normalized, SellerBrowserConnectionFailed);
     assert.strictEqual(normalized.target, "http://127.0.0.1:9222");
-    assert.strictEqual((normalized as SellerBrowserConnectionFailed).cause, cause);
+    assert.strictEqual(normalized.cause, cause);
   });
 });
 
@@ -301,7 +315,7 @@ describe("seller browser launch construction", () => {
     withPlatform("win32", () => {
       assert.strictEqual(
         defaultSellerBrowser(),
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`,
       );
     });
     withPlatform("linux", () => {
@@ -318,7 +332,7 @@ describe("readSellerBrowserState", () => {
       Effect.flip,
       Effect.map((error) => {
         assert.instanceOf(error, SellerSessionNotFound);
-        assert.strictEqual((error as SellerSessionNotFound).path, join(dir, ".taizn/seller.json"));
+        assert.strictEqual(error.path, join(dir, ".taizn/seller.json"));
       }),
       Effect.provide(Layer.mergeAll(NodeServices.layer, systemFor(dir))),
     );
@@ -331,10 +345,7 @@ describe("readSellerBrowserState", () => {
       Effect.flip,
       Effect.map((error) => {
         assert.instanceOf(error, SellerPortalProtocolError);
-        assert.include(
-          (error as SellerPortalProtocolError).details,
-          "invalid seller session state",
-        );
+        assert.include(error.details, "invalid seller session state");
       }),
       Effect.provide(Layer.mergeAll(NodeServices.layer, systemFor(dir))),
     );
@@ -347,10 +358,7 @@ describe("readSellerBrowserState", () => {
       Effect.flip,
       Effect.map((error) => {
         assert.instanceOf(error, SellerPortalProtocolError);
-        assert.strictEqual(
-          (error as SellerPortalProtocolError).details,
-          "invalid seller browser port: 0",
-        );
+        assert.strictEqual(error.details, "invalid seller browser port: 0");
       }),
       Effect.provide(Layer.mergeAll(NodeServices.layer, systemFor(dir))),
     );
@@ -363,10 +371,7 @@ describe("readSellerBrowserState", () => {
       Effect.flip,
       Effect.map((error) => {
         assert.instanceOf(error, SellerPortalProtocolError);
-        assert.strictEqual(
-          (error as SellerPortalProtocolError).details,
-          "invalid seller browser port: 9222.5",
-        );
+        assert.strictEqual(error.details, "invalid seller browser port: 9222.5");
       }),
       Effect.provide(Layer.mergeAll(NodeServices.layer, systemFor(dir))),
     );
@@ -388,6 +393,7 @@ describe("readSellerBrowserState", () => {
 describe("waitForDevToolsPort", () => {
   it("resolves once the port file names a live DevTools endpoint", async () => {
     const dir = tempDir("taizn-devtools-port-");
+
     const server = createServer((_request, response) => {
       response.setHeader("content-type", "application/json");
       response.end(JSON.stringify({ Browser: "Fixture/1.0" }));

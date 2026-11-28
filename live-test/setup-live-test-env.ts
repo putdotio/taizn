@@ -1,17 +1,16 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import {
   buildLiveSetupEnv,
   parseEnvAssignments,
   redactEnvValue,
   readSigningProfileFromConfigSource,
   serializeEnvAssignments,
-  type LiveSetupOptions,
 } from "./setup-core.ts";
+import type { LiveSetupOptions } from "./setup-core.ts";
 
-const liveTestDir = dirname(fileURLToPath(import.meta.url));
+const liveTestDir = import.meta.dirname;
 const fixtureAppDir = join(liveTestDir, "app");
 const fixtureStateDir = join(fixtureAppDir, ".taizn");
 const fixtureEnvPath = join(fixtureStateDir, ".env");
@@ -31,9 +30,11 @@ if (args.help) {
 }
 
 const sourceAppDir = args.from ? resolve(args.from) : undefined;
+
 const currentValues = existsSync(fixtureEnvPath)
   ? parseEnvAssignments(readFileSync(fixtureEnvPath, "utf8"))
   : {};
+
 const sourceValues = sourceAppDir ? readSourceEnv(sourceAppDir) : {};
 const profile = args.profile ?? (sourceAppDir ? readSourceProfile(sourceAppDir) : undefined);
 const defaults = readLocalToolDefaults();
@@ -41,6 +42,7 @@ const result = buildLiveSetupEnv(currentValues, sourceValues, { ...args, profile
 const copiedCertificates = sourceAppDir ? copySourceCertificates(sourceAppDir) : [];
 
 mkdirSync(fixtureStateDir, { mode: 0o700, recursive: true });
+
 writeFileSync(fixtureEnvPath, serializeEnvAssignments(result.values), { mode: 0o600 });
 
 const summary = {
@@ -76,7 +78,7 @@ if (args.json) {
   }
 }
 
-function parseArgs(argv: readonly string[]): SetupArgs {
+function parseArgs(argv: ReadonlyArray<string>): SetupArgs {
   const parsed: {
     beaconHost?: string;
     from?: string;
@@ -127,7 +129,7 @@ function parseArgs(argv: readonly string[]): SetupArgs {
   return parsed;
 }
 
-function requireArgValue(argv: readonly string[], index: number, option: string) {
+function requireArgValue(argv: ReadonlyArray<string>, index: number, option: string) {
   const value = argv[index + 1];
 
   if (!value || value.startsWith("--")) {
@@ -176,7 +178,7 @@ function readLocalToolDefaults() {
 
 function copySourceCertificates(sourceAppDir: string) {
   const sourceCertificateDir = join(sourceAppDir, ".taizn", "certificates");
-  const copied: string[] = [];
+  const copied: Array<string> = [];
 
   if (!existsSync(sourceCertificateDir)) {
     return copied;

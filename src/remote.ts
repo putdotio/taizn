@@ -87,7 +87,7 @@ type SavedRemoteOptions = RemoteOptions & {
 
 type RemoteKeySequence = {
   readonly delayMs: number;
-  readonly keys: readonly string[];
+  readonly keys: ReadonlyArray<string>;
 };
 
 type PressOptions = {
@@ -228,6 +228,7 @@ export const pairSamsungTvRemote = Effect.fn("pairSamsungTvRemote")(function* (
         target: remoteTarget(remoteOptions),
       }),
     );
+
     return;
   }
 
@@ -249,7 +250,7 @@ export const sendSamsungTvKey = Effect.fn("sendSamsungTvKey")(function* (
 
 export const sendSamsungTvKeys = Effect.fn("sendSamsungTvKeys")(function* (
   env: TaiznEnv,
-  keys: readonly string[],
+  keys: ReadonlyArray<string>,
   pressOptions?: PressOptions,
 ) {
   const remoteOptions = yield* resolveRemoteOptions(env, { requireToken: !pressOptions?.dryRun });
@@ -266,6 +267,7 @@ export const sendSamsungTvKeys = Effect.fn("sendSamsungTvKeys")(function* (
       keys,
     });
   }
+
   const result = {
     delayMs,
     dryRun: pressOptions?.dryRun === true,
@@ -285,6 +287,7 @@ export const sendSamsungTvKeys = Effect.fn("sendSamsungTvKeys")(function* (
 
   if (pressOptions?.json) {
     yield* Console.log(yield* jsonForOutput(result, { fields: pressOptions.fields }));
+
     return;
   }
 
@@ -297,6 +300,7 @@ export const sendSamsungTvKeys = Effect.fn("sendSamsungTvKeys")(function* (
           : `Sent Samsung TV remote keys: ${keys.join(", ")}`,
     );
   }
+
   if (pressOptions?.artifact) {
     yield* Console.log(`TV press artifact: ${pressOptions.artifact}`);
   }
@@ -313,6 +317,7 @@ export const diagnoseSamsungTvRemote = Effect.fn("diagnoseSamsungTvRemote")(func
   const hostSource = valueSource(env.tvHost, state?.host, targetHost);
   const token = env.tvToken ?? state?.token;
   const tokenSource = valueSource(env.tvToken, state?.token, undefined);
+
   const remoteOptions = host
     ? {
         host,
@@ -323,9 +328,11 @@ export const diagnoseSamsungTvRemote = Effect.fn("diagnoseSamsungTvRemote")(func
         token,
       }
     : undefined;
+
   const infoPort = env.tvInfoPort ?? TV_INFO_PORT;
   const info = yield* readInfoDiagnostic(host, infoPort, remoteOptions?.timeoutMs);
   const connection = yield* readRemoteConnectionDiagnostic(remoteOptions, doctorOptions);
+
   const result: TvDoctorResult = {
     host,
     hostSource,
@@ -351,6 +358,7 @@ export const diagnoseSamsungTvRemote = Effect.fn("diagnoseSamsungTvRemote")(func
 
   if (doctorOptions.json) {
     yield* Console.log(yield* jsonForOutput(result, { fields: doctorOptions.fields }));
+
     return;
   }
 
@@ -368,6 +376,7 @@ export const diagnoseSamsungTvRemote = Effect.fn("diagnoseSamsungTvRemote")(func
   } else {
     yield* Console.log(`remote_connect: skipped (${connection.reason})`);
   }
+
   if (doctorOptions.artifact) {
     yield* Console.log(`TV doctor artifact: ${doctorOptions.artifact}`);
   }
@@ -378,11 +387,14 @@ export const showSamsungTvInfo = Effect.fn("showSamsungTvInfo")(function* (
   infoOptions: TvInfoOptions = {},
 ) {
   const options = yield* resolveRemoteOptions(env);
+
   const info = yield* fetchSamsungTvInfo(options.host, {
     port: env.tvInfoPort,
     timeoutMs: options.timeoutMs,
   });
+
   const support = info.isSupport ? parseSupport(info.isSupport) : undefined;
+
   const result = {
     developer: {
       enabled: stringFlag(info.device.developerMode),
@@ -407,6 +419,7 @@ export const showSamsungTvInfo = Effect.fn("showSamsungTvInfo")(function* (
 
   if (infoOptions.json) {
     yield* Console.log(yield* jsonForOutput(result, { fields: infoOptions.fields }));
+
     return;
   }
 
@@ -418,6 +431,7 @@ export const showSamsungTvInfo = Effect.fn("showSamsungTvInfo")(function* (
   yield* Console.log(`token_auth: ${info.device.TokenAuthSupport ?? "unknown"}`);
   yield* Console.log(`developer_ip: ${info.device.developerIP ?? "unknown"}`);
   yield* Console.log(`developer_mode: ${info.device.developerMode ?? "unknown"}`);
+
   if (infoOptions.artifact) {
     yield* Console.log(`TV info artifact: ${infoOptions.artifact}`);
   }
@@ -428,9 +442,11 @@ const resolveRemoteOptions = Effect.fn("resolveRemoteOptions")(function* (
   options?: { readonly ignoreToken?: boolean; readonly requireToken?: boolean },
 ) {
   const targetHost = hostFromTarget(env.target);
+
   const needsState =
     (!env.tvHost && !targetHost) ||
     Boolean(options?.requireToken && !options.ignoreToken && !env.tvToken);
+
   const state = needsState ? yield* readRemoteState() : undefined;
   const host = env.tvHost ?? state?.host ?? targetHost;
 
@@ -457,6 +473,7 @@ const resolveRemoteOptions = Effect.fn("resolveRemoteOptions")(function* (
 const readRemoteState = Effect.fn("readRemoteState")(function* () {
   const fs = yield* FileSystem.FileSystem;
   const paths = yield* getPaths();
+
   const exists = yield* fs
     .exists(paths.remoteStatePath)
     .pipe(
@@ -477,6 +494,7 @@ const readRemoteState = Effect.fn("readRemoteState")(function* () {
         (cause) => new FileSystemFailure({ cause, operation: "read", path: paths.remoteStatePath }),
       ),
     );
+
   const json = yield* Effect.try({
     try: () => JSON.parse(source),
     catch: (cause) =>
@@ -493,6 +511,7 @@ const readRemoteState = Effect.fn("readRemoteState")(function* () {
 const saveRemoteState = Effect.fn("saveRemoteState")(function* (options: SavedRemoteOptions) {
   const fs = yield* FileSystem.FileSystem;
   const paths = yield* getPaths();
+
   const state = TvRemoteState.make({
     host: options.host,
     name: options.name,
@@ -576,18 +595,22 @@ const connectRemotePromise = (
 ) =>
   new Promise<string>((resolve, reject) => {
     const url = remoteUrl(options);
+
     const ws = new WebSocket(url, {
       handshakeTimeout: options.timeoutMs,
       rejectUnauthorized: false,
     });
+
     const sequenceTimers = new Set<NodeJS.Timeout>();
     let settled = false;
 
     const cleanup = (terminate = false) => {
       clearTimeout(timer);
+
       for (const sequenceTimer of sequenceTimers) {
         clearTimeout(sequenceTimer);
       }
+
       sequenceTimers.clear();
       signal.removeEventListener("abort", abort);
 
@@ -634,8 +657,10 @@ const connectRemotePromise = (
     );
 
     signal.addEventListener("abort", abort, { once: true });
+
     if (signal.aborted) {
       abort();
+
       return;
     }
 
@@ -644,15 +669,18 @@ const connectRemotePromise = (
 
       if (keys.length === 0) {
         succeed(token);
+
         return;
       }
 
       let index = 0;
+
       const sendNext = () => {
         const key = keys[index];
 
         if (!key) {
           succeed(token);
+
           return;
         }
 
@@ -662,10 +690,12 @@ const connectRemotePromise = (
               fail(new TvRemoteConnectionFailed({ cause, target: remoteTarget(options) }), true);
             }
           });
-        } catch (cause) {
-          fail(new TvRemoteConnectionFailed({ cause, target: remoteTarget(options) }), true);
+        } catch (error) {
+          fail(new TvRemoteConnectionFailed({ cause: error, target: remoteTarget(options) }), true);
+
           return;
         }
+
         index += 1;
 
         if (index >= keys.length) {
@@ -673,7 +703,9 @@ const connectRemotePromise = (
             sequenceTimers.delete(sequenceTimer);
             succeed(token);
           }, 500);
+
           sequenceTimers.add(sequenceTimer);
+
           return;
         }
 
@@ -681,6 +713,7 @@ const connectRemotePromise = (
           sequenceTimers.delete(sequenceTimer);
           sendNext();
         }, sequence?.delayMs ?? 250);
+
         sequenceTimers.add(sequenceTimer);
       };
 
@@ -692,13 +725,15 @@ const connectRemotePromise = (
 
       try {
         event = parseRemoteEvent(data.toString(), options);
-      } catch (cause) {
-        fail(normalizeRemoteError(cause, options));
+      } catch (error) {
+        fail(normalizeRemoteError(error, options));
+
         return;
       }
 
       if (event.event === "ms.channel.unauthorized") {
         fail(new TvRemoteUnauthorized({ target: remoteTarget(options) }));
+
         return;
       }
 
@@ -714,6 +749,7 @@ const connectRemotePromise = (
             details: "connect event did not include a token",
           }),
         );
+
         return;
       }
 
@@ -741,6 +777,7 @@ export const fetchSamsungTvInfo = Effect.fn("fetchSamsungTvInfo")(function* (
   options?: { readonly port?: number; readonly timeoutMs?: number },
 ) {
   const url = `http://${host}:${options?.port ?? TV_INFO_PORT}/api/v2/`;
+
   const json = yield* Effect.tryPromise({
     try: async (signal) => {
       const response = await fetch(url, {
@@ -853,9 +890,9 @@ const isAbortError = (cause: unknown) =>
 const parseRemoteEvent = (source: string, options: RemoteOptions) => {
   try {
     return Schema.decodeUnknownSync(RemoteEvent)(JSON.parse(source));
-  } catch (cause) {
+  } catch (error) {
     throw new TvRemoteProtocolError({
-      details: `${remoteTarget(options)} sent an unexpected message: ${causeToMessage(cause)}`,
+      details: `${remoteTarget(options)} sent an unexpected message: ${causeToMessage(error)}`,
     });
   }
 };

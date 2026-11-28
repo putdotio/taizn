@@ -11,15 +11,17 @@ export type AssetProbe = {
 };
 
 export const extractAssetUrls = (source: string) => {
-  const urls: string[] = [];
+  const urls: Array<string> = [];
   const pattern = /\b(?:src|href)=["'](https?:\/\/[^"']+)["']/gu;
   let match = pattern.exec(source);
 
   while (match) {
     const url = match[1];
+
     if (url) {
       urls.push(url);
     }
+
     match = pattern.exec(source);
   }
 
@@ -43,7 +45,7 @@ export const readConfiguredIndexHtml = Effect.fn("readConfiguredIndexHtml")(func
     );
 });
 
-export const probeAssetUrls = Effect.fn("probeAssetUrls")(function* (urls: readonly string[]) {
+export const probeAssetUrls = Effect.fn("probeAssetUrls")(function* (urls: ReadonlyArray<string>) {
   return yield* Effect.forEach(urls, probeAssetUrl, { concurrency: 4 });
 });
 
@@ -85,9 +87,9 @@ const probeAssetUrl = Effect.fn("probeAssetUrl")(function* (url: string) {
 });
 
 export const validateAssetUrls = Effect.fn("validateAssetUrls")(function* (
-  urls: readonly string[],
+  urls: ReadonlyArray<string>,
 ) {
-  const validated: string[] = [];
+  const validated: Array<string> = [];
 
   for (const url of urls) {
     const parsed = yield* parseHttpUrl(url);

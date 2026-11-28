@@ -3,7 +3,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { homedir, networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   envFlagEnabled,
   failedFetchProbes,
@@ -20,7 +19,7 @@ import {
   selectBeaconHost,
 } from "./harness-core.ts";
 
-const liveTestDir = dirname(fileURLToPath(import.meta.url));
+const liveTestDir = import.meta.dirname;
 const appDir = join(liveTestDir, "app");
 const cliPath = resolve(liveTestDir, "..", "dist", "taizn.mjs");
 const envPath = join(appDir, ".taizn", ".env");
@@ -46,7 +45,7 @@ type LiveTestMode =
 type TaiznMode = Exclude<LiveTestMode, "remote" | "roundtrip" | "smoke">;
 
 type TextResult = {
-  readonly command: readonly string[];
+  readonly command: ReadonlyArray<string>;
   readonly name: string;
   readonly status: number;
   readonly stderr: string;
@@ -103,7 +102,7 @@ function writeFixtureConfig() {
   console.log(`Using Tizen signing profile: ${profile}`);
 }
 
-function resolveMode(args: readonly string[]): LiveTestMode {
+function resolveMode(args: ReadonlyArray<string>): LiveTestMode {
   if (args.includes("--doctor")) {
     return "doctor";
   }
@@ -162,6 +161,7 @@ function resolveProfile() {
 function findActiveProfile() {
   const tizenCli =
     process.env.TAIZN_TIZEN_CLI || join(homedir(), "tizen-studio/tools/ide/bin/tizen");
+
   const result = spawnSync(tizenCli, ["security-profiles", "list"], {
     cwd: appDir,
     encoding: "utf8",
@@ -196,6 +196,7 @@ function runTaizn(command: TaiznMode) {
       : command === "doctor"
         ? ["tv", "doctor", "--json", ...(args.includes("--connect") ? ["--connect"] : [])]
         : [command];
+
   const result = spawnSync(process.execPath, [cliPath, ...commandArgs], {
     cwd: appDir,
     env: {
@@ -206,7 +207,10 @@ function runTaizn(command: TaiznMode) {
     ...(command === "prove" ? { timeout: 120_000, killSignal: "SIGKILL" as const } : {}),
   });
 
-  if (result.error) console.error(`taizn ${command}: ${result.error.message}`);
+  if (result.error) {
+    console.error(`taizn ${command}: ${result.error.message}`);
+  }
+
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }
@@ -311,7 +315,9 @@ async function runRoundtrip() {
       timeoutMs: beacon.timeoutMs,
       url: beacon.url,
     };
+
     const fetchUrls = resolveFetchProbeUrls(process.env, args.includes("--tv-assets"));
+
     const install = runInstallWithRetry(
       {
         ...roundtripEnv,
@@ -320,11 +326,13 @@ async function runRoundtrip() {
       },
       precheck.json,
     );
+
     const smoke = buildSmokeArtifact(
       roundtripEnv,
       resolveFixtureProofQuery(configTemplatePath),
       false,
     );
+
     const beaconEvent = await beacon.waitForEvent();
 
     if (!beaconEvent) {
@@ -333,6 +341,7 @@ async function runRoundtrip() {
     }
 
     const failedFetches = failedFetchProbes(beaconEvent.fetches);
+
     const artifact = {
       createdAt: new Date().toISOString(),
       failedFetches,
@@ -416,7 +425,7 @@ function runInstallWithRetry(env: Record<string, string>, checkJson: unknown) {
 
 function runTaiznJson(
   name: string,
-  commandArgs: readonly string[],
+  commandArgs: ReadonlyArray<string>,
   env: Record<string, string> = {},
 ) {
   const result = spawnSync(process.execPath, [cliPath, ...commandArgs], {
@@ -430,6 +439,7 @@ function runTaiznJson(
       TAIZN_VARIANT: process.env.TAIZN_VARIANT || "development",
     },
   });
+
   const stdout = result.stdout.trim();
   const stderr = [result.stderr.trim(), result.error?.message].filter(Boolean).join("\n");
 
@@ -454,7 +464,7 @@ function runTaiznJson(
 
 function runTaiznTextResult(
   name: string,
-  commandArgs: readonly string[],
+  commandArgs: ReadonlyArray<string>,
   env: Record<string, string> = {},
 ) {
   const result = spawnSync(process.execPath, [cliPath, ...commandArgs], {
@@ -466,6 +476,7 @@ function runTaiznTextResult(
       TAIZN_VARIANT: process.env.TAIZN_VARIANT || "development",
     },
   });
+
   const stdout = result.stdout.trim();
   const stderr = result.stderr.trim();
 
@@ -481,10 +492,12 @@ function runTaiznTextResult(
 function uninstallFixturePackage(target: string, checkJson: unknown) {
   const sdbPath = resolveSdbPath(checkJson);
   const packageId = resolvePackageId(configTemplatePath);
+
   const result = spawnSync(sdbPath, ["-s", target, "uninstall", packageId], {
     cwd: appDir,
     encoding: "utf8",
   });
+
   const step = {
     command: ["sdb", "-s", target, "uninstall", packageId],
     name: "uninstall",
@@ -545,6 +558,7 @@ async function startBeaconServer(host: string, timeoutMs: number): Promise<Beaco
   let event: BeaconEvent | undefined;
   let resolveWaiting: ((event: BeaconEvent | null) => void) | undefined;
   let timer: NodeJS.Timeout | undefined;
+
   const server = createServer((request, response) => {
     const requestUrl = request.url ?? "/";
     event = {
@@ -577,6 +591,7 @@ async function startBeaconServer(host: string, timeoutMs: number): Promise<Beaco
       server.off("listening", onListening);
       rejectListen(error);
     };
+
     const onListening = () => {
       server.off("error", onError);
       resolveListen();
@@ -590,13 +605,18 @@ async function startBeaconServer(host: string, timeoutMs: number): Promise<Beaco
   const address = server.address();
 
   if (!address || typeof address === "string") {
-    await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+    await new Promise<void>((resolveClose) => {
+      server.close(() => resolveClose());
+    });
     console.error("Could not determine live fixture beacon port.");
     process.exit(1);
   }
 
   return {
-    close: () => new Promise<void>((resolveClose) => server.close(() => resolveClose())),
+    close: () =>
+      new Promise<void>((resolveClose) => {
+        server.close(() => resolveClose());
+      }),
     host,
     timeoutMs,
     url: `http://${host}:${address.port}/taizn-live-ready`,
@@ -627,7 +647,7 @@ function parseBeaconFetches(requestUrl: string) {
   return parseJson(fetches, "beacon fetch results");
 }
 
-function headerValue(value: string | readonly string[] | undefined) {
+function headerValue(value: string | ReadonlyArray<string> | undefined) {
   if (typeof value === "string") {
     return value;
   }
@@ -653,7 +673,7 @@ function resolveBeaconHost(doctorJson: unknown, target: string | undefined) {
 }
 
 function externalIpv4Addresses() {
-  const externalAddresses: string[] = [];
+  const externalAddresses: Array<string> = [];
 
   for (const addresses of Object.values(networkInterfaces())) {
     if (!addresses) {
@@ -673,8 +693,8 @@ function externalIpv4Addresses() {
 function resolveBeaconTimeoutMs() {
   try {
     return parseBeaconTimeoutMs(process.env.TAIZN_LIVE_BEACON_TIMEOUT_MS);
-  } catch (cause) {
-    console.error(cause instanceof Error ? cause.message : String(cause));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }
@@ -682,8 +702,8 @@ function resolveBeaconTimeoutMs() {
 function resolveRemoteDelayMs() {
   try {
     return parseRemoteDelayMs(process.env.LIVE_TEST_REMOTE_DELAY_MS);
-  } catch (cause) {
-    console.error(cause instanceof Error ? cause.message : String(cause));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }

@@ -13,5 +13,7 @@ writeFileSync(
   process.env.TAIZN_TEST_BROWSER_PIDS,
   JSON.stringify({ descendant: descendant.pid, leader: process.pid }),
 );
+
 process.on("SIGTERM", () => {});
-setInterval(() => {}, 1_000);
+
+setInterval(() => {}, 1000);

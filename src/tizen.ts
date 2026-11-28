@@ -10,7 +10,6 @@ import {
   appBuildEnv,
   appPath,
   baseChildEnv,
-  type ChildEnv,
   defaultSdb,
   defaultTizenCli,
   getPaths,
@@ -21,6 +20,7 @@ import {
   TaiznSystem,
   withTizenPath,
 } from "./runtime.js";
+import type { ChildEnv } from "./runtime.js";
 import {
   ApplicationNotFound,
   CommandFailed,
@@ -64,7 +64,7 @@ type WidgetIndexOptions = {
 };
 
 type WidgetStageOptions = WidgetIndexOptions & {
-  readonly excludeFiles: readonly string[];
+  readonly excludeFiles: ReadonlyArray<string>;
 };
 
 type RunOptions = {
@@ -105,6 +105,7 @@ export const checkTizen = Effect.fn("checkTizen")(function* (
   const tizenPath = yield* resolveTizenCli(env);
   const sdbPath = yield* resolveSdb(env);
   const devices = yield* listSdbDevices(sdbPath);
+
   const result = {
     configuredTarget: env.target,
     targets: devices.map((device) => ({
@@ -124,6 +125,7 @@ export const checkTizen = Effect.fn("checkTizen")(function* (
 
   if (options.json) {
     yield* Console.log(yield* jsonForOutput(result, { fields: options.fields }));
+
     return;
   }
 
@@ -132,9 +134,11 @@ export const checkTizen = Effect.fn("checkTizen")(function* (
 
   if (devices.length === 0) {
     yield* Console.log("connected targets: none");
+
     if (options.artifact) {
       yield* Console.log(`Check artifact: ${options.artifact}`);
     }
+
     return;
   }
 
@@ -165,6 +169,7 @@ export const createProfile = Effect.fn("createProfile")(function* (
         tizenCli: tizenPath,
       }),
     );
+
     return;
   }
 
@@ -223,6 +228,7 @@ export const packageWidget = Effect.fn("packageWidget")(function* (
         variant: env.variant,
       }),
     );
+
     return installable;
   }
 
@@ -258,6 +264,7 @@ export const packageWidget = Effect.fn("packageWidget")(function* (
   }
 
   yield* Console.log(`Packaged ${installable}`);
+
   return installable;
 });
 
@@ -267,9 +274,11 @@ export const installWidget = Effect.fn("installWidget")(function* (
 ) {
   const paths = yield* getPaths();
   const variant = getVariant(context.config, context.env.variant);
+
   const built = options.dryRun
     ? plannedWidgetPath(paths.outputDir, variant)
     : yield* packageWidget(context);
+
   const target = yield* resolveInstallTarget(context.env, { quiet: options.dryRun });
   const sdbPath = yield* resolveSdb(context.env);
   const tizenPath = yield* resolveTizenCli(context.env);
@@ -285,6 +294,7 @@ export const installWidget = Effect.fn("installWidget")(function* (
         tizenCli: tizenPath,
       }),
     );
+
     return;
   }
 
@@ -306,7 +316,7 @@ export const runWidget = Effect.fn("runWidget")(function* (
   const sdbPath = yield* resolveSdb(env);
   const tizenPath = yield* resolveTizenCli(env);
   const target = yield* resolveRunTarget(env, sdbPath, { quiet: options.dryRun });
-  // Real Samsung TVs launch web widgets here by application id; package id fails.
+
   const runArgs = target
     ? ["run", "-p", variant.applicationId, target.flag, target.value]
     : ["run", "-p", variant.applicationId];
@@ -321,6 +331,7 @@ export const runWidget = Effect.fn("runWidget")(function* (
         tizenCli: tizenPath,
       }),
     );
+
     return;
   }
 
@@ -340,11 +351,14 @@ export const listInstalledApplications = Effect.fn("listInstalledApplications")(
   const { applications: installedApplications, target } = yield* loadInstalledApplications(env, {
     quiet: options.json,
   });
+
   const queryLabel = query?.trim();
   const normalizedQuery = normalizeQuery(queryLabel);
+
   const applications = installedApplications.filter((application) =>
     matchesApplicationQuery(application, normalizedQuery),
   );
+
   const result = {
     applications: applications.map((application) => ({
       id: application.applicationId,
@@ -360,6 +374,7 @@ export const listInstalledApplications = Effect.fn("listInstalledApplications")(
 
   if (options.json) {
     yield* Console.log(yield* jsonForOutput(result, { fields: options.fields }));
+
     return;
   }
 
@@ -369,9 +384,11 @@ export const listInstalledApplications = Effect.fn("listInstalledApplications")(
 
   if (applications.length === 0) {
     yield* Console.log("none");
+
     if (options.artifact) {
       yield* Console.log(`Apps artifact: ${options.artifact}`);
     }
+
     return;
   }
 
@@ -405,6 +422,7 @@ export const launchInstalledApplication = Effect.fn("launchInstalledApplication"
         tizenCli: tizenPath,
       }),
     );
+
     return;
   }
 
@@ -421,12 +439,15 @@ export const proveInstalledApplication = Effect.fn("proveInstalledApplication")(
   const tizenPath = yield* resolveTizenCli(env);
   const { applications, target } = yield* loadInstalledApplications(env, { quiet: options.json });
   const application = yield* resolveInstalledApplication(query, applications);
+
   const launchOutput = options.dryRun
     ? ""
     : yield* launchApplication(tizenPath, target, application, {
         captureOutput: true,
       });
+
   const now = yield* DateTime.now;
+
   const proof = {
     application: {
       id: application.applicationId,
@@ -448,17 +469,20 @@ export const proveInstalledApplication = Effect.fn("proveInstalledApplication")(
 
   if (options.json) {
     yield* Console.log(yield* jsonForOutput(proof, { fields: options.fields }));
+
     return;
   }
 
   yield* Console.log(`Tizen target: ${target}`);
   yield* Console.log(`Installed application: ${application.name} (${application.applicationId})`);
+
   if (options.dryRun) {
     yield* Console.log(`Launch proof dry-run: ${application.applicationId} resolved on ${target}`);
   } else {
     yield* Console.log(launchOutput.trim());
     yield* Console.log(`Launch proof: ${application.applicationId} started on ${target}`);
   }
+
   if (options.artifact) {
     yield* Console.log(`Proof artifact: ${options.artifact}`);
   }
@@ -466,6 +490,7 @@ export const proveInstalledApplication = Effect.fn("proveInstalledApplication")(
 
 export const listTizenTargets = Effect.fn("listTizenTargets")(function* (env: TaiznEnv) {
   const sdbPath = yield* resolveSdb(env);
+
   return yield* listSdbDevices(sdbPath);
 });
 
@@ -503,6 +528,7 @@ export const captureTizenLogs = Effect.fn("captureTizenLogs")(function* (
   const target = yield* resolveRequiredSdbTarget(env, sdbPath, {
     quiet,
   });
+
   const durationMs = options.durationMs ?? 0;
 
   if (durationMs < 0) {
@@ -516,10 +542,13 @@ export const captureTizenLogs = Effect.fn("captureTizenLogs")(function* (
     durationMs > 0
       ? yield* captureForDuration(sdbPath, ["-s", target, "dlog"], durationMs)
       : yield* capture(sdbPath, ["-s", target, "dlog", "-d"]);
+
   const now = yield* DateTime.now;
+
   const lines = output
     .split("\n")
     .filter((line) => line && (!options.app || line.includes(options.app)));
+
   const artifact = {
     app: options.app,
     capturedAt: DateTime.formatIso(now),
@@ -544,15 +573,18 @@ export const captureTizenLogs = Effect.fn("captureTizenLogs")(function* (
         }),
       );
     }
+
     return;
   }
 
   if (options.json || outputMode === "json") {
     yield* Console.log(yield* jsonForOutput(artifact, { fields: options.fields }));
+
     return;
   }
 
   yield* Console.log(`Captured ${lines.length} log lines from ${target}`);
+
   if (options.artifact) {
     yield* Console.log(`Log artifact: ${options.artifact}`);
   }
@@ -561,12 +593,14 @@ export const captureTizenLogs = Effect.fn("captureTizenLogs")(function* (
 const resolveTizenCli = Effect.fn("resolveTizenCli")(function* (env: TaiznEnv) {
   const path = yield* requireFile(env.tizenCli ?? (yield* defaultTizenCli()), "Tizen CLI");
   yield* requireNativeOrRosetta(path, "Tizen CLI", { bundledJava: true });
+
   return path;
 });
 
 const resolveSdb = Effect.fn("resolveSdb")(function* (env: TaiznEnv) {
   const path = yield* requireFile(env.sdb ?? (yield* defaultSdb()), "sdb");
   yield* requireNativeOrRosetta(path, "sdb");
+
   return path;
 });
 
@@ -582,12 +616,14 @@ export const requireNativeOrRosetta = Effect.fn("requireNativeOrRosetta")(functi
   }
 
   const fs = yield* FileSystem.FileSystem;
+
   const readBytes = (file: string) =>
     fs
       .readFile(file)
       .pipe(
         Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "read", path: file })),
       );
+
   const bytes = yield* readBytes(path);
 
   if (needsRosetta(bytes)) {
@@ -600,14 +636,14 @@ export const requireNativeOrRosetta = Effect.fn("requireNativeOrRosetta")(functi
     return;
   }
 
-  // The Tizen Studio `tizen` wrapper is a shell script that runs the bundled
-  // JDK at <tizen-studio>/jdk/Contents/Home on macOS, relative to tools/ide/bin.
   const realPath = yield* fs
     .realPath(path)
     .pipe(
       Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "realPath", path })),
     );
+
   const java = join(dirname(realPath), "../../../jdk/Contents/Home/bin/java");
+
   const javaExists = yield* fs
     .exists(java)
     .pipe(
@@ -651,6 +687,7 @@ const rewriteConfigForWidget = Effect.fn("rewriteConfigForWidget")(function* (
   const fs = yield* FileSystem.FileSystem;
   const paths = yield* getPaths();
   const targetPath = join(paths.stageDir, "config.xml");
+
   const source = yield* fs
     .readFileString(targetPath)
     .pipe(
@@ -658,6 +695,7 @@ const rewriteConfigForWidget = Effect.fn("rewriteConfigForWidget")(function* (
         (cause) => new FileSystemFailure({ cause, operation: "read", path: targetPath }),
       ),
     );
+
   const withApplication = source.replace(/<tizen:application\b[^>]*\/>/, (tag) =>
     setXmlAttribute(
       setXmlAttribute(tag, "id", variant.applicationId),
@@ -665,6 +703,7 @@ const rewriteConfigForWidget = Effect.fn("rewriteConfigForWidget")(function* (
       variant.packageId,
     ),
   );
+
   const rewritten = withApplication.replace(
     /<name>[^<]*<\/name>/,
     `<name>${escapeXml(variant.name)}</name>`,
@@ -687,6 +726,7 @@ const rewriteIndexForWidget = Effect.fn("rewriteIndexForWidget")(function* (
   const targetPath = join(paths.stageDir, "index.html");
   const webapisScript = '<script src="$WEBAPIS/webapis/webapis.js"></script>';
   const indexPath = appPath(paths.appDir, options.indexHtml);
+
   const source = yield* fs
     .readFileString(indexPath)
     .pipe(
@@ -694,9 +734,11 @@ const rewriteIndexForWidget = Effect.fn("rewriteIndexForWidget")(function* (
         (cause) => new FileSystemFailure({ cause, operation: "read", path: indexPath }),
       ),
     );
+
   const withAssets = options.rewriteAssetUrls
     ? source.replaceAll('href="/', 'href="./').replaceAll('src="/', 'src="./')
     : source;
+
   const html =
     options.injectWebapis !== false && !withAssets.includes("$WEBAPIS/webapis/webapis.js")
       ? withAssets.replace("</head>", `${webapisScript}</head>`)
@@ -725,7 +767,7 @@ const assertBuildOutput = Effect.fn("assertBuildOutput")(function* (config: Tize
 });
 
 const removeExcludedStageFiles = Effect.fn("removeExcludedStageFiles")(function* (
-  excludeFiles: readonly string[],
+  excludeFiles: ReadonlyArray<string>,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const paths = yield* getPaths();
@@ -806,6 +848,7 @@ const stageWidget = Effect.fn("stageWidget")(function* (
 const findBuiltWidget = Effect.fn("findBuiltWidget")(function* () {
   const fs = yield* FileSystem.FileSystem;
   const paths = yield* getPaths();
+
   const entries = yield* fs
     .readDirectory(paths.outputDir)
     .pipe(
@@ -814,6 +857,7 @@ const findBuiltWidget = Effect.fn("findBuiltWidget")(function* () {
           new FileSystemFailure({ cause, operation: "readDirectory", path: paths.outputDir }),
       ),
     );
+
   const built = entries
     .filter((entry) => entry.endsWith(".wgt"))
     .map((entry) => join(paths.outputDir, entry))
@@ -840,6 +884,7 @@ const listSdbDevices = Effect.fn("listSdbDevices")(function* (sdbPath: string) {
 
 const parseSdbDevice = (line: string): SdbDevice => {
   const [id = "", state = "", label = ""] = line.split(/\s+/, 3);
+
   return { id, label, state };
 };
 
@@ -855,6 +900,7 @@ const resolveInstallTarget = Effect.fn("resolveInstallTarget")(function* (
 
   if (devices.length === 1) {
     const device = devices[0];
+
     if (device) {
       if (!options.quiet) {
         yield* Console.log(
@@ -888,6 +934,7 @@ const resolveRunTarget = Effect.fn("resolveRunTarget")(function* (
 
   if (devices.length === 1) {
     const device = devices[0];
+
     if (device) {
       if (!options.quiet) {
         yield* Console.log(
@@ -921,6 +968,7 @@ const resolveRequiredSdbTarget = Effect.fn("resolveRequiredSdbTarget")(function*
 
   if (devices.length === 1) {
     const device = devices[0];
+
     if (device) {
       if (!options.quiet) {
         yield* Console.log(
@@ -961,7 +1009,7 @@ const loadInstalledApplications = Effect.fn("loadInstalledApplications")(functio
   return { applications: parseInstalledApplications(output), target };
 });
 
-const parseInstalledApplications = (output: string): readonly TizenApplication[] =>
+const parseInstalledApplications = (output: string): ReadonlyArray<TizenApplication> =>
   output.split("\n").flatMap((line) => {
     const match = line.match(/^\s*'([^']*)'\s+'([^']*)'\s*$/);
     const name = match?.[1]?.trim();
@@ -982,7 +1030,7 @@ const matchesApplicationQuery = (
 
 const resolveInstalledApplication = Effect.fn("resolveInstalledApplication")(function* (
   query: string,
-  applications: readonly TizenApplication[],
+  applications: ReadonlyArray<TizenApplication>,
 ) {
   const queryLabel = query.trim();
   const normalizedQuery = normalizeQuery(queryLabel);
@@ -1005,6 +1053,7 @@ const resolveInstalledApplication = Effect.fn("resolveInstalledApplication")(fun
 
   if (exactNameMatches.length === 1) {
     const [match] = exactNameMatches;
+
     if (match) {
       return match;
     }
@@ -1025,6 +1074,7 @@ const resolveInstalledApplication = Effect.fn("resolveInstalledApplication")(fun
 
   if (matches.length === 1) {
     const [match] = matches;
+
     if (match) {
       return match;
     }
@@ -1053,6 +1103,7 @@ const launchApplication = Effect.fn("launchApplication")(function* (
   yield* run(tizenPath, ["run", "-p", application.applicationId, "-s", target], {
     env: yield* baseChildEnv(),
   });
+
   return "";
 });
 
@@ -1064,26 +1115,29 @@ export const run = Effect.fn("run")(function* (
   const paths = yield* getPaths();
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const env = yield* withTizenPath(options.env ?? (yield* baseChildEnv()));
+
   const failed = (stderr = "") =>
     new CommandFailed({ args: redactCommandArgs(args), command, ...(stderr ? { stderr } : {}) });
+
   const child = ChildProcess.make(command, args, {
     cwd: options.cwd ?? paths.appDir,
     forceKillAfter: options.finite ? "1 second" : undefined,
     env,
-    // Quiet runs keep the child's output off the terminal so structured output
-    // stays parseable; stderr is kept for the failure's cause.
     stderr: options.quiet ? "pipe" : "inherit",
     stdin: "inherit",
     stdout: options.quiet ? "ignore" : "inherit",
   });
+
   const execution = options.quiet
     ? Effect.scoped(
         Effect.gen(function* () {
           const process = yield* child;
+
           const [stderr, exitCode] = yield* Effect.all(
             [process.stderr.pipe(Stream.decodeText, Stream.mkString), process.exitCode],
             { concurrency: 2 },
           );
+
           return { exitCode, stderr: stderr.trim() };
         }),
       ).pipe(Effect.mapError(() => failed()))
@@ -1093,6 +1147,7 @@ export const run = Effect.fn("run")(function* (
       );
 
   const timeoutMs = yield* CommandTimeoutMs;
+
   const outcome = yield* options.finite
     ? execution.pipe(
         Effect.timeoutOrElse({
@@ -1102,6 +1157,7 @@ export const run = Effect.fn("run")(function* (
         }),
       )
     : execution;
+
   if (outcome.exitCode !== 0) {
     return yield* failed(outcome.stderr);
   }
@@ -1109,19 +1165,23 @@ export const run = Effect.fn("run")(function* (
 
 const capture = Effect.fn("capture")(function* (command: string, args: ReadonlyArray<string>) {
   const timeoutMs = yield* CommandTimeoutMs;
+
   const output = yield* Effect.scoped(
     Effect.gen(function* () {
       const paths = yield* getPaths();
       const env = yield* withTizenPath(yield* baseChildEnv());
+
       const process = yield* ChildProcess.make(command, args, {
         forceKillAfter: "1 second",
         cwd: paths.appDir,
         env,
         stderr: "inherit",
       }).pipe(Effect.mapError(() => new CommandFailed({ args: redactCommandArgs(args), command })));
+
       const output = yield* process.stdout
         .pipe(Stream.decodeText, Stream.mkString)
         .pipe(Effect.mapError(() => new CommandFailed({ args: redactCommandArgs(args), command })));
+
       const exitCode = yield* process.exitCode.pipe(
         Effect.mapError(() => new CommandFailed({ args: redactCommandArgs(args), command })),
       );
@@ -1157,6 +1217,7 @@ export const captureForDuration = Effect.fn("captureForDuration")(function* (
       env,
       stdio: ["ignore", "pipe", "pipe"],
     });
+
     let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
     let stderr = "";
     let settled = false;
@@ -1189,7 +1250,7 @@ export const captureForDuration = Effect.fn("captureForDuration")(function* (
 
     const stopChild = () => {
       child.kill("SIGTERM");
-      forceKillTimer ??= setTimeout(() => child.kill("SIGKILL"), 1_000);
+      forceKillTimer ??= setTimeout(() => child.kill("SIGKILL"), 1000);
     };
 
     const timer = setTimeout(() => {
@@ -1201,6 +1262,7 @@ export const captureForDuration = Effect.fn("captureForDuration")(function* (
     child.on("close", (code, signal) => {
       if (timedOut || code === 0 || signal === "SIGTERM") {
         finish(Effect.succeed(stdout));
+
         return;
       }
 
@@ -1218,12 +1280,13 @@ export const captureForDuration = Effect.fn("captureForDuration")(function* (
           ) {
             cleanup();
             resolve();
+
             return;
           }
 
           settled = true;
           cleanup();
-          const forceKill = setTimeout(() => child.kill("SIGKILL"), 1_000);
+          const forceKill = setTimeout(() => child.kill("SIGKILL"), 1000);
           child.once("close", () => {
             clearTimeout(forceKill);
             resolve();

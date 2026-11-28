@@ -27,7 +27,7 @@ import {
   serializeEnvAssignments,
 } from "../live-test/setup-core.ts";
 
-const tempDirs: string[] = [];
+const tempDirs: Array<string> = [];
 
 afterAll(() => {
   for (const dir of tempDirs) {
@@ -38,12 +38,14 @@ afterAll(() => {
 const tempDir = (prefix: string) => {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   tempDirs.push(dir);
+
   return dir;
 };
 
 describe("live test harness core", () => {
   it("keeps roundtrip proof tied to the selected fixture variant", () => {
     const templatePath = writeTemplate();
+
     const env = {
       TAIZN_LIVE_PROVE_APP: "SomeInstalledApp.app",
       TAIZN_VARIANT: "production",
@@ -221,7 +223,7 @@ describe("live test harness core", () => {
   it("escapes JSON before embedding it in the fixture script", () => {
     assert.strictEqual(
       jsonForHtmlScript(["https://example.test/a</script>b.js"]),
-      '["https://example.test/a\\u003c/script>b.js"]',
+      String.raw`["https://example.test/a\u003c/script>b.js"]`,
     );
   });
 
@@ -253,6 +255,7 @@ TAIZN_CERT_PASSWORD=cert
 TAIZN_DIST_PASSWORD="dist value"
 PUBLIC_PUTIO_API_URL=https://example.invalid
 `);
+
     const result = buildLiveSetupEnv(
       { TAIZN_TARGET: "old-target:26101" },
       source,

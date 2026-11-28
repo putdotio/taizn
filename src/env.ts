@@ -39,6 +39,7 @@ export class TaiznEnv extends Schema.Class<TaiznEnv>("TaiznEnv")({
 export const loadEnv = Effect.fn("loadEnv")(function* () {
   const system = yield* TaiznSystem;
   const env = yield* system.env;
+
   const raw = yield* Schema.decodeUnknownEffect(RawTaiznEnv)(
     {
       certPassword: env.TAIZN_CERT_PASSWORD,
@@ -58,10 +59,13 @@ export const loadEnv = Effect.fn("loadEnv")(function* () {
     },
     { errors: "all" },
   ).pipe(Effect.mapError((error) => new InvalidEnvironment({ details: error.message })));
+
   const tvInfoPort = raw.tvInfoPort
     ? yield* parsePort(raw.tvInfoPort, "TAIZN_TV_INFO_PORT")
     : undefined;
+
   const tvPort = raw.tvPort ? yield* parseTvPort(raw.tvPort) : undefined;
+
   const tvTimeoutMs = raw.tvTimeoutMs
     ? yield* parsePositiveInteger(raw.tvTimeoutMs, "TAIZN_TV_TIMEOUT_MS")
     : undefined;
@@ -82,7 +86,7 @@ const parseTvPort = Effect.fn("parseTvPort")(function* (value: string) {
 const parsePort = Effect.fn("parsePort")(function* (value: string, variable: string) {
   const port = Number(value);
 
-  if (!/^\d+$/.test(value) || !Number.isInteger(port) || port < 1 || port > 65535) {
+  if (!/^\d+$/.test(value) || !Number.isInteger(port) || port < 1 || port > 65_535) {
     return yield* new InvalidEnvironment({
       details: `${variable} must be an integer between 1 and 65535. Received: ${value}`,
     });
