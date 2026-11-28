@@ -199,14 +199,14 @@ importers:
   .:
     dependencies:
       '@effect/platform-node':
-        specifier: 4.1.5
-        version: 4.1.5(effect@4.1.5)(redis@5.12.1(@opentelemetry/api@1.9.1))
+        specifier: 4.1.7
+        version: 4.1.7(effect@4.1.7)(redis@5.12.1(@opentelemetry/api@1.9.1))
       '@effect/platform-node-shared':
-        specifier: 4.1.5
-        version: 4.1.5(effect@4.1.5)
+        specifier: 4.1.7
+        version: 4.1.7(effect@4.1.7)
       effect:
-        specifier: 4.1.5
-        version: 4.1.5
+        specifier: 4.1.7
+        version: 4.1.7
       saxes:
         specifier: ^6.0.0
         version: 6.0.0
@@ -215,8 +215,8 @@ importers:
         version: 8.23.0
     devDependencies:
       '@effect/vitest':
-        specifier: 4.1.5
-        version: 4.1.5(effect@4.1.5)(vitest@5.1.0)
+        specifier: 4.1.7
+        version: 4.1.7(effect@4.1.7)(vitest@5.1.0)
       '@types/node':
         specifier: ^26.1.0
         version: 26.6.11
@@ -276,23 +276,23 @@ packages:
   '@blazediff/core@1.10.0':
     resolution: {integrity: sha512-AOQff0zgR7cGsZL+4E7hVkmujoPUpm0J9xzWGWZj5wCjd3gmxESXAPfKyuzs93VdpQNFhHlBhfOjrcZ+XTERtQ==}
 
-  '@effect/platform-node-shared@4.1.5':
-    resolution: {integrity: sha512-JzlrYe4uKaBFTWihBRXo2pDjkUVB39kQpKdGfXdbp7Co5sKT8hbcjOmdB5pg/WOYESdGTddd3fxD4lwlZELbZQ==}
+  '@effect/platform-node-shared@4.1.7':
+    resolution: {integrity: sha512-EDnlB5zL6EW0ahVAeQAUtpuMHc/0yruMLKBsX3nC4Zn3PuG4McWv2A6Rvdk2OUSFM/OFTCclt3sKWNCvk3pEUw==}
     engines: {node: '>=22.19.0'}
     peerDependencies:
-      effect: ^4.1.5
+      effect: ^4.1.7
 
-  '@effect/platform-node@4.1.5':
-    resolution: {integrity: sha512-tFnRvxF9EKc3oU17sDHj1JeLP+TL/IkaOEl3IUk2EjgMS0x7AWs0ioUXjdNKLb3Z1LdjVfMf/DxsNh9PW5FFAg==}
+  '@effect/platform-node@4.1.7':
+    resolution: {integrity: sha512-+hWmfkd5QtfeDKdCnyf+Vs/XK6lnNCfwXWMXWb6YOAyhAQC6qBvHNR5Tx6Lkk8l33eL8xAalHexXF64jL8ABiQ==}
     engines: {node: '>=22.19.0'}
     peerDependencies:
-      effect: ^4.1.5
+      effect: ^4.1.7
       redis: '>=5.1.0 <7.0.0'
 
-  '@effect/vitest@4.1.5':
-    resolution: {integrity: sha512-18u1013wkJtSelk1ZYLc/5aUnluTQyDfi2hAemkJW1GQ9qXw4mtPSiSf0AXZPhesmGCvG1Dk2C4JYD2sz+R72w==}
+  '@effect/vitest@4.1.7':
+    resolution: {integrity: sha512-4Rj7db3Zol7HtCkuQ2KZ26KrbIWIKAS2rpvH5s3drB1sMZh93nSaK6zXZ6EOtMtWl2CM/flz7tJ8ADaMCRHUWw==}
     peerDependencies:
-      effect: ^4.1.5
+      effect: ^4.1.7
       vitest: 5.1.0
 
   '@esbuild/aix-ppc64@0.28.2':
@@ -1238,8 +1238,8 @@ packages:
   dom-accessibility-api@0.5.16:
     resolution: {integrity: sha512-X7BJ2yElsnOJ30pZF4uIIDfBEVgF4XEBxL9Bxhy6dnrm5hkzqmsWHGTiHqRiITNhMyFLyAiWndIJP7Z1NTteDg==}
 
-  effect@4.1.5:
-    resolution: {integrity: sha512-xyR20KhQI0vg2gD8ILUSQRTTESEYJ0JKdP+QD8J37xbwPTqXRxFM/l0+vUVD9fuSvoYruoTqyt33C4FZv1s4TQ==}
+  effect@4.1.7:
+    resolution: {integrity: sha512-8QUe2XO3auHF5r7+bfIDWxyXlLA0sso4Sia1QYP+vrYA7qb3sq1u2eJmhyXGmKc8yZ+TY2SNxPozeMdyKmWing==}
 
   es-module-lexer@2.3.2:
     resolution: {integrity: sha512-poHGpORABojJJucnV9KbOavETW8lBVnphkW77ER5/BQ5Fz7oXSoCNek7IH3vR5nRjdsEz926ibFYX8KtLQmdyw==}
@@ -1493,8 +1493,8 @@ packages:
   undici-types@8.9.0:
     resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
-  undici@8.12.4:
-    resolution: {integrity: sha512-8Mx+uNKKER2bA4AdtedkqRbwUCIJFr2nJckXRe5yrDqzePqwLP7VNcctN8/XdmDSbF7mS+jJKIszlL+vbam1VA==}
+  undici@8.13.1:
+    resolution: {integrity: sha512-Kt7EaPjh0s93lJH/PmW3d5rhkcpUa6fS3jqZ7+YGxNd9L7Xy/i827xe4C2uhhq+pJebM4tQOl5AgHmW11G5Skg==}
     engines: {node: '>=22.19.0'}
 
   vite-plus@1.6.0:
@@ -1609,28 +1609,28 @@ snapshots:
 
   '@blazediff/core@1.10.0': {}
 
-  '@effect/platform-node-shared@4.1.5(effect@4.1.5)':
+  '@effect/platform-node-shared@4.1.7(effect@4.1.7)':
     dependencies:
       '@types/ws': 8.18.2
-      effect: 4.1.5
+      effect: 4.1.7
       ws: 8.23.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.1.5(effect@4.1.5)(redis@5.12.1(@opentelemetry/api@1.9.1))':
+  '@effect/platform-node@4.1.7(effect@4.1.7)(redis@5.12.1(@opentelemetry/api@1.9.1))':
     dependencies:
-      '@effect/platform-node-shared': 4.1.5(effect@4.1.5)
-      effect: 4.1.5
+      '@effect/platform-node-shared': 4.1.7(effect@4.1.7)
+      effect: 4.1.7
       redis: 5.12.1(@opentelemetry/api@1.9.1)
-      undici: 8.12.4
+      undici: 8.13.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/vitest@4.1.5(effect@4.1.5)(vitest@5.1.0)':
+  '@effect/vitest@4.1.7(effect@4.1.7)(vitest@5.1.0)':
     dependencies:
-      effect: 4.1.5
+      effect: 4.1.7
       vitest: 5.1.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/browser-preview@5.1.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@1.6.0(@types/node@26.6.11)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2))
 
   '@esbuild/aix-ppc64@0.28.2':
@@ -2181,7 +2181,7 @@ snapshots:
 
   dom-accessibility-api@0.5.16: {}
 
-  effect@4.1.5: {}
+  effect@4.1.7: {}
 
   es-module-lexer@2.3.2: {}
 
@@ -2455,7 +2455,7 @@ snapshots:
 
   undici-types@8.9.0: {}
 
-  undici@8.12.4: {}
+  undici@8.13.1: {}
 
   vite-plus@1.6.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2):
     dependencies:
