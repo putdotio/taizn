@@ -224,8 +224,8 @@ importers:
         specifier: ^8.18.1
         version: 8.18.2
       '@uinaf/oxlint-config':
-        specifier: 1.0.0
-        version: 1.0.0(oxlint@1.94.0(vite-plus@1.8.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2))
+        specifier: 1.0.1
+        version: 1.0.1(oxlint@1.94.0(vite-plus@1.8.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2))
       '@uinaf/skillcheck':
         specifier: 1.7.7
         version: 1.7.7
@@ -1002,8 +1002,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@uinaf/oxlint-config@1.0.0':
-    resolution: {integrity: sha512-mijhPRhKF+MTJZHEh2aXWNAZpkeq1EF4J/sm2uh0NsoIioB8bW8AJJepqQ3+wXBCRB5k0d9K0aEUAuHyDPfhKw==}
+  '@uinaf/oxlint-config@1.0.1':
+    resolution: {integrity: sha512-1p41DSKyR+DqlsnShp4rz+c6F8ZBXkA0n1MsXGye/AMvzOFIXQxmUlVqQf/ZLNpurWU+t8A7XKunW1akBUHAHQ==}
     engines: {node: ^22.18.0 || >=24.0.0}
     peerDependencies:
       oxlint: '>=1.94.0'
@@ -1014,8 +1014,8 @@ packages:
       vite-plus:
         optional: true
 
-  '@uinaf/oxlint-plugin-no-comments@1.1.0':
-    resolution: {integrity: sha512-Jc1LomQyspHZCKNRX+5OLXqzWgz+Z1Jey1JxpbBITSxTrQ7RLR3JmWsSpbReyP8p6Xa/Bzx1+tVJJ67tD57kPw==}
+  '@uinaf/oxlint-plugin-no-comments@1.1.1':
+    resolution: {integrity: sha512-/rurT1L+Zi3IXFBkjyLOyWVwJATAnlOCvR8eMw3LoNz0mhkbcXeq78Ii9GHuF7t7TTaZgEnsxkN6vaIr9f13LQ==}
     engines: {node: '>=20.19.0'}
 
   '@uinaf/skillcheck@1.7.7':
@@ -2097,10 +2097,10 @@ snapshots:
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
 
-  '@uinaf/oxlint-config@1.0.0(oxlint@1.94.0(vite-plus@1.8.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2))':
+  '@uinaf/oxlint-config@1.0.1(oxlint@1.94.0(vite-plus@1.8.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2))':
     dependencies:
       '@cloudflare/oxlint-config': 0.2.0(oxlint@1.94.0(vite-plus@1.8.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2))
-      '@uinaf/oxlint-plugin-no-comments': 1.1.0
+      '@uinaf/oxlint-plugin-no-comments': 1.1.1
     optionalDependencies:
       oxlint: 1.94.0(vite-plus@1.8.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2))
       vite-plus: 1.8.0(@opentelemetry/api@1.9.1)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@7.0.2)
@@ -2109,7 +2109,7 @@ snapshots:
       - eslint-plugin-perfectionist
       - tsrs
 
-  '@uinaf/oxlint-plugin-no-comments@1.1.0': {}
+  '@uinaf/oxlint-plugin-no-comments@1.1.1': {}
 
   '@uinaf/skillcheck@1.7.7': {}
 
