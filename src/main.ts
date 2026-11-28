@@ -130,10 +130,11 @@ const flushBufferedConsole = (buffered: BufferedConsole, outerConsole: Console.C
     }
   });
 
+const format = (args: ReadonlyArray<unknown>) => args.map(String).join(" ");
+
 const makeBufferedConsole = (realConsole: Console.Console): BufferedConsole => {
   const stdout: Array<string> = [];
   const stderr: Array<string> = [];
-  const format = (args: ReadonlyArray<unknown>) => args.map(String).join(" ");
 
   return {
     console: {

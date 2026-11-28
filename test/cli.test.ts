@@ -97,9 +97,10 @@ const runTaiznInProcess = async (
 
 const joinOutputLines = (lines: ReadonlyArray<string>) => lines.map((line) => `${line}\n`).join("");
 
+const format = (args: ReadonlyArray<unknown>) => args.map(String).join(" ");
+
 const makeCapturedConsole = (stdout: Array<string>, stderr: Array<string>): Console.Console => {
   const realConsole = globalThis.console;
-  const format = (args: ReadonlyArray<unknown>) => args.map(String).join(" ");
 
   return {
     assert: realConsole.assert.bind(realConsole),
@@ -1297,9 +1298,9 @@ describe("taizn cli", () => {
       await Effect.runPromise(Fiber.interrupt(fiber));
       await Promise.race([
         closed.promise,
-        new Promise<never>((_resolve, reject) =>
-          setTimeout(() => reject(new Error("Interrupted websocket did not close")), 1000),
-        ),
+        new Promise<never>((_resolve, reject) => {
+          setTimeout(() => reject(new Error("Interrupted websocket did not close")), 1000);
+        }),
       ]);
       assert.strictEqual(server.clients.size, 0);
     } finally {
@@ -3189,7 +3190,9 @@ const waitForFile = async (path: string) => {
     try {
       return readFileSync(path, "utf8");
     } catch {
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 10);
+      });
     }
   }
 
