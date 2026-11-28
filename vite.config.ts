@@ -1,6 +1,51 @@
+import uinaf, { env, ignorePatterns } from "@uinaf/oxlint-config/effect/vite-plus";
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
+  lint: {
+    extends: [uinaf],
+    env,
+    ignorePatterns,
+    rules: {
+      "@nkzw/no-instanceof": "off",
+      "anti-slop-effect/no-manual-effect-error-tag": "off",
+      "anti-slop-effect/no-manual-tag-comparison": "off",
+      "anti-slop-effect/prefer-effect-match": "off",
+      "anti-slop/no-runtime-typeof": "off",
+      "anti-slop/no-unknown-parameters": "off",
+      "anti-slop/require-readable-spacing": "off",
+      "anti-slop/require-safety-comment-for-type-assertion": "off",
+      "array-callback-return": "off",
+      curly: "off",
+      "import/consistent-type-specifier-style": "off",
+      "no-console": "off",
+      "no-promise-executor-return": "off",
+      "quality/no-conditional-empty-object-spread": "off",
+      "quality/no-known-value-widening": "off",
+      "quality/no-reflect-get": "off",
+      "quality/no-unknown-returns": "off",
+      "quality/no-unsafe-dictionary-type": "off",
+      "react-hooks/rules-of-hooks": "off",
+      "typescript/array-type": "off",
+      "typescript/no-non-null-assertion": "off",
+      "typescript/no-unnecessary-type-assertion": "off",
+      "typescript/no-unsafe-argument": "off",
+      "typescript/no-unsafe-assignment": "off",
+      "typescript/no-unsafe-call": "off",
+      "typescript/no-unsafe-return": "off",
+      "typescript/no-unsafe-type-assertion": "off",
+      "uinaf/no-comments": "off",
+      "unicorn/catch-error-name": "off",
+      "unicorn/consistent-function-scoping": "off",
+      "unicorn/no-hex-escape": "off",
+      "unicorn/numeric-separators-style": "off",
+      "unicorn/prefer-import-meta-properties": "off",
+      "unicorn/prefer-string-raw": "off",
+      "unicorn/prefer-string-replace-all": "off",
+      "unicorn/prefer-structured-clone": "off",
+      "unicorn/prefer-top-level-await": "off",
+    },
+  },
   test: {
     coverage: {
       // Coverage blind spot: a handful of CLI tests spawn the packaged
