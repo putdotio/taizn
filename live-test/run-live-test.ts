@@ -162,6 +162,7 @@ function resolveProfile() {
 function findActiveProfile() {
   const tizenCli =
     process.env.TAIZN_TIZEN_CLI || join(homedir(), "tizen-studio/tools/ide/bin/tizen");
+
   const result = spawnSync(tizenCli, ["security-profiles", "list"], {
     cwd: appDir,
     encoding: "utf8",
@@ -196,6 +197,7 @@ function runTaizn(command: TaiznMode) {
       : command === "doctor"
         ? ["tv", "doctor", "--json", ...(args.includes("--connect") ? ["--connect"] : [])]
         : [command];
+
   const result = spawnSync(process.execPath, [cliPath, ...commandArgs], {
     cwd: appDir,
     env: {
@@ -209,6 +211,7 @@ function runTaizn(command: TaiznMode) {
   if (result.error) {
     console.error(`taizn ${command}: ${result.error.message}`);
   }
+
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }
@@ -313,7 +316,9 @@ async function runRoundtrip() {
       timeoutMs: beacon.timeoutMs,
       url: beacon.url,
     };
+
     const fetchUrls = resolveFetchProbeUrls(process.env, args.includes("--tv-assets"));
+
     const install = runInstallWithRetry(
       {
         ...roundtripEnv,
@@ -322,11 +327,13 @@ async function runRoundtrip() {
       },
       precheck.json,
     );
+
     const smoke = buildSmokeArtifact(
       roundtripEnv,
       resolveFixtureProofQuery(configTemplatePath),
       false,
     );
+
     const beaconEvent = await beacon.waitForEvent();
 
     if (!beaconEvent) {
@@ -335,6 +342,7 @@ async function runRoundtrip() {
     }
 
     const failedFetches = failedFetchProbes(beaconEvent.fetches);
+
     const artifact = {
       createdAt: new Date().toISOString(),
       failedFetches,
@@ -432,6 +440,7 @@ function runTaiznJson(
       TAIZN_VARIANT: process.env.TAIZN_VARIANT || "development",
     },
   });
+
   const stdout = result.stdout.trim();
   const stderr = [result.stderr.trim(), result.error?.message].filter(Boolean).join("\n");
 
@@ -468,6 +477,7 @@ function runTaiznTextResult(
       TAIZN_VARIANT: process.env.TAIZN_VARIANT || "development",
     },
   });
+
   const stdout = result.stdout.trim();
   const stderr = result.stderr.trim();
 
@@ -483,10 +493,12 @@ function runTaiznTextResult(
 function uninstallFixturePackage(target: string, checkJson: unknown) {
   const sdbPath = resolveSdbPath(checkJson);
   const packageId = resolvePackageId(configTemplatePath);
+
   const result = spawnSync(sdbPath, ["-s", target, "uninstall", packageId], {
     cwd: appDir,
     encoding: "utf8",
   });
+
   const step = {
     command: ["sdb", "-s", target, "uninstall", packageId],
     name: "uninstall",
@@ -547,6 +559,7 @@ async function startBeaconServer(host: string, timeoutMs: number): Promise<Beaco
   let event: BeaconEvent | undefined;
   let resolveWaiting: ((event: BeaconEvent | null) => void) | undefined;
   let timer: NodeJS.Timeout | undefined;
+
   const server = createServer((request, response) => {
     const requestUrl = request.url ?? "/";
     event = {
@@ -579,6 +592,7 @@ async function startBeaconServer(host: string, timeoutMs: number): Promise<Beaco
       server.off("listening", onListening);
       rejectListen(error);
     };
+
     const onListening = () => {
       server.off("error", onError);
       resolveListen();

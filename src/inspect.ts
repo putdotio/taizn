@@ -64,6 +64,7 @@ export const inspectWidgetArchive = Effect.fn("inspectWidgetArchive")(function* 
 ) {
   const { entries, payload } = yield* readWidgetArchive(path);
   const now = yield* DateTime.now;
+
   const result = {
     config: payload.config,
     entryCount: entries.length,
@@ -83,14 +84,17 @@ export const inspectWidgetArchive = Effect.fn("inspectWidgetArchive")(function* 
 
   if (options.json) {
     yield* Console.log(yield* jsonForOutput(result, { fields: options.fields }));
+
     return;
   }
 
   yield* Console.log(`Widget archive: ${basename(path)}`);
   yield* Console.log(`entries: ${entries.length}`);
+
   if (result.config?.applicationId) {
     yield* Console.log(`application_id: ${result.config.applicationId}`);
   }
+
   if (result.config?.packageId) {
     yield* Console.log(`package_id: ${result.config.packageId}`);
   }
@@ -109,18 +113,22 @@ export const prepareSubmission = Effect.fn("prepareSubmission")(function* (
 
   if (options.json) {
     yield* Console.log(yield* jsonForOutput(manifest, { fields: options.fields }));
+
     return;
   }
 
   yield* Console.log(`Submission manifest: ${manifest.file.name}`);
   yield* Console.log(`size: ${manifest.file.size}`);
   yield* Console.log(`sha256: ${manifest.file.sha256}`);
+
   if (manifest.widget.applicationId) {
     yield* Console.log(`application_id: ${manifest.widget.applicationId}`);
   }
+
   if (manifest.widget.version) {
     yield* Console.log(`version: ${manifest.widget.version}`);
   }
+
   yield* Console.log(
     `author_signature: ${manifest.signatures.authorPresent ? "present" : "missing"}`,
   );
@@ -139,11 +147,13 @@ export const validateSubmission = Effect.fn("validateSubmission")(function* (
   const hostedAssets = extractAssetUrls(indexHtml);
   const archive = path ? yield* inspectArchivePayload(path) : undefined;
   const now = yield* DateTime.now;
+
   const problems = [
     ...validateIdentifier("applicationId", variant.applicationId),
     ...validateIdentifier("packageId", variant.packageId),
     ...validateArchive(archive, variant),
   ];
+
   const result = {
     archive,
     hostedAssets,
@@ -164,21 +174,25 @@ export const validateSubmission = Effect.fn("validateSubmission")(function* (
 
   if (options.json) {
     yield* Console.log(yield* jsonForOutput(result, { fields: options.fields }));
+
     if (!result.ok) {
       return yield* new InvalidInput({
         details: problems.join("; "),
         label: "submission validation",
       });
     }
+
     return;
   }
 
   yield* Console.log(result.ok ? "Submission validation: ok" : "Submission validation: failed");
   yield* Console.log(`variant: ${env.variant}`);
   yield* Console.log(`hosted_assets: ${hostedAssets.length}`);
+
   for (const problem of problems) {
     yield* Console.log(`- ${problem}`);
   }
+
   if (!result.ok) {
     return yield* new InvalidInput({
       details: problems.join("; "),
@@ -189,6 +203,7 @@ export const validateSubmission = Effect.fn("validateSubmission")(function* (
 
 const inspectArchivePayload = Effect.fn("inspectArchivePayload")(function* (path: string) {
   const { payload } = yield* readWidgetArchive(path);
+
   return payload;
 });
 
@@ -197,11 +212,13 @@ const readWidgetArchive = Effect.fn("readWidgetArchive")(function* (path: string
   const { buffer, entries } = yield* readZipArchive(path);
   const configXml = entries.find((entry) => entry.name === "config.xml")?.content.toString("utf8");
   const config = configXml ? yield* inspectConfigXml(configXml) : undefined;
+
   const widget: ArchiveConfig = config ?? {
     declarations: { autoRestart: false, onBoot: false, ticker: false },
     features: [],
     privileges: [],
   };
+
   const manifest: SubmissionManifest = {
     file: {
       name: basename(path),
@@ -229,9 +246,11 @@ const readWidgetArchive = Effect.fn("readWidgetArchive")(function* (path: string
 
 const readZipArchive = Effect.fn("readZipArchive")(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
+
   const bytes = yield* fs
     .readFile(path)
     .pipe(Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "read", path })));
+
   const buffer = Buffer.from(bytes);
 
   const entries = yield* Effect.try({
@@ -259,15 +278,19 @@ const parseZipEntries = (buffer: Buffer): readonly ZipEntry[] => {
   if (endOffset + 22 + commentLength !== buffer.length) {
     throw new Error("ZIP end-of-central-directory comment length is inconsistent");
   }
+
   if (disk !== 0 || centralDisk !== 0 || diskEntryCount !== entryCount) {
     throw new Error("multi-disk ZIP archives are not supported");
   }
+
   if (entryCount === 0) {
     throw new Error("ZIP central directory contains no entries");
   }
+
   if (entryCount === 0xffff || centralSize === 0xffff_ffff || centralOffset === 0xffff_ffff) {
     throw new Error("ZIP64 archives are not supported");
   }
+
   if (centralOffset + centralSize !== endOffset) {
     throw new Error("ZIP central directory location is inconsistent");
   }
@@ -278,6 +301,7 @@ const parseZipEntries = (buffer: Buffer): readonly ZipEntry[] => {
 
   for (let index = 0; index < entryCount; index += 1) {
     requireZipRange(buffer, offset, 46, "central directory entry");
+
     if (buffer.readUInt32LE(offset) !== 0x02014b50) {
       throw new Error("ZIP central directory entry signature is invalid");
     }
@@ -299,18 +323,23 @@ const parseZipEntries = (buffer: Buffer): readonly ZipEntry[] => {
     if (entryDisk !== 0) {
       throw new Error(`ZIP entry ${name} is stored on an unsupported disk`);
     }
+
     if ((flags & 0x01) !== 0) {
       throw new Error(`ZIP entry ${name} is encrypted`);
     }
+
     if (names.has(name)) {
       throw new Error(`ZIP entry ${name} is duplicated`);
     }
+
     names.add(name);
 
     requireZipRange(buffer, localOffset, 30, `local header for ${name}`);
+
     if (buffer.readUInt32LE(localOffset) !== 0x04034b50) {
       throw new Error(`ZIP local header for ${name} is invalid`);
     }
+
     const localFlags = buffer.readUInt16LE(localOffset + 6);
     const localMethod = buffer.readUInt16LE(localOffset + 8);
     const localCrc = buffer.readUInt32LE(localOffset + 14);
@@ -323,24 +352,30 @@ const parseZipEntries = (buffer: Buffer): readonly ZipEntry[] => {
     const dataEnd = dataStart + compressedSize;
 
     requireZipRange(buffer, localNameStart, localNameLength, `local name for ${name}`);
+
     const localName = buffer
       .subarray(localNameStart, localNameStart + localNameLength)
       .toString("utf8");
+
     if (localName !== name || localFlags !== flags || localMethod !== method) {
       throw new Error(`ZIP local header for ${name} does not match its central directory entry`);
     }
+
     if (dataEnd > centralOffset) {
       throw new Error(`ZIP entry ${name} extends into the central directory`);
     }
 
     const compressed = buffer.subarray(dataStart, dataEnd);
     const content = readZipEntryContent(name, method, compressed);
+
     if (content.byteLength !== uncompressedSize) {
       throw new Error(`ZIP entry ${name} has an inconsistent uncompressed size`);
     }
+
     if (crc32(content) !== expectedCrc) {
       throw new Error(`ZIP entry ${name} failed its CRC-32 check`);
     }
+
     if ((flags & 0x08) === 0) {
       if (
         localCrc !== expectedCrc ||
@@ -380,6 +415,7 @@ const parseZipEntries = (buffer: Buffer): readonly ZipEntry[] => {
 
 const findEndOfCentralDirectory = (buffer: Buffer) => {
   const minimumOffset = Math.max(0, buffer.length - 65_557);
+
   for (let offset = buffer.length - 22; offset >= minimumOffset; offset -= 1) {
     if (
       buffer.readUInt32LE(offset) === 0x06054b50 &&
@@ -388,6 +424,7 @@ const findEndOfCentralDirectory = (buffer: Buffer) => {
       return offset;
     }
   }
+
   throw new Error("ZIP end-of-central-directory record is missing");
 };
 
@@ -401,9 +438,11 @@ const readZipEntryContent = (name: string, method: number, compressed: Buffer) =
   if (method === 0) {
     return compressed;
   }
+
   if (method === 8) {
     return inflateRawSync(compressed);
   }
+
   throw new Error(`ZIP entry ${name} uses unsupported compression method ${method}`);
 };
 
@@ -419,9 +458,11 @@ const validateZipDataDescriptor = (
   requireZipRange(buffer, offset, 12, `data descriptor for ${name}`);
   const valuesOffset = buffer.readUInt32LE(offset) === 0x08074b50 ? offset + 4 : offset;
   requireZipRange(buffer, valuesOffset, 12, `data descriptor for ${name}`);
+
   if (valuesOffset + 12 > centralOffset) {
     throw new Error(`ZIP data descriptor for ${name} extends into the central directory`);
   }
+
   if (
     buffer.readUInt32LE(valuesOffset) !== expectedCrc ||
     buffer.readUInt32LE(valuesOffset + 4) !== compressedSize ||
@@ -433,21 +474,27 @@ const validateZipDataDescriptor = (
 
 const crc32Table = Array.from({ length: 256 }, (_, index) => {
   let value = index;
+
   for (let bit = 0; bit < 8; bit += 1) {
     value = (value & 1) !== 0 ? 0xedb8_8320 ^ (value >>> 1) : value >>> 1;
   }
+
   return value >>> 0;
 });
 
 const crc32 = (buffer: Buffer) => {
   let value = 0xffff_ffff;
+
   for (const byte of buffer) {
     const tableValue = crc32Table[(value ^ byte) & 0xff];
+
     if (tableValue === undefined) {
       throw new Error("CRC-32 table lookup failed");
     }
+
     value = tableValue ^ (value >>> 8);
   }
+
   return (value ^ 0xffff_ffff) >>> 0;
 };
 
@@ -489,6 +536,7 @@ const parseConfigXml = (source: string): ArchiveConfig => {
       if (tag.local !== "widget" || tag.uri !== widgetNamespace) {
         throw new Error("root element must be a W3C widget element");
       }
+
       rootSeen = true;
     }
 
@@ -501,11 +549,13 @@ const parseConfigXml = (source: string): ArchiveConfig => {
       requiredTizenVersion = readXmlAttribute(tag, "required_version");
     } else if (tag.local === "feature" && tag.uri === widgetNamespace) {
       const feature = readXmlAttribute(tag, "name");
+
       if (feature) {
         features.push(feature);
       }
     } else if (tag.local === "privilege" && tag.uri === tizenNamespace) {
       const privilege = readXmlAttribute(tag, "name");
+
       if (privilege) {
         privileges.push(privilege);
       }
@@ -519,6 +569,7 @@ const parseConfigXml = (source: string): ArchiveConfig => {
     if (tag.local === "ticker") {
       ticker = true;
     }
+
     if (tag.local === "service" && tag.uri === tizenNamespace) {
       autoRestart ||= readXmlAttribute(tag, "auto-restart") === "true";
       onBoot ||= readXmlAttribute(tag, "on-boot") === "true";
@@ -530,18 +581,22 @@ const parseConfigXml = (source: string): ArchiveConfig => {
       nameCapture.text += text;
     }
   };
+
   parser.on("text", appendNameText);
   parser.on("cdata", appendNameText);
   parser.on("closetag", (tag) => {
     if (tag.local === "name" && tag.uri === widgetNamespace && nameCapture) {
       const normalizedName = normalizeXmlName(nameCapture.text);
+
       if (!nameCapture.language) {
         defaultName ??= normalizedName;
       } else if (nameCapture.language === defaultLocale) {
         defaultLocaleName ??= normalizedName;
       }
+
       nameCapture = undefined;
     }
+
     languageStack.pop();
   });
   parser.write(source).close();
@@ -615,9 +670,11 @@ const validateSubmissionManifest = (manifest: SubmissionManifest) => {
   if (!manifest.file.name.endsWith(".wgt")) {
     problems.push("archive file extension must be lowercase .wgt");
   }
+
   if (!/^[\p{L}\p{N} _]+\.wgt$/u.test(manifest.file.name)) {
     problems.push("archive file name may contain only letters, numbers, spaces, and underscores");
   }
+
   if (Buffer.byteLength(manifest.file.name, "utf8") > 100) {
     problems.push("archive file name must not exceed 100 bytes");
   }
@@ -654,6 +711,7 @@ const validateSubmissionManifest = (manifest: SubmissionManifest) => {
 
   for (const privilege of widget.privileges) {
     const name = privilege.split("/").at(-1);
+
     if (name && unavailableSamsungPrivileges.has(name)) {
       problems.push(`archive privilege ${name} is no longer available for Samsung TV apps`);
     }
@@ -662,9 +720,11 @@ const validateSubmissionManifest = (manifest: SubmissionManifest) => {
   if (widget.declarations.autoRestart) {
     problems.push("archive auto-restart must not be true");
   }
+
   if (widget.declarations.onBoot) {
     problems.push("archive on-boot must not be true");
   }
+
   if (widget.declarations.ticker) {
     problems.push("archive ticker declaration is not supported on Samsung TV");
   }
@@ -690,6 +750,7 @@ const isValidWidgetVersion = (value: string) => {
 
   return segments.every((segment, index) => {
     const limit = limits[index];
+
     return /^\d+$/u.test(segment) && limit !== undefined && Number(segment) <= limit;
   });
 };
@@ -726,6 +787,7 @@ const validateIdentifier = (label: string, value: string) => {
 const hasControlCharacter = (value: string) => {
   for (const character of value) {
     const codePoint = character.codePointAt(0);
+
     if (codePoint !== undefined && (codePoint < 32 || codePoint === 127)) {
       return true;
     }

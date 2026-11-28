@@ -44,9 +44,11 @@ const makeCard = (options: {
     if (selector === ".appInfo span") {
       return (options.identity ?? []).map(element);
     }
+
     if (selector === ".appStatus span") {
       return (options.status ?? []).map(element);
     }
+
     return [];
   },
 });
@@ -66,9 +68,11 @@ const evaluateSellerPage = (
             if (selector === ".appThumb") {
               return options.cards ?? [];
             }
+
             if (selector === "h1") {
               return (options.headings ?? []).map(element);
             }
+
             return [];
           },
         },
@@ -99,6 +103,7 @@ afterAll(() => {
 const tempDir = (prefix: string) => {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   tempDirs.push(dir);
+
   return dir;
 };
 
@@ -396,6 +401,7 @@ describe("readSellerBrowserState", () => {
 describe("waitForDevToolsPort", () => {
   it("resolves once the port file names a live DevTools endpoint", async () => {
     const dir = tempDir("taizn-devtools-port-");
+
     const server = createServer((_request, response) => {
       response.setHeader("content-type", "application/json");
       response.end(JSON.stringify({ Browser: "Fixture/1.0" }));

@@ -48,6 +48,7 @@ export class TizenConfig extends Schema.Class<TizenConfig>("TizenConfig")({
 export const loadConfig = Effect.fn("loadConfig")(function* () {
   const fs = yield* FileSystem.FileSystem;
   const paths = yield* getPaths();
+
   const exists = yield* fs
     .exists(paths.configPath)
     .pipe(

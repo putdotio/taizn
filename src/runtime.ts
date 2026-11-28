@@ -80,6 +80,7 @@ export const makePaths = (appDir: string): TaiznPaths => {
 export const getPaths = Effect.fn("getPaths")(function* () {
   const system = yield* TaiznSystem;
   const appDir = yield* system.cwd;
+
   return makePaths(appDir);
 });
 
@@ -94,6 +95,7 @@ export const loadLocalEnv = Effect.fn("loadLocalEnv")(function* () {
 
 export const requireFile = Effect.fn("requireFile")(function* (path: string, label: string) {
   const fs = yield* FileSystem.FileSystem;
+
   const exists = yield* fs
     .exists(path)
     .pipe(Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "exists", path })));
@@ -111,6 +113,7 @@ export const baseChildEnv = Effect.fn("baseChildEnv")(function* () {
   const env: ChildEnv = { ...source };
 
   delete env.DYLD_INSERT_LIBRARIES;
+
   return env;
 });
 
@@ -124,6 +127,7 @@ export const appBuildEnv = Effect.fn("appBuildEnv")(function* () {
   }
 
   delete env.SDB;
+
   return env;
 });
 
@@ -142,12 +146,14 @@ export const withTizenPath = Effect.fn("withTizenPath")(function* (env: ChildEnv
 export const defaultTizenCli = Effect.fn("defaultTizenCli")(function* () {
   const system = yield* TaiznSystem;
   const home = yield* system.homeDir;
+
   return join(home, "tizen-studio/tools/ide/bin/tizen");
 });
 
 export const defaultSdb = Effect.fn("defaultSdb")(function* () {
   const system = yield* TaiznSystem;
   const home = yield* system.homeDir;
+
   return join(home, "tizen-studio/tools/sdb");
 });
 
@@ -176,6 +182,7 @@ export const needsRosetta = (bytes: Uint8Array) => {
 
   if (bigEndianMagic === 0xcafebabe || bigEndianMagic === 0xcafebabf) {
     const cpuTypes = fatArchCpuTypes(bytes, view);
+
     return cpuTypes.includes(machOX86_64) && !cpuTypes.includes(machOArm64);
   }
 
@@ -191,6 +198,7 @@ export const readPassword = Effect.fn("readPassword")(function* (
   }
 
   const system = yield* TaiznSystem;
+
   return yield* system.readSecret(prompt);
 });
 
@@ -210,6 +218,7 @@ const readSecret = (prompt: string, signal: AbortSignal) =>
   new Promise<string>((resolve, reject) => {
     if (!process.stdin.isTTY) {
       resolve("");
+
       return;
     }
 
@@ -237,6 +246,7 @@ const readSecret = (prompt: string, signal: AbortSignal) =>
         cleanup();
         process.stdout.write("\n");
         reject(new Error("interrupted"));
+
         return;
       }
 
@@ -244,11 +254,13 @@ const readSecret = (prompt: string, signal: AbortSignal) =>
         cleanup();
         process.stdout.write("\n");
         resolve(value);
+
         return;
       }
 
       if (char === "\u007f") {
         value = value.slice(0, -1);
+
         return;
       }
 
@@ -256,9 +268,12 @@ const readSecret = (prompt: string, signal: AbortSignal) =>
     };
 
     signal.addEventListener("abort", onAbort, { once: true });
+
     if (signal.aborted) {
       onAbort();
+
       return;
     }
+
     process.stdin.on("data", onData);
   });

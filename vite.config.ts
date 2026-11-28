@@ -13,7 +13,6 @@ export default defineConfig({
       "anti-slop-effect/prefer-effect-match": "off",
       "anti-slop/no-runtime-typeof": "off",
       "anti-slop/no-unknown-parameters": "off",
-      "anti-slop/require-readable-spacing": "off",
       "anti-slop/require-safety-comment-for-type-assertion": "off",
       "array-callback-return": "off",
       "import/consistent-type-specifier-style": "off",

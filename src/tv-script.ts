@@ -35,6 +35,7 @@ export const runTvScript = Effect.fn("runTvScript")(function* (
 ) {
   const script = yield* loadTvScript(file);
   const steps = yield* resolveScriptSteps(script);
+
   const result = {
     dryRun: options.dryRun === true,
     file,
@@ -62,6 +63,7 @@ export const runTvScript = Effect.fn("runTvScript")(function* (
 
   if (options.json) {
     yield* Console.log(JSON.stringify(result));
+
     return;
   }
 
@@ -70,6 +72,7 @@ export const runTvScript = Effect.fn("runTvScript")(function* (
       ? `TV script dry-run: ${result.keyCount} keys from ${file}`
       : `TV script sent ${result.keyCount} keys from ${file}`,
   );
+
   if (options.artifact) {
     yield* Console.log(`TV script artifact: ${options.artifact}`);
   }

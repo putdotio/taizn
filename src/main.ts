@@ -12,13 +12,16 @@ class PackageJson extends Schema.Class<PackageJson>("PackageJson")({
 const getPackageVersion = Effect.fn("getPackageVersion")(
   function* () {
     const fs = yield* FileSystem.FileSystem;
+
     const source = yield* fs.readFileString(
       fileURLToPath(new URL("../package.json", import.meta.url)),
     );
+
     const json = yield* Effect.try({
       try: () => JSON.parse(source),
       catch: () => undefined,
     });
+
     const parsed = yield* Schema.decodeUnknownEffect(PackageJson)(json).pipe(
       Effect.catch(() => Effect.succeed(PackageJson.make({ version: "0.0.0" }))),
     );
@@ -39,6 +42,7 @@ export const runTaiznCli = (args: ReadonlyArray<string>) =>
     }
 
     yield* runCommand;
+
     return 0;
   }).pipe(Effect.catch(handleMainError(args)));
 

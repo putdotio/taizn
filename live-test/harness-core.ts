@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 type LiveTestEnv = Record<string, string | undefined>;
+
 type LiveTestVariant = "development" | "production";
 
 export const hostedAssetProbeUrls = [
@@ -74,6 +75,7 @@ export function selectBeaconHost(
   target: string | undefined,
 ) {
   const targetHost = parseTargetHost(target);
+
   const sameSubnetAddress = targetHost
     ? interfaceAddresses.find((address) => sameIpv4Subnet(address, targetHost))
     : undefined;

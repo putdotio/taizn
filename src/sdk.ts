@@ -42,6 +42,7 @@ const certificateRoots = [
   "tizen-studio-data/keystore",
   "tizen-studio-data/profile",
 ];
+
 const fullRoots = [
   "SamsungCertificate",
   ".tizen",
@@ -50,6 +51,7 @@ const fullRoots = [
   "tizen-studio-extensions",
   "tizen-studio-workspace",
 ];
+
 const restorableRoots = new Set(fullRoots);
 
 const installerPlatforms: Partial<Record<NodeJS.Platform, string>> = {
@@ -63,6 +65,7 @@ const fsFailure = (operation: string, path: string) => (cause: unknown) =>
 const isExecutableFile = Effect.fn("isExecutableFile")(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
   const info = yield* fs.stat(path).pipe(Effect.option);
+
   return Option.isSome(info) && info.value.type === "File" && (info.value.mode & 0o111) !== 0;
 });
 
@@ -83,9 +86,11 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
   }
 
   const installerName = `web-cli_Tizen_SDK_${options.sdkVersion}_${installerSuffix}`;
+
   const installerUrl =
     options.installerUrl ??
     `https://download.tizen.org/sdk/Installer/tizen-sdk_${options.sdkVersion}/${installerName}`;
+
   const downloadDir = options.downloadDir ? resolve(paths.appDir, options.downloadDir) : undefined;
   const defaultStudioDir = join(home, "tizen-studio");
   const studioDir = options.studioDir ? resolve(paths.appDir, options.studioDir) : defaultStudioDir;
@@ -122,6 +127,7 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
         tools: { packageManager, sdb, tizenCli },
       }),
     );
+
     return;
   }
 
@@ -137,6 +143,7 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
           (yield* fs
             .makeTempDirectoryScoped({ prefix: "taizn-tizen-sdk-" })
             .pipe(Effect.mapError(fsFailure("mkdtemp", "taizn-tizen-sdk-"))));
+
         const installerPath = join(directory, installerName);
         yield* fs
           .makeDirectory(directory, { recursive: true })
@@ -232,12 +239,15 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
   }
 
   const mode = options.full ? "full" : "certificates";
+
   const timestamp = DateTime.formatIso(yield* DateTime.now)
     .replaceAll(/\D/g, "")
     .slice(0, 14);
+
   const output = requestedOutput
     ? resolve(paths.appDir, requestedOutput)
     : join(home, `tizen-${options.full ? "full" : "certs"}-${timestamp}.tar.gz`);
+
   const included: string[] = [];
   const skipped: string[] = [];
 
@@ -276,6 +286,7 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
 
   for (const root of included) {
     const rootPath = join(home, root);
+
     const resolvedRoot = yield* fs
       .realPath(rootPath)
       .pipe(Effect.mapError(fsFailure("realpath", rootPath)));
@@ -291,6 +302,7 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
   // Restore rejects links that leave the backup roots, so refuse to write an
   // archive it could not restore.
   yield* validateTree(home, included);
+
   const result = {
     archive: output,
     dryRun: options.dryRun === true,
@@ -303,6 +315,7 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
     yield* fs
       .makeDirectory(outputDir, { recursive: true })
       .pipe(Effect.mapError(fsFailure("mkdir", outputDir)));
+
     // Stage in a private directory beside the output, then rename into place so
     // a failed tar never leaves a partial archive.
     if ((yield* pathKind(output)) !== "missing") {
@@ -314,6 +327,7 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
         const staging = yield* fs
           .makeTempDirectoryScoped({ directory: outputDir, prefix: ".taizn-sdk-backup." })
           .pipe(Effect.mapError(fsFailure("mkdtemp", outputDir)));
+
         yield* fs.chmod(staging, 0o700).pipe(Effect.mapError(fsFailure("chmod", staging)));
         const archive = join(staging, "archive.tar.gz");
         yield* run("tar", ["-C", home, "-czf", archive, ...included], { quiet: options.json });
@@ -325,6 +339,7 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
 
   if (options.json) {
     yield* Console.log(JSON.stringify(result));
+
     return;
   }
 
@@ -366,8 +381,10 @@ export const restoreSdk = Effect.fn("restoreSdk")(function* (
           prefix: ".taizn-sdk-restore.",
         })
         .pipe(Effect.mapError(fsFailure("mkdtemp", home)));
+
       yield* fs.chmod(staging, 0o700).pipe(Effect.mapError(fsFailure("chmod", staging)));
       yield* run("tar", ["-C", staging, "-xzf", archive], { quiet: options.json });
+
       const roots = yield* fs
         .readDirectory(staging)
         .pipe(Effect.mapError(fsFailure("readdir", staging)));
@@ -400,10 +417,12 @@ export const restoreSdk = Effect.fn("restoreSdk")(function* (
       return [...roots].sort();
     }),
   );
+
   const result = { archive, dryRun: options.dryRun === true, home, paths: roots };
 
   if (options.json) {
     yield* Console.log(JSON.stringify(result));
+
     return;
   }
 
@@ -417,6 +436,7 @@ export const restoreSdk = Effect.fn("restoreSdk")(function* (
 
 const isInside = (parent: string, path: string) => {
   const fromParent = relative(parent, path);
+
   return !fromParent.startsWith("..") && !isAbsolute(fromParent);
 };
 
@@ -425,6 +445,7 @@ type PathKind = "missing" | FileSystem.File.Type;
 // FileSystem has no lstat: readLink tells links apart, stat types everything else.
 const pathKind = Effect.fn("pathKind")(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
+
   const link = yield* fs.readLink(path).pipe(
     Effect.as("link" as const),
     Effect.catch((cause) =>
@@ -441,6 +462,7 @@ const pathKind = Effect.fn("pathKind")(function* (path: string) {
   }
 
   const info = yield* fs.stat(path).pipe(Effect.mapError(fsFailure("stat", path)));
+
   return info.type satisfies PathKind;
 });
 
@@ -468,6 +490,7 @@ const validateTree = Effect.fn("validateTree")(function* (base: string, roots: r
       const children = yield* fs
         .readDirectory(path)
         .pipe(Effect.mapError(fsFailure("readdir", path)));
+
       pending.push(...children.map((child) => join(entry, child)));
     } else if (kind === "SymbolicLink") {
       const target = yield* fs.readLink(path).pipe(Effect.mapError(fsFailure("readlink", path)));
@@ -495,6 +518,7 @@ const resolveExisting = Effect.fn("resolveExisting")(function* (
   }
 
   const parent = dirname(path);
+
   return parent === path ? path : join(yield* resolveExisting(parent), relative(parent, path));
 });
 
@@ -532,6 +556,7 @@ const planMoves = Effect.fn("planMoves")(function* (
       const children = yield* fs
         .readDirectory(join(staging, path))
         .pipe(Effect.mapError(fsFailure("readdir", join(staging, path))));
+
       moves.push(...(yield* planMoves(staging, home, children, path)));
     } else if (staged !== "Directory" && (existing === "File" || existing === "SymbolicLink")) {
       moves.push(path);

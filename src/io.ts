@@ -9,6 +9,7 @@ export type JsonOutputOptions = {
 
 export const readJsonFile = Effect.fn("readJsonFile")(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
+
   const source = yield* fs
     .readFileString(path)
     .pipe(Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "read", path })));
@@ -20,6 +21,7 @@ export const parseJson = Effect.fn("parseJson")(function* (source: string, file:
   return yield* Effect.try({
     try: () => {
       const parsed: unknown = JSON.parse(source);
+
       return parsed;
     },
     catch: (cause) => new InvalidJson({ details: causeToMessage(cause), file }),
@@ -28,9 +30,11 @@ export const parseJson = Effect.fn("parseJson")(function* (source: string, file:
 
 export const resolveOutputPath = Effect.fn("resolveOutputPath")(function* (requestedPath: string) {
   const paths = yield* getPaths();
+
   const resolved = isAbsolute(requestedPath)
     ? resolve(requestedPath)
     : resolve(paths.appDir, requestedPath);
+
   const rel = relative(paths.appDir, resolved);
 
   if (rel === "" || escapesDirectory(rel)) {
@@ -41,6 +45,7 @@ export const resolveOutputPath = Effect.fn("resolveOutputPath")(function* (reque
   }
 
   const fs = yield* FileSystem.FileSystem;
+
   const root = yield* fs
     .realPath(paths.appDir)
     .pipe(
@@ -48,10 +53,12 @@ export const resolveOutputPath = Effect.fn("resolveOutputPath")(function* (reque
         (cause) => new FileSystemFailure({ cause, operation: "realpath", path: paths.appDir }),
       ),
     );
+
   let physical = root;
 
   for (const segment of rel.split(sep)) {
     const candidate = resolve(physical, segment);
+
     const canonical = yield* fs
       .realPath(candidate)
       .pipe(
@@ -75,6 +82,7 @@ export const resolveOutputPath = Effect.fn("resolveOutputPath")(function* (reque
                 ),
           ),
         );
+
       if (link !== undefined) {
         return yield* new InvalidInput({
           details: `output path must stay inside the app directory; dangling links are not allowed. Received: ${requestedPath}`,
@@ -84,6 +92,7 @@ export const resolveOutputPath = Effect.fn("resolveOutputPath")(function* (reque
     }
 
     physical = canonical ?? candidate;
+
     if (escapesDirectory(relative(root, physical))) {
       return yield* new InvalidInput({
         details: `output path must stay inside the app directory. Received: ${requestedPath}`,
@@ -127,6 +136,7 @@ export const jsonForOutput = Effect.fn("jsonForOutput")(function* (
   options: JsonOutputOptions = {},
 ) {
   const selected = yield* selectJsonFields(value, options.fields);
+
   return JSON.stringify(selected);
 });
 
@@ -219,6 +229,7 @@ const setPath = (target: Record<string, unknown>, segments: readonly string[], v
   for (const [index, segment] of segments.entries()) {
     if (index === segments.length - 1) {
       current[segment] = value;
+
       return;
     }
 
@@ -234,6 +245,7 @@ const causeToMessage = (cause: unknown) => (cause instanceof Error ? cause.messa
 const hasControlCharacter = (value: string) => {
   for (const character of value) {
     const codePoint = character.codePointAt(0);
+
     if (codePoint !== undefined && (codePoint < 32 || codePoint === 127)) {
       return true;
     }

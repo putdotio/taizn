@@ -17,9 +17,11 @@ export const extractAssetUrls = (source: string) => {
 
   while (match) {
     const url = match[1];
+
     if (url) {
       urls.push(url);
     }
+
     match = pattern.exec(source);
   }
 

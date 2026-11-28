@@ -9,6 +9,7 @@ const fetchUrls = parseFetchUrls(process.env.LIVE_TEST_FETCH_URLS);
 const source = readFileSync(join(appDir, "src", "index.html"), "utf8");
 
 mkdirSync(join(appDir, "dist"), { recursive: true });
+
 writeFileSync(
   join(appDir, "dist", "index.html"),
   source

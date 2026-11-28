@@ -28,6 +28,7 @@ export const listTargets = Effect.fn("listTargets")(function* (
   const paths = yield* getPaths();
   const aliases = yield* readTargetsFile();
   const connected = yield* listTizenTargets(env);
+
   const result = {
     aliases,
     configured: {
@@ -46,10 +47,12 @@ export const listTargets = Effect.fn("listTargets")(function* (
 
   if (options.json) {
     yield* Console.log(yield* jsonForOutput(result, { fields: options.fields }));
+
     return;
   }
 
   yield* Console.log("Tizen targets:");
+
   if (connected.length === 0) {
     yield* Console.log("- connected: none");
   }
@@ -60,6 +63,7 @@ export const listTargets = Effect.fn("listTargets")(function* (
 
   if (aliases.length === 0) {
     yield* Console.log("- aliases: none");
+
     return;
   }
 
@@ -74,6 +78,7 @@ export const showCurrentTarget = Effect.fn("showCurrentTarget")(function* (
 ) {
   const aliases = yield* readTargetsFile();
   const alias = aliases.find((candidate) => candidate.target === env.target);
+
   const result = {
     alias: alias?.alias,
     target: env.target,
@@ -86,11 +91,13 @@ export const showCurrentTarget = Effect.fn("showCurrentTarget")(function* (
 
   if (options.json) {
     yield* Console.log(yield* jsonForOutput(result, { fields: options.fields }));
+
     return;
   }
 
   yield* Console.log(`target: ${result.target ?? "unset"}`);
   yield* Console.log(`tv_host: ${result.tvHost ?? "unset"}`);
+
   if (result.alias) {
     yield* Console.log(`alias: ${result.alias}`);
   }
@@ -100,6 +107,7 @@ const readTargetsFile = Effect.fn("readTargetsFile")(function* () {
   const fs = yield* FileSystem.FileSystem;
   const paths = yield* getPaths();
   const path = `${paths.taiznDir}/targets.json`;
+
   const exists = yield* fs
     .exists(path)
     .pipe(Effect.mapError((cause) => new FileSystemFailure({ cause, operation: "exists", path })));
@@ -109,6 +117,7 @@ const readTargetsFile = Effect.fn("readTargetsFile")(function* () {
   }
 
   const json = yield* readJsonFile(path);
+
   const decoded = yield* Schema.decodeUnknownEffect(TargetsFile)(json, { errors: "all" }).pipe(
     Effect.mapError((error) => new InvalidJson({ details: error.message, file: path })),
   );

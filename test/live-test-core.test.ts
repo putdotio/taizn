@@ -38,12 +38,14 @@ afterAll(() => {
 const tempDir = (prefix: string) => {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   tempDirs.push(dir);
+
   return dir;
 };
 
 describe("live test harness core", () => {
   it("keeps roundtrip proof tied to the selected fixture variant", () => {
     const templatePath = writeTemplate();
+
     const env = {
       TAIZN_LIVE_PROVE_APP: "SomeInstalledApp.app",
       TAIZN_VARIANT: "production",
@@ -253,6 +255,7 @@ TAIZN_CERT_PASSWORD=cert
 TAIZN_DIST_PASSWORD="dist value"
 PUBLIC_PUTIO_API_URL=https://example.invalid
 `);
+
     const result = buildLiveSetupEnv(
       { TAIZN_TARGET: "old-target:26101" },
       source,

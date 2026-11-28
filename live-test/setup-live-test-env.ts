@@ -31,9 +31,11 @@ if (args.help) {
 }
 
 const sourceAppDir = args.from ? resolve(args.from) : undefined;
+
 const currentValues = existsSync(fixtureEnvPath)
   ? parseEnvAssignments(readFileSync(fixtureEnvPath, "utf8"))
   : {};
+
 const sourceValues = sourceAppDir ? readSourceEnv(sourceAppDir) : {};
 const profile = args.profile ?? (sourceAppDir ? readSourceProfile(sourceAppDir) : undefined);
 const defaults = readLocalToolDefaults();
@@ -41,6 +43,7 @@ const result = buildLiveSetupEnv(currentValues, sourceValues, { ...args, profile
 const copiedCertificates = sourceAppDir ? copySourceCertificates(sourceAppDir) : [];
 
 mkdirSync(fixtureStateDir, { mode: 0o700, recursive: true });
+
 writeFileSync(fixtureEnvPath, serializeEnvAssignments(result.values), { mode: 0o600 });
 
 const summary = {
