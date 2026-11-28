@@ -34,7 +34,6 @@ export default defineConfig({
       "unicorn/catch-error-name": "off",
       "unicorn/consistent-function-scoping": "off",
       "unicorn/no-hex-escape": "off",
-      "unicorn/numeric-separators-style": "off",
       "unicorn/prefer-import-meta-properties": "off",
       "unicorn/prefer-string-raw": "off",
       "unicorn/prefer-string-replace-all": "off",

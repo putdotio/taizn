@@ -157,12 +157,12 @@ export const defaultSdb = Effect.fn("defaultSdb")(function* () {
   return join(home, "tizen-studio/tools/sdb");
 });
 
-const machOX86_64 = 0x01000007;
-const machOArm64 = 0x0100000c;
+const machOX86_64 = 0x01_00_00_07;
+const machOArm64 = 0x01_00_00_0c;
 
 const fatArchCpuTypes = (bytes: Uint8Array, view: DataView) => {
   const count = view.getUint32(4);
-  const stride = view.getUint32(0) === 0xcafebabf ? 32 : 20;
+  const stride = view.getUint32(0) === 0xca_fe_ba_bf ? 32 : 20;
   const cpuTypes: Array<number> = [];
 
   for (let index = 0; index < count && 8 + (index + 1) * stride <= bytes.length; index++) {
@@ -180,13 +180,13 @@ export const needsRosetta = (bytes: Uint8Array) => {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const bigEndianMagic = view.getUint32(0);
 
-  if (bigEndianMagic === 0xcafebabe || bigEndianMagic === 0xcafebabf) {
+  if (bigEndianMagic === 0xca_fe_ba_be || bigEndianMagic === 0xca_fe_ba_bf) {
     const cpuTypes = fatArchCpuTypes(bytes, view);
 
     return cpuTypes.includes(machOX86_64) && !cpuTypes.includes(machOArm64);
   }
 
-  return view.getUint32(0, true) === 0xfeedfacf && view.getUint32(4, true) === machOX86_64;
+  return view.getUint32(0, true) === 0xfe_ed_fa_cf && view.getUint32(4, true) === machOX86_64;
 };
 
 export const readPassword = Effect.fn("readPassword")(function* (

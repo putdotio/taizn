@@ -329,13 +329,13 @@ const stopBrowser = async (child: ChildProcess) => {
 
   signal("SIGTERM");
 
-  if (await waitForBrowserTreeExit(child.pid, 2_000)) {
+  if (await waitForBrowserTreeExit(child.pid, 2000)) {
     return;
   }
 
   signal("SIGKILL");
 
-  if (!(await waitForBrowserTreeExit(child.pid, 2_000))) {
+  if (!(await waitForBrowserTreeExit(child.pid, 2000))) {
     throw new Error(`Seller Office browser ${child.pid} did not stop.`);
   }
 };

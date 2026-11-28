@@ -16,4 +16,4 @@ writeFileSync(
 
 process.on("SIGTERM", () => {});
 
-setInterval(() => {}, 1_000);
+setInterval(() => {}, 1000);

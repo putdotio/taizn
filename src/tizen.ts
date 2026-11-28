@@ -1255,7 +1255,7 @@ export const captureForDuration = Effect.fn("captureForDuration")(function* (
 
     const stopChild = () => {
       child.kill("SIGTERM");
-      forceKillTimer ??= setTimeout(() => child.kill("SIGKILL"), 1_000);
+      forceKillTimer ??= setTimeout(() => child.kill("SIGKILL"), 1000);
     };
 
     const timer = setTimeout(() => {
@@ -1291,7 +1291,7 @@ export const captureForDuration = Effect.fn("captureForDuration")(function* (
 
           settled = true;
           cleanup();
-          const forceKill = setTimeout(() => child.kill("SIGKILL"), 1_000);
+          const forceKill = setTimeout(() => child.kill("SIGKILL"), 1000);
           child.once("close", () => {
             clearTimeout(forceKill);
             resolve();

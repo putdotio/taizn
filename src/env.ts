@@ -86,7 +86,7 @@ const parseTvPort = Effect.fn("parseTvPort")(function* (value: string) {
 const parsePort = Effect.fn("parsePort")(function* (value: string, variable: string) {
   const port = Number(value);
 
-  if (!/^\d+$/.test(value) || !Number.isInteger(port) || port < 1 || port > 65535) {
+  if (!/^\d+$/.test(value) || !Number.isInteger(port) || port < 1 || port > 65_535) {
     return yield* new InvalidEnvironment({
       details: `${variable} must be an integer between 1 and 65535. Received: ${value}`,
     });

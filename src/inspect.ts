@@ -288,7 +288,7 @@ const parseZipEntries = (buffer: Buffer): ReadonlyArray<ZipEntry> => {
     throw new Error("ZIP central directory contains no entries");
   }
 
-  if (entryCount === 0xffff || centralSize === 0xffff_ffff || centralOffset === 0xffff_ffff) {
+  if (entryCount === 0xff_ff || centralSize === 0xff_ff_ff_ff || centralOffset === 0xff_ff_ff_ff) {
     throw new Error("ZIP64 archives are not supported");
   }
 
@@ -303,7 +303,7 @@ const parseZipEntries = (buffer: Buffer): ReadonlyArray<ZipEntry> => {
   for (let index = 0; index < entryCount; index += 1) {
     requireZipRange(buffer, offset, 46, "central directory entry");
 
-    if (buffer.readUInt32LE(offset) !== 0x02014b50) {
+    if (buffer.readUInt32LE(offset) !== 0x02_01_4b_50) {
       throw new Error("ZIP central directory entry signature is invalid");
     }
 
@@ -337,7 +337,7 @@ const parseZipEntries = (buffer: Buffer): ReadonlyArray<ZipEntry> => {
 
     requireZipRange(buffer, localOffset, 30, `local header for ${name}`);
 
-    if (buffer.readUInt32LE(localOffset) !== 0x04034b50) {
+    if (buffer.readUInt32LE(localOffset) !== 0x04_03_4b_50) {
       throw new Error(`ZIP local header for ${name} is invalid`);
     }
 
@@ -419,7 +419,7 @@ const findEndOfCentralDirectory = (buffer: Buffer) => {
 
   for (let offset = buffer.length - 22; offset >= minimumOffset; offset -= 1) {
     if (
-      buffer.readUInt32LE(offset) === 0x06054b50 &&
+      buffer.readUInt32LE(offset) === 0x06_05_4b_50 &&
       offset + 22 + buffer.readUInt16LE(offset + 20) === buffer.length
     ) {
       return offset;
@@ -457,7 +457,7 @@ const validateZipDataDescriptor = (
   uncompressedSize: number,
 ) => {
   requireZipRange(buffer, offset, 12, `data descriptor for ${name}`);
-  const valuesOffset = buffer.readUInt32LE(offset) === 0x08074b50 ? offset + 4 : offset;
+  const valuesOffset = buffer.readUInt32LE(offset) === 0x08_07_4b_50 ? offset + 4 : offset;
   requireZipRange(buffer, valuesOffset, 12, `data descriptor for ${name}`);
 
   if (valuesOffset + 12 > centralOffset) {
@@ -477,14 +477,14 @@ const crc32Table = Array.from({ length: 256 }, (_, index) => {
   let value = index;
 
   for (let bit = 0; bit < 8; bit += 1) {
-    value = (value & 1) !== 0 ? 0xedb8_8320 ^ (value >>> 1) : value >>> 1;
+    value = (value & 1) !== 0 ? 0xed_b8_83_20 ^ (value >>> 1) : value >>> 1;
   }
 
   return value >>> 0;
 });
 
 const crc32 = (buffer: Buffer) => {
-  let value = 0xffff_ffff;
+  let value = 0xff_ff_ff_ff;
 
   for (const byte of buffer) {
     const tableValue = crc32Table[(value ^ byte) & 0xff];
@@ -496,7 +496,7 @@ const crc32 = (buffer: Buffer) => {
     value = tableValue ^ (value >>> 8);
   }
 
-  return (value ^ 0xffff_ffff) >>> 0;
+  return (value ^ 0xff_ff_ff_ff) >>> 0;
 };
 
 const inspectConfigXml = Effect.fn("inspectConfigXml")(function* (source: string) {

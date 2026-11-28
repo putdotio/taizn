@@ -1091,7 +1091,7 @@ describe("taizn cli", () => {
           port: remoteAddress.port,
           protocol: "ws",
           target: `ws://127.0.0.1:${remoteAddress.port}`,
-          timeoutMs: 30000,
+          timeoutMs: 30_000,
           tokenConfigured: true,
           tokenSource: "state",
         },
@@ -1298,7 +1298,7 @@ describe("taizn cli", () => {
       await Promise.race([
         closed.promise,
         new Promise<never>((_resolve, reject) =>
-          setTimeout(() => reject(new Error("Interrupted websocket did not close")), 1_000),
+          setTimeout(() => reject(new Error("Interrupted websocket did not close")), 1000),
         ),
       ]);
       assert.strictEqual(server.clients.size, 0);
@@ -1510,7 +1510,7 @@ describe("taizn cli", () => {
 
     assert.strictEqual(result.status, 1);
     assert.include(result.stderr, "Command failed");
-    assert.isBelow(Date.now() - startedAt, 2_000);
+    assert.isBelow(Date.now() - startedAt, 2000);
   });
 
   for (const scenario of [
@@ -1559,7 +1559,7 @@ describe("taizn cli", () => {
         const result = await Promise.race([
           resultPromise,
           new Promise<never>((_, reject) => {
-            guard = setTimeout(() => reject(new Error("command failed to terminate")), 3_000);
+            guard = setTimeout(() => reject(new Error("command failed to terminate")), 3000);
           }),
         ]);
 
@@ -1616,7 +1616,7 @@ describe("taizn cli", () => {
     await Effect.runPromise(Fiber.interrupt(fiber));
 
     assert.isAtLeast(Date.now() - startedAt, 900);
-    assert.isBelow(Date.now() - startedAt, 3_000);
+    assert.isBelow(Date.now() - startedAt, 3000);
     assert.throws(() => process.kill(pid, 0));
   });
 
@@ -1791,7 +1791,7 @@ describe("taizn cli", () => {
       await Promise.race([
         responseClosed,
         new Promise<never>((_resolve, reject) => {
-          setTimeout(() => reject(new Error("Expected asset response body to close.")), 1_000);
+          setTimeout(() => reject(new Error("Expected asset response body to close.")), 1000);
         }),
       ]);
     } finally {
@@ -3082,13 +3082,13 @@ const parseSubmissionManifestJson = (text: string): SubmissionManifestJson => {
   return Schema.decodeUnknownSync(SubmissionManifestJsonSchema)(manifest);
 };
 
-const x86_64CpuType = 0x01000007;
-const arm64CpuType = 0x0100000c;
-const i386CpuType = 0x00000007;
+const x86_64CpuType = 0x01_00_00_07;
+const arm64CpuType = 0x01_00_00_0c;
+const i386CpuType = 0x00_00_00_07;
 
 const machOThin = (cpuType: number) => {
   const bytes = Buffer.alloc(32);
-  bytes.writeUInt32LE(0xfeedfacf, 0);
+  bytes.writeUInt32LE(0xfe_ed_fa_cf, 0);
   bytes.writeUInt32LE(cpuType, 4);
 
   return bytes;
@@ -3096,7 +3096,7 @@ const machOThin = (cpuType: number) => {
 
 const machOFat = (cpuTypes: ReadonlyArray<number>) => {
   const bytes = Buffer.alloc(8 + cpuTypes.length * 20);
-  bytes.writeUInt32BE(0xcafebabe, 0);
+  bytes.writeUInt32BE(0xca_fe_ba_be, 0);
   bytes.writeUInt32BE(cpuTypes.length, 4);
   cpuTypes.forEach((cpuType, index) => bytes.writeUInt32BE(cpuType, 8 + index * 20));
 
@@ -3105,7 +3105,7 @@ const machOFat = (cpuTypes: ReadonlyArray<number>) => {
 
 const machOFat64 = (cpuTypes: ReadonlyArray<number>) => {
   const bytes = Buffer.alloc(8 + cpuTypes.length * 32);
-  bytes.writeUInt32BE(0xcafebabf, 0);
+  bytes.writeUInt32BE(0xca_fe_ba_bf, 0);
   bytes.writeUInt32BE(cpuTypes.length, 4);
   cpuTypes.forEach((cpuType, index) => bytes.writeUInt32BE(cpuType, 8 + index * 32));
 
@@ -3183,7 +3183,7 @@ const waitForHttpServer = (server: ReturnType<typeof createServer>) =>
   });
 
 const waitForFile = async (path: string) => {
-  const deadline = Date.now() + 2_000;
+  const deadline = Date.now() + 2000;
 
   while (Date.now() < deadline) {
     try {
@@ -3291,7 +3291,7 @@ const makeStoredZip = (
 
   const directory = Buffer.concat(directoryEntries);
   const end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt32LE(0x06_05_4b_50, 0);
   end.writeUInt16LE(entries.length, 8);
   end.writeUInt16LE(entries.length, 10);
   end.writeUInt32LE(directory.byteLength, 12);
@@ -3329,7 +3329,7 @@ const makeStoredZipEntry = (entry: { readonly content: string; readonly name: st
   const content = Buffer.from(entry.content);
   const header = Buffer.alloc(30);
 
-  header.writeUInt32LE(0x04034b50, 0);
+  header.writeUInt32LE(0x04_03_4b_50, 0);
   header.writeUInt16LE(20, 4);
   header.writeUInt16LE(0, 6);
   header.writeUInt16LE(0, 8);
@@ -3351,7 +3351,7 @@ const makeStoredZipDirectoryEntry = (
   const content = Buffer.from(entry.content);
   const header = Buffer.alloc(46);
 
-  header.writeUInt32LE(0x02014b50, 0);
+  header.writeUInt32LE(0x02_01_4b_50, 0);
   header.writeUInt16LE(20, 4);
   header.writeUInt16LE(20, 6);
   header.writeUInt32LE(testCrc32(content), 16);
@@ -3367,14 +3367,14 @@ const testCrc32Table = Array.from({ length: 256 }, (_, index) => {
   let value = index;
 
   for (let bit = 0; bit < 8; bit += 1) {
-    value = (value & 1) !== 0 ? 0xedb8_8320 ^ (value >>> 1) : value >>> 1;
+    value = (value & 1) !== 0 ? 0xed_b8_83_20 ^ (value >>> 1) : value >>> 1;
   }
 
   return value >>> 0;
 });
 
 const testCrc32 = (buffer: Buffer) => {
-  let value = 0xffff_ffff;
+  let value = 0xff_ff_ff_ff;
 
   for (const byte of buffer) {
     const tableValue = testCrc32Table[(value ^ byte) & 0xff];
@@ -3386,5 +3386,5 @@ const testCrc32 = (buffer: Buffer) => {
     value = tableValue ^ (value >>> 8);
   }
 
-  return (value ^ 0xffff_ffff) >>> 0;
+  return (value ^ 0xff_ff_ff_ff) >>> 0;
 };
