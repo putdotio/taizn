@@ -13,7 +13,6 @@ export default defineConfig({
       "anti-slop-effect/prefer-effect-match": "off",
       "anti-slop/no-runtime-typeof": "off",
       "anti-slop/no-unknown-parameters": "off",
-      "array-callback-return": "off",
       "quality/no-conditional-empty-object-spread": "off",
       "quality/no-known-value-widening": "off",
       "quality/no-reflect-get": "off",
@@ -24,7 +23,6 @@ export default defineConfig({
       "typescript/no-unsafe-call": "off",
       "typescript/no-unsafe-return": "off",
       "typescript/no-unsafe-type-assertion": "off",
-      "unicorn/prefer-top-level-await": "off",
     },
     overrides: [
       {
