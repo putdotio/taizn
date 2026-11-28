@@ -62,10 +62,10 @@ export const resolveOutputPath = Effect.fn("resolveOutputPath")(function* (reque
     const canonical = yield* fs
       .realPath(candidate)
       .pipe(
-        Effect.catch((cause) =>
-          cause.reason._tag === "NotFound"
+        Effect.catch((error) =>
+          error.reason._tag === "NotFound"
             ? Effect.succeed(undefined)
-            : Effect.fail(new FileSystemFailure({ cause, operation: "realpath", path: candidate })),
+            : Effect.fail(new FileSystemFailure({ error, operation: "realpath", path: candidate })),
         ),
       );
 
@@ -74,11 +74,11 @@ export const resolveOutputPath = Effect.fn("resolveOutputPath")(function* (reque
       const link = yield* fs
         .readLink(candidate)
         .pipe(
-          Effect.catch((cause) =>
-            cause.reason._tag === "NotFound"
+          Effect.catch((error) =>
+            error.reason._tag === "NotFound"
               ? Effect.succeed(undefined)
               : Effect.fail(
-                  new FileSystemFailure({ cause, operation: "readlink", path: candidate }),
+                  new FileSystemFailure({ error, operation: "readlink", path: candidate }),
                 ),
           ),
         );

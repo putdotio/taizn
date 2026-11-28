@@ -30,7 +30,6 @@ export default defineConfig({
       "typescript/no-unsafe-return": "off",
       "typescript/no-unsafe-type-assertion": "off",
       "uinaf/no-comments": "off",
-      "unicorn/catch-error-name": "off",
       "unicorn/consistent-function-scoping": "off",
       "unicorn/no-hex-escape": "off",
       "unicorn/prefer-structured-clone": "off",

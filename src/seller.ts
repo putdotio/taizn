@@ -434,9 +434,9 @@ const readSellerApplications = async (target: string) => {
           expression: SELLER_APPLICATIONS_EXPRESSION,
           returnByValue: true,
         });
-      } catch (cause) {
+      } catch (error) {
         if (attempt === 49) {
-          throw cause;
+          throw error;
         }
 
         await delay(200);

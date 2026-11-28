@@ -1133,8 +1133,8 @@ describe("taizn cli", () => {
             timeoutMs: 10,
           }),
         );
-      } catch (cause) {
-        error = cause;
+      } catch (error_) {
+        error = error_;
       }
 
       assert.include(String(error), "Timed out waiting for Samsung TV remote response");

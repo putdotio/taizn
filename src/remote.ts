@@ -690,8 +690,8 @@ const connectRemotePromise = (
               fail(new TvRemoteConnectionFailed({ cause, target: remoteTarget(options) }), true);
             }
           });
-        } catch (cause) {
-          fail(new TvRemoteConnectionFailed({ cause, target: remoteTarget(options) }), true);
+        } catch (error) {
+          fail(new TvRemoteConnectionFailed({ error, target: remoteTarget(options) }), true);
 
           return;
         }
@@ -725,8 +725,8 @@ const connectRemotePromise = (
 
       try {
         event = parseRemoteEvent(data.toString(), options);
-      } catch (cause) {
-        fail(normalizeRemoteError(cause, options));
+      } catch (error) {
+        fail(normalizeRemoteError(error, options));
 
         return;
       }
@@ -890,9 +890,9 @@ const isAbortError = (cause: unknown) =>
 const parseRemoteEvent = (source: string, options: RemoteOptions) => {
   try {
     return Schema.decodeUnknownSync(RemoteEvent)(JSON.parse(source));
-  } catch (cause) {
+  } catch (error) {
     throw new TvRemoteProtocolError({
-      details: `${remoteTarget(options)} sent an unexpected message: ${causeToMessage(cause)}`,
+      details: `${remoteTarget(options)} sent an unexpected message: ${causeToMessage(error)}`,
     });
   }
 };

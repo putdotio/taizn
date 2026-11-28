@@ -448,8 +448,8 @@ const pathKind = Effect.fn("pathKind")(function* (path: string) {
 
   const link = yield* fs.readLink(path).pipe(
     Effect.as("link" as const),
-    Effect.catch((cause) =>
-      Effect.succeed(cause.reason._tag === "NotFound" ? ("missing" as const) : ("other" as const)),
+    Effect.catch((error) =>
+      Effect.succeed(error.reason._tag === "NotFound" ? ("missing" as const) : ("other" as const)),
     ),
   );
 

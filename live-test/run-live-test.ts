@@ -688,8 +688,8 @@ function externalIpv4Addresses() {
 function resolveBeaconTimeoutMs() {
   try {
     return parseBeaconTimeoutMs(process.env.TAIZN_LIVE_BEACON_TIMEOUT_MS);
-  } catch (cause) {
-    console.error(cause instanceof Error ? cause.message : String(cause));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }
@@ -697,8 +697,8 @@ function resolveBeaconTimeoutMs() {
 function resolveRemoteDelayMs() {
   try {
     return parseRemoteDelayMs(process.env.LIVE_TEST_REMOTE_DELAY_MS);
-  } catch (cause) {
-    console.error(cause instanceof Error ? cause.message : String(cause));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }
