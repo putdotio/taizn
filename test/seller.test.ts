@@ -288,7 +288,7 @@ describe("normalizeSellerError", () => {
 
     assert.instanceOf(normalized, SellerBrowserConnectionFailed);
     assert.strictEqual(normalized.target, "http://127.0.0.1:9222");
-    assert.strictEqual((normalized as SellerBrowserConnectionFailed).cause, cause);
+    assert.strictEqual(normalized.cause, cause);
   });
 });
 
@@ -331,7 +331,7 @@ describe("readSellerBrowserState", () => {
       Effect.flip,
       Effect.map((error) => {
         assert.instanceOf(error, SellerSessionNotFound);
-        assert.strictEqual((error as SellerSessionNotFound).path, join(dir, ".taizn/seller.json"));
+        assert.strictEqual(error.path, join(dir, ".taizn/seller.json"));
       }),
       Effect.provide(Layer.mergeAll(NodeServices.layer, systemFor(dir))),
     );
@@ -344,10 +344,7 @@ describe("readSellerBrowserState", () => {
       Effect.flip,
       Effect.map((error) => {
         assert.instanceOf(error, SellerPortalProtocolError);
-        assert.include(
-          (error as SellerPortalProtocolError).details,
-          "invalid seller session state",
-        );
+        assert.include(error.details, "invalid seller session state");
       }),
       Effect.provide(Layer.mergeAll(NodeServices.layer, systemFor(dir))),
     );
@@ -360,10 +357,7 @@ describe("readSellerBrowserState", () => {
       Effect.flip,
       Effect.map((error) => {
         assert.instanceOf(error, SellerPortalProtocolError);
-        assert.strictEqual(
-          (error as SellerPortalProtocolError).details,
-          "invalid seller browser port: 0",
-        );
+        assert.strictEqual(error.details, "invalid seller browser port: 0");
       }),
       Effect.provide(Layer.mergeAll(NodeServices.layer, systemFor(dir))),
     );
@@ -376,10 +370,7 @@ describe("readSellerBrowserState", () => {
       Effect.flip,
       Effect.map((error) => {
         assert.instanceOf(error, SellerPortalProtocolError);
-        assert.strictEqual(
-          (error as SellerPortalProtocolError).details,
-          "invalid seller browser port: 9222.5",
-        );
+        assert.strictEqual(error.details, "invalid seller browser port: 9222.5");
       }),
       Effect.provide(Layer.mergeAll(NodeServices.layer, systemFor(dir))),
     );
