@@ -108,7 +108,7 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
   }
 
   // Samsung's installer rejects these destinations but still exits 0.
-  if (!installed && (!isInside(home, studioDir) || /[^\x21-\x7e]/.test(studioDir))) {
+  if (!installed && (!isInside(home, studioDir) || /[^\u0021-\u007e]/.test(studioDir))) {
     return yield* new InvalidInput({
       details: `Samsung's installer needs a path inside ${home} without spaces or non-ASCII characters. Received: ${studioDir}`,
       label: "studio dir",
