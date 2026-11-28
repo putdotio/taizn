@@ -35,7 +35,6 @@ export default defineConfig({
       "unicorn/consistent-function-scoping": "off",
       "unicorn/no-hex-escape": "off",
       "unicorn/prefer-import-meta-properties": "off",
-      "unicorn/prefer-string-raw": "off",
       "unicorn/prefer-structured-clone": "off",
       "unicorn/prefer-top-level-await": "off",
     },

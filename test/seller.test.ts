@@ -314,7 +314,7 @@ describe("seller browser launch construction", () => {
     withPlatform("win32", () => {
       assert.strictEqual(
         defaultSellerBrowser(),
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`,
       );
     });
     withPlatform("linux", () => {

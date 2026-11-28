@@ -223,7 +223,7 @@ describe("live test harness core", () => {
   it("escapes JSON before embedding it in the fixture script", () => {
     assert.strictEqual(
       jsonForHtmlScript(["https://example.test/a</script>b.js"]),
-      '["https://example.test/a\\u003c/script>b.js"]',
+      String.raw`["https://example.test/a\u003c/script>b.js"]`,
     );
   });
 

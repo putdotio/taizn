@@ -238,7 +238,7 @@ export const defaultSellerBrowser = () => {
   }
 
   if (process.platform === "win32") {
-    return "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+    return String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`;
   }
 
   return "google-chrome";

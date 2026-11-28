@@ -186,7 +186,7 @@ export function envFlagEnabled(value: string | undefined) {
 }
 
 export function jsonForHtmlScript(value: unknown) {
-  return JSON.stringify(value).replaceAll("<", "\\u003c");
+  return JSON.stringify(value).replaceAll("<", String.raw`\u003c`);
 }
 
 export function readTemplateVariantString(
