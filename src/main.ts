@@ -2,7 +2,8 @@ import { CliError, Command } from "effect/cli";
 import { Console, Effect, FileSystem, Schema } from "effect";
 import { fileURLToPath } from "node:url";
 import { command } from "./cli.js";
-import { type TaiznError, renderError, renderErrorJson } from "./errors.js";
+import { renderError, renderErrorJson } from "./errors.js";
+import type { TaiznError } from "./errors.js";
 import { loadLocalEnv } from "./runtime.js";
 
 class PackageJson extends Schema.Class<PackageJson>("PackageJson")({

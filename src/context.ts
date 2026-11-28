@@ -1,6 +1,8 @@
 import { Effect } from "effect";
-import { loadConfig, type TizenConfig } from "./config.js";
-import { loadEnv, type TaiznEnv } from "./env.js";
+import { loadConfig } from "./config.js";
+import type { TizenConfig } from "./config.js";
+import { loadEnv } from "./env.js";
+import type { TaiznEnv } from "./env.js";
 
 export type TaiznContext = {
   readonly config: TizenConfig;

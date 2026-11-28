@@ -1,6 +1,7 @@
 import { Argument, Command, Flag } from "effect/cli";
 import { Effect, Option } from "effect";
-import { loadContext, type TaiznContext } from "./context.js";
+import { loadContext } from "./context.js";
+import type { TaiznContext } from "./context.js";
 import { loadEnv } from "./env.js";
 import {
   diagnoseSamsungTvRemote,

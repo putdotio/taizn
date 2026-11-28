@@ -10,7 +10,6 @@ import {
   appBuildEnv,
   appPath,
   baseChildEnv,
-  type ChildEnv,
   defaultSdb,
   defaultTizenCli,
   getPaths,
@@ -21,6 +20,7 @@ import {
   TaiznSystem,
   withTizenPath,
 } from "./runtime.js";
+import type { ChildEnv } from "./runtime.js";
 import {
   ApplicationNotFound,
   CommandFailed,

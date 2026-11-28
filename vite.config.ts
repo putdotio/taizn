@@ -15,7 +15,6 @@ export default defineConfig({
       "anti-slop/no-unknown-parameters": "off",
       "anti-slop/require-safety-comment-for-type-assertion": "off",
       "array-callback-return": "off",
-      "import/consistent-type-specifier-style": "off",
       "no-console": "off",
       "no-promise-executor-return": "off",
       "quality/no-conditional-empty-object-spread": "off",

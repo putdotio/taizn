@@ -8,8 +8,8 @@ import {
   redactEnvValue,
   readSigningProfileFromConfigSource,
   serializeEnvAssignments,
-  type LiveSetupOptions,
 } from "./setup-core.ts";
+import type { LiveSetupOptions } from "./setup-core.ts";
 
 const liveTestDir = dirname(fileURLToPath(import.meta.url));
 const fixtureAppDir = join(liveTestDir, "app");
