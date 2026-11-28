@@ -288,7 +288,9 @@ const waitForBrowserTreeExit = async (pid: number, timeoutMs: number) => {
       return false;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 25);
+    });
   }
 
   return true;
@@ -313,13 +315,15 @@ const stopBrowser = async (child: ChildProcess) => {
     return;
   }
 
-  if (!browserTreeExists(child.pid)) {
+  const pid = child.pid;
+
+  if (!browserTreeExists(pid)) {
     return;
   }
 
   const signal = (name: NodeJS.Signals) => {
     try {
-      process.kill(-child.pid!, name);
+      process.kill(-pid, name);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
         throw error;

@@ -605,13 +605,18 @@ async function startBeaconServer(host: string, timeoutMs: number): Promise<Beaco
   const address = server.address();
 
   if (!address || typeof address === "string") {
-    await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+    await new Promise<void>((resolveClose) => {
+      server.close(() => resolveClose());
+    });
     console.error("Could not determine live fixture beacon port.");
     process.exit(1);
   }
 
   return {
-    close: () => new Promise<void>((resolveClose) => server.close(() => resolveClose())),
+    close: () =>
+      new Promise<void>((resolveClose) => {
+        server.close(() => resolveClose());
+      }),
     host,
     timeoutMs,
     url: `http://${host}:${address.port}/taizn-live-ready`,
