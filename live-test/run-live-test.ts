@@ -46,7 +46,7 @@ type LiveTestMode =
 type TaiznMode = Exclude<LiveTestMode, "remote" | "roundtrip" | "smoke">;
 
 type TextResult = {
-  readonly command: readonly string[];
+  readonly command: ReadonlyArray<string>;
   readonly name: string;
   readonly status: number;
   readonly stderr: string;
@@ -103,7 +103,7 @@ function writeFixtureConfig() {
   console.log(`Using Tizen signing profile: ${profile}`);
 }
 
-function resolveMode(args: readonly string[]): LiveTestMode {
+function resolveMode(args: ReadonlyArray<string>): LiveTestMode {
   if (args.includes("--doctor")) {
     return "doctor";
   }
@@ -426,7 +426,7 @@ function runInstallWithRetry(env: Record<string, string>, checkJson: unknown) {
 
 function runTaiznJson(
   name: string,
-  commandArgs: readonly string[],
+  commandArgs: ReadonlyArray<string>,
   env: Record<string, string> = {},
 ) {
   const result = spawnSync(process.execPath, [cliPath, ...commandArgs], {
@@ -465,7 +465,7 @@ function runTaiznJson(
 
 function runTaiznTextResult(
   name: string,
-  commandArgs: readonly string[],
+  commandArgs: ReadonlyArray<string>,
   env: Record<string, string> = {},
 ) {
   const result = spawnSync(process.execPath, [cliPath, ...commandArgs], {
@@ -643,7 +643,7 @@ function parseBeaconFetches(requestUrl: string) {
   return parseJson(fetches, "beacon fetch results");
 }
 
-function headerValue(value: string | readonly string[] | undefined) {
+function headerValue(value: string | ReadonlyArray<string> | undefined) {
   if (typeof value === "string") {
     return value;
   }
@@ -669,7 +669,7 @@ function resolveBeaconHost(doctorJson: unknown, target: string | undefined) {
 }
 
 function externalIpv4Addresses() {
-  const externalAddresses: string[] = [];
+  const externalAddresses: Array<string> = [];
 
   for (const addresses of Object.values(networkInterfaces())) {
     if (!addresses) {

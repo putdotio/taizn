@@ -18,7 +18,7 @@ type ProbeOptions = {
 
 export const probeHostedAssets = Effect.fn("probeHostedAssets")(function* (
   { config, env }: TaiznContext,
-  urls: readonly string[],
+  urls: ReadonlyArray<string>,
   options: ProbeOptions = {},
 ) {
   const variant = config.widget.variants[env.variant];

@@ -25,7 +25,7 @@ type TvScriptOptions = {
 
 type ResolvedStep = {
   readonly delayMs: number;
-  readonly keys: readonly string[];
+  readonly keys: ReadonlyArray<string>;
 };
 
 export const runTvScript = Effect.fn("runTvScript")(function* (
@@ -89,7 +89,7 @@ const loadTvScript = Effect.fn("loadTvScript")(function* (file: string) {
 
 const resolveScriptSteps = Effect.fn("resolveScriptSteps")(function* (script: TvScript) {
   const steps = script.steps ?? [{ delayMs: script.delayMs, keys: script.keys }];
-  const resolved: ResolvedStep[] = [];
+  const resolved: Array<ResolvedStep> = [];
 
   for (const step of steps) {
     const keys = [...(step.keys ?? []), ...(step.key ? [step.key] : [])];

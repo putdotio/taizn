@@ -30,12 +30,12 @@ const element = (textContent: string | null): FakeElement => ({ textContent });
 
 type FakeCard = {
   readonly querySelector: (selector: string) => FakeElement | null;
-  readonly querySelectorAll: (selector: string) => readonly FakeElement[];
+  readonly querySelectorAll: (selector: string) => ReadonlyArray<FakeElement>;
 };
 
 const makeCard = (options: {
-  readonly identity?: readonly (string | null)[];
-  readonly status?: readonly (string | null)[];
+  readonly identity?: ReadonlyArray<string | null>;
+  readonly status?: ReadonlyArray<string | null>;
   readonly type?: string;
 }): FakeCard => ({
   querySelector: (selector) =>
@@ -56,8 +56,8 @@ const makeCard = (options: {
 const evaluateSellerPage = (
   pathname: string,
   options: {
-    readonly cards?: readonly FakeCard[];
-    readonly headings?: readonly string[];
+    readonly cards?: ReadonlyArray<FakeCard>;
+    readonly headings?: ReadonlyArray<string>;
   } = {},
 ): unknown =>
   JSON.parse(
@@ -92,7 +92,7 @@ const systemFor = (dir: string) =>
     readSecret: () => Effect.succeed(""),
   });
 
-const tempDirs: string[] = [];
+const tempDirs: Array<string> = [];
 
 afterAll(() => {
   for (const dir of tempDirs) {
@@ -200,7 +200,7 @@ describe("seller applications extraction", () => {
         }),
       ],
       headings: ["Applications"],
-    }) as { readonly applications: readonly Record<string, string>[] };
+    }) as { readonly applications: ReadonlyArray<Record<string, string>> };
 
     assert.notProperty(result.applications[0], "updatedAt");
     assert.strictEqual(result.applications[0]?.status, "Registering");

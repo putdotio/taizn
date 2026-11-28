@@ -63,8 +63,8 @@ const handleMainError =
 
 type BufferedConsole = {
   readonly console: Console.Console;
-  readonly stderr: readonly string[];
-  readonly stdout: readonly string[];
+  readonly stderr: ReadonlyArray<string>;
+  readonly stdout: ReadonlyArray<string>;
 };
 
 const runWithBufferedConsole = <R>(
@@ -130,8 +130,8 @@ const flushBufferedConsole = (buffered: BufferedConsole, outerConsole: Console.C
   });
 
 const makeBufferedConsole = (realConsole: Console.Console): BufferedConsole => {
-  const stdout: string[] = [];
-  const stderr: string[] = [];
+  const stdout: Array<string> = [];
+  const stderr: Array<string> = [];
   const format = (args: ReadonlyArray<unknown>) => args.map(String).join(" ");
 
   return {

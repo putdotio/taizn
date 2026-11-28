@@ -27,7 +27,7 @@ import {
   serializeEnvAssignments,
 } from "../live-test/setup-core.ts";
 
-const tempDirs: string[] = [];
+const tempDirs: Array<string> = [];
 
 afterAll(() => {
   for (const dir of tempDirs) {

@@ -248,8 +248,8 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
     ? resolve(paths.appDir, requestedOutput)
     : join(home, `tizen-${options.full ? "full" : "certs"}-${timestamp}.tar.gz`);
 
-  const included: string[] = [];
-  const skipped: string[] = [];
+  const included: Array<string> = [];
+  const skipped: Array<string> = [];
 
   for (const root of options.full ? fullRoots : certificateRoots) {
     const path = join(home, root);
@@ -470,7 +470,10 @@ const invalidArchive = (details: string) => new InvalidInput({ details, label: "
 
 // Walks `roots` under `base` without following links. Only regular files,
 // directories, and relative symlinks that stay inside the backup roots pass.
-const validateTree = Effect.fn("validateTree")(function* (base: string, roots: readonly string[]) {
+const validateTree = Effect.fn("validateTree")(function* (
+  base: string,
+  roots: ReadonlyArray<string>,
+) {
   const fs = yield* FileSystem.FileSystem;
   const pending = [...roots];
 
@@ -530,11 +533,15 @@ const resolveExisting = Effect.fn("resolveExisting")(function* (
 const planMoves = Effect.fn("planMoves")(function* (
   staging: string,
   home: string,
-  names: readonly string[],
+  names: ReadonlyArray<string>,
   prefix = "",
-): Effect.fn.Return<readonly string[], FileSystemFailure | InvalidInput, FileSystem.FileSystem> {
+): Effect.fn.Return<
+  ReadonlyArray<string>,
+  FileSystemFailure | InvalidInput,
+  FileSystem.FileSystem
+> {
   const fs = yield* FileSystem.FileSystem;
-  const moves: string[] = [];
+  const moves: Array<string> = [];
 
   for (const name of names) {
     const path = join(prefix, name);

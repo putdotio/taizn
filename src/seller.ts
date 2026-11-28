@@ -252,7 +252,7 @@ export const sellerBrowserArgs = (profileDir: string) => [
   SELLER_LOGIN_URL,
 ];
 
-const launchBrowser = (browser: string, args: readonly string[]) =>
+const launchBrowser = (browser: string, args: ReadonlyArray<string>) =>
   new Promise<ChildProcess>((resolve, reject) => {
     const child = spawn(browser, args, {
       detached: process.platform !== "win32",

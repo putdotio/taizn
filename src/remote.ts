@@ -87,7 +87,7 @@ type SavedRemoteOptions = RemoteOptions & {
 
 type RemoteKeySequence = {
   readonly delayMs: number;
-  readonly keys: readonly string[];
+  readonly keys: ReadonlyArray<string>;
 };
 
 type PressOptions = {
@@ -250,7 +250,7 @@ export const sendSamsungTvKey = Effect.fn("sendSamsungTvKey")(function* (
 
 export const sendSamsungTvKeys = Effect.fn("sendSamsungTvKeys")(function* (
   env: TaiznEnv,
-  keys: readonly string[],
+  keys: ReadonlyArray<string>,
   pressOptions?: PressOptions,
 ) {
   const remoteOptions = yield* resolveRemoteOptions(env, { requireToken: !pressOptions?.dryRun });

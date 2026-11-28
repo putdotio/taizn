@@ -163,7 +163,7 @@ const machOArm64 = 0x0100000c;
 const fatArchCpuTypes = (bytes: Uint8Array, view: DataView) => {
   const count = view.getUint32(4);
   const stride = view.getUint32(0) === 0xcafebabf ? 32 : 20;
-  const cpuTypes: number[] = [];
+  const cpuTypes: Array<number> = [];
 
   for (let index = 0; index < count && 8 + (index + 1) * stride <= bytes.length; index++) {
     cpuTypes.push(view.getUint32(8 + index * stride));

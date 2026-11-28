@@ -79,7 +79,7 @@ if (args.json) {
   }
 }
 
-function parseArgs(argv: readonly string[]): SetupArgs {
+function parseArgs(argv: ReadonlyArray<string>): SetupArgs {
   const parsed: {
     beaconHost?: string;
     from?: string;
@@ -130,7 +130,7 @@ function parseArgs(argv: readonly string[]): SetupArgs {
   return parsed;
 }
 
-function requireArgValue(argv: readonly string[], index: number, option: string) {
+function requireArgValue(argv: ReadonlyArray<string>, index: number, option: string) {
   const value = argv[index + 1];
 
   if (!value || value.startsWith("--")) {
@@ -179,7 +179,7 @@ function readLocalToolDefaults() {
 
 function copySourceCertificates(sourceAppDir: string) {
   const sourceCertificateDir = join(sourceAppDir, ".taizn", "certificates");
-  const copied: string[] = [];
+  const copied: Array<string> = [];
 
   if (!existsSync(sourceCertificateDir)) {
     return copied;

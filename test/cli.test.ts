@@ -31,7 +31,7 @@ import { captureForDuration, CommandTimeoutMs } from "../src/tizen.js";
 
 const cliPath = resolve("dist/taizn.mjs");
 
-const tempDirs: string[] = [];
+const tempDirs: Array<string> = [];
 
 afterAll(() => {
   for (const dir of tempDirs) {
@@ -49,7 +49,7 @@ const tempDir = (prefix: string) => {
 // Kept for the boundary tests below that prove the packaged binary itself:
 // boot, stream separation, and exit codes. Everything else runs the same CLI
 // entry in-process through runTaiznInProcess so V8 coverage attributes it.
-const spawnTaizn = (args: string[], cwd = process.cwd(), env: NodeJS.ProcessEnv = {}) =>
+const spawnTaizn = (args: Array<string>, cwd = process.cwd(), env: NodeJS.ProcessEnv = {}) =>
   spawnSync(process.execPath, [cliPath, ...args], {
     cwd,
     encoding: "utf8",
@@ -60,15 +60,15 @@ const spawnTaizn = (args: string[], cwd = process.cwd(), env: NodeJS.ProcessEnv 
   });
 
 const runTaiznInProcess = async (
-  args: string[],
+  args: Array<string>,
   cwd = process.cwd(),
   env: NodeJS.ProcessEnv = {},
   commandTimeoutMs = 30_000,
   canRunX86_64 = true,
   platform: NodeJS.Platform = process.platform,
 ): Promise<{ readonly status: number; readonly stderr: string; readonly stdout: string }> => {
-  const stdout: string[] = [];
-  const stderr: string[] = [];
+  const stdout: Array<string> = [];
+  const stderr: Array<string> = [];
 
   const system = Layer.succeed(TaiznSystem)({
     canRunX86_64: Effect.succeed(canRunX86_64),
@@ -95,9 +95,9 @@ const runTaiznInProcess = async (
   };
 };
 
-const joinOutputLines = (lines: readonly string[]) => lines.map((line) => `${line}\n`).join("");
+const joinOutputLines = (lines: ReadonlyArray<string>) => lines.map((line) => `${line}\n`).join("");
 
-const makeCapturedConsole = (stdout: string[], stderr: string[]): Console.Console => {
+const makeCapturedConsole = (stdout: Array<string>, stderr: Array<string>): Console.Console => {
   const realConsole = globalThis.console;
   const format = (args: ReadonlyArray<unknown>) => args.map(String).join(" ");
 
@@ -1002,7 +1002,7 @@ describe("taizn cli", () => {
       );
     });
 
-    const requestUrls: string[] = [];
+    const requestUrls: Array<string> = [];
 
     await waitForHttpServer(infoServer);
     const remoteServer = new WebSocketServer({ host: "127.0.0.1", port: 0 });
@@ -1146,8 +1146,8 @@ describe("taizn cli", () => {
   it("pairs and sends Samsung TV remote keys", async () => {
     const dir = tempDir("taizn-tv-remote-");
     const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
-    const receivedKeys: string[] = [];
-    const requestUrls: string[] = [];
+    const receivedKeys: Array<string> = [];
+    const requestUrls: Array<string> = [];
 
     await waitForServer(server);
 
@@ -2441,7 +2441,7 @@ describe("taizn cli", () => {
   });
 
   const unsafeArchives: ReadonlyArray<{
-    readonly entries: readonly TarEntry[];
+    readonly entries: ReadonlyArray<TarEntry>;
     readonly kind: string;
     readonly leaked: string;
   }> = [
@@ -2594,9 +2594,9 @@ type TarEntry = {
 
 // Hand-rolled ustar records, because system tar refuses to create the unsafe
 // members these tests need.
-const makeTarGz = (entries: readonly TarEntry[]) => {
+const makeTarGz = (entries: ReadonlyArray<TarEntry>) => {
   const typeFlags = { fifo: "6", file: "0", hardlink: "1", symlink: "2" } as const;
-  const blocks: Buffer[] = [];
+  const blocks: Array<Buffer> = [];
 
   for (const entry of entries) {
     const content = Buffer.from(entry.content ?? "");
@@ -3094,7 +3094,7 @@ const machOThin = (cpuType: number) => {
   return bytes;
 };
 
-const machOFat = (cpuTypes: readonly number[]) => {
+const machOFat = (cpuTypes: ReadonlyArray<number>) => {
   const bytes = Buffer.alloc(8 + cpuTypes.length * 20);
   bytes.writeUInt32BE(0xcafebabe, 0);
   bytes.writeUInt32BE(cpuTypes.length, 4);
@@ -3103,7 +3103,7 @@ const machOFat = (cpuTypes: readonly number[]) => {
   return bytes;
 };
 
-const machOFat64 = (cpuTypes: readonly number[]) => {
+const machOFat64 = (cpuTypes: ReadonlyArray<number>) => {
   const bytes = Buffer.alloc(8 + cpuTypes.length * 32);
   bytes.writeUInt32BE(0xcafebabf, 0);
   bytes.writeUInt32BE(cpuTypes.length, 4);
@@ -3199,10 +3199,10 @@ const waitForFile = async (path: string) => {
 const startFakeSellerBrowser = async (
   dir: string,
   extraction: unknown,
-  unansweredMethods: readonly string[] = [],
+  unansweredMethods: ReadonlyArray<string> = [],
 ) => {
-  const methods: string[] = [];
-  const httpPaths: string[] = [];
+  const methods: Array<string> = [];
+  const httpPaths: Array<string> = [];
   const websocketServer = new WebSocketServer({ host: "127.0.0.1", port: 0 });
   await waitForServer(websocketServer);
   const websocketAddress = websocketServer.address();
@@ -3275,11 +3275,11 @@ const startFakeSellerBrowser = async (
 };
 
 const makeStoredZip = (
-  entries: readonly { readonly content: string; readonly name: string }[],
+  entries: ReadonlyArray<{ readonly content: string; readonly name: string }>,
   comment = Buffer.alloc(0),
 ) => {
-  const localEntries: Buffer[] = [];
-  const directoryEntries: Buffer[] = [];
+  const localEntries: Array<Buffer> = [];
+  const directoryEntries: Array<Buffer> = [];
   let localOffset = 0;
 
   for (const entry of entries) {

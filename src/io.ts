@@ -209,7 +209,7 @@ const parseFields = Effect.fn("parseFields")(function* (fields: string | undefin
   return parsed;
 });
 
-const readPath = (source: unknown, segments: readonly string[]) => {
+const readPath = (source: unknown, segments: ReadonlyArray<string>) => {
   let current = source;
 
   for (const segment of segments) {
@@ -223,7 +223,11 @@ const readPath = (source: unknown, segments: readonly string[]) => {
   return current;
 };
 
-const setPath = (target: Record<string, unknown>, segments: readonly string[], value: unknown) => {
+const setPath = (
+  target: Record<string, unknown>,
+  segments: ReadonlyArray<string>,
+  value: unknown,
+) => {
   let current = target;
 
   for (const [index, segment] of segments.entries()) {

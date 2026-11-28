@@ -71,7 +71,7 @@ export function resolveSmokeTarget(checkJson: unknown) {
 }
 
 export function selectBeaconHost(
-  interfaceAddresses: readonly string[],
+  interfaceAddresses: ReadonlyArray<string>,
   target: string | undefined,
 ) {
   const targetHost = parseTargetHost(target);
@@ -143,7 +143,7 @@ export function parseRemoteDelayMs(value: string | undefined) {
   return parsed;
 }
 
-export function failedFetchProbes(fetches: unknown): readonly FetchProbeFailure[] {
+export function failedFetchProbes(fetches: unknown): ReadonlyArray<FetchProbeFailure> {
   if (fetches === undefined) {
     return [];
   }

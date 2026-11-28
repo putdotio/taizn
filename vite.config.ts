@@ -24,7 +24,6 @@ export default defineConfig({
       "quality/no-unknown-returns": "off",
       "quality/no-unsafe-dictionary-type": "off",
       "react-hooks/rules-of-hooks": "off",
-      "typescript/array-type": "off",
       "typescript/no-non-null-assertion": "off",
       "typescript/no-unnecessary-type-assertion": "off",
       "typescript/no-unsafe-argument": "off",

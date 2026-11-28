@@ -29,10 +29,10 @@ type ArchiveConfig = {
     readonly onBoot: boolean;
     readonly ticker: boolean;
   };
-  readonly features: readonly string[];
+  readonly features: ReadonlyArray<string>;
   readonly name?: string;
   readonly packageId?: string;
-  readonly privileges: readonly string[];
+  readonly privileges: ReadonlyArray<string>;
   readonly requiredTizenVersion?: string;
   readonly version?: string;
 };
@@ -265,7 +265,7 @@ const readZipArchive = Effect.fn("readZipArchive")(function* (path: string) {
   return { buffer, entries };
 });
 
-const parseZipEntries = (buffer: Buffer): readonly ZipEntry[] => {
+const parseZipEntries = (buffer: Buffer): ReadonlyArray<ZipEntry> => {
   const endOffset = findEndOfCentralDirectory(buffer);
   const disk = buffer.readUInt16LE(endOffset + 4);
   const centralDisk = buffer.readUInt16LE(endOffset + 6);
@@ -295,7 +295,7 @@ const parseZipEntries = (buffer: Buffer): readonly ZipEntry[] => {
     throw new Error("ZIP central directory location is inconsistent");
   }
 
-  const entries: ZipEntry[] = [];
+  const entries: Array<ZipEntry> = [];
   const names = new Set<string>();
   let offset = centralOffset;
 
@@ -510,8 +510,8 @@ const inspectConfigXml = Effect.fn("inspectConfigXml")(function* (source: string
 });
 
 const parseConfigXml = (source: string): ArchiveConfig => {
-  const features: string[] = [];
-  const privileges: string[] = [];
+  const features: Array<string> = [];
+  const privileges: Array<string> = [];
   let applicationId: string | undefined;
   let autoRestart = false;
   let defaultName: string | undefined;
@@ -664,7 +664,7 @@ const validateArchive = (
 };
 
 const validateSubmissionManifest = (manifest: SubmissionManifest) => {
-  const problems: string[] = [];
+  const problems: Array<string> = [];
   const { widget } = manifest;
 
   if (!manifest.file.name.endsWith(".wgt")) {
@@ -761,7 +761,7 @@ const isCanonicalScreenSizeFeature = (feature: string) =>
 const unavailableSamsungPrivileges = new Set(["keymanager", "systemmanager", "websetting"]);
 
 const validateIdentifier = (label: string, value: string) => {
-  const problems: string[] = [];
+  const problems: Array<string> = [];
 
   if (hasControlCharacter(value)) {
     problems.push(`${label} contains control characters`);

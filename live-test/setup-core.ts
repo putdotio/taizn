@@ -8,12 +8,12 @@ export type LiveSetupOptions = {
 };
 
 export type LiveSetupResult = {
-  readonly keys: readonly string[];
-  readonly missing: readonly string[];
+  readonly keys: ReadonlyArray<string>;
+  readonly missing: ReadonlyArray<string>;
   readonly values: Readonly<Record<string, string>>;
 };
 
-export const liveSetupEnvKeys: readonly string[] = [
+export const liveSetupEnvKeys: ReadonlyArray<string> = [
   "TAIZN_CERT_PASSWORD",
   "TAIZN_DIST_PASSWORD",
   "TAIZN_LIVE_BEACON_HOST",
@@ -147,7 +147,7 @@ export function redactEnvValue(key: string, value: string) {
   return value;
 }
 
-const requiredLiveSetupKeys: readonly string[] = ["TAIZN_CERT_PASSWORD", "TAIZN_DIST_PASSWORD"];
+const requiredLiveSetupKeys: ReadonlyArray<string> = ["TAIZN_CERT_PASSWORD", "TAIZN_DIST_PASSWORD"];
 
 function copyAllowedValues(
   target: Record<string, string>,

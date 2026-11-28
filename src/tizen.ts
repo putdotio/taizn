@@ -64,7 +64,7 @@ type WidgetIndexOptions = {
 };
 
 type WidgetStageOptions = WidgetIndexOptions & {
-  readonly excludeFiles: readonly string[];
+  readonly excludeFiles: ReadonlyArray<string>;
 };
 
 type RunOptions = {
@@ -770,7 +770,7 @@ const assertBuildOutput = Effect.fn("assertBuildOutput")(function* (config: Tize
 });
 
 const removeExcludedStageFiles = Effect.fn("removeExcludedStageFiles")(function* (
-  excludeFiles: readonly string[],
+  excludeFiles: ReadonlyArray<string>,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const paths = yield* getPaths();
@@ -1012,7 +1012,7 @@ const loadInstalledApplications = Effect.fn("loadInstalledApplications")(functio
   return { applications: parseInstalledApplications(output), target };
 });
 
-const parseInstalledApplications = (output: string): readonly TizenApplication[] =>
+const parseInstalledApplications = (output: string): ReadonlyArray<TizenApplication> =>
   output.split("\n").flatMap((line) => {
     const match = line.match(/^\s*'([^']*)'\s+'([^']*)'\s*$/);
     const name = match?.[1]?.trim();
@@ -1033,7 +1033,7 @@ const matchesApplicationQuery = (
 
 const resolveInstalledApplication = Effect.fn("resolveInstalledApplication")(function* (
   query: string,
-  applications: readonly TizenApplication[],
+  applications: ReadonlyArray<TizenApplication>,
 ) {
   const queryLabel = query.trim();
   const normalizedQuery = normalizeQuery(queryLabel);
