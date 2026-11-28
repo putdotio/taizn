@@ -191,6 +191,7 @@ describe("seller applications extraction", () => {
   });
 
   it("omits updatedAt when the card has no date field", () => {
+    // SAFETY: the fixture builds one card whose fields are all strings.
     const result = evaluateSellerPage("/tv/tizen-application", {
       cards: [
         makeCard({

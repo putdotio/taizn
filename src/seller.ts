@@ -272,6 +272,7 @@ const browserTreeExists = (pid: number) => {
 
     return true;
   } catch (error) {
+    // SAFETY: process.kill throws Node system errors, which carry an errno code.
     if ((error as NodeJS.ErrnoException).code === "ESRCH") {
       return false;
     }
@@ -306,6 +307,7 @@ const stopBrowser = async (child: ChildProcess) => {
       stdio: "ignore",
     });
 
+    // SAFETY: a ChildProcess "exit" event passes the exit code as its first argument.
     const [code] = (await once(killer, "exit")) as [number | null];
 
     if (code !== 0) {
@@ -325,6 +327,7 @@ const stopBrowser = async (child: ChildProcess) => {
     try {
       process.kill(-pid, name);
     } catch (error) {
+      // SAFETY: process.kill throws Node system errors, which carry an errno code.
       if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
         throw error;
       }
