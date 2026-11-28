@@ -3,7 +3,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { homedir, networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   envFlagEnabled,
   failedFetchProbes,
@@ -20,7 +19,7 @@ import {
   selectBeaconHost,
 } from "./harness-core.ts";
 
-const liveTestDir = dirname(fileURLToPath(import.meta.url));
+const liveTestDir = import.meta.dirname;
 const appDir = join(liveTestDir, "app");
 const cliPath = resolve(liveTestDir, "..", "dist", "taizn.mjs");
 const envPath = join(appDir, ".taizn", ".env");

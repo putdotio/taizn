@@ -1,7 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import {
   buildLiveSetupEnv,
   parseEnvAssignments,
@@ -11,7 +10,7 @@ import {
 } from "./setup-core.ts";
 import type { LiveSetupOptions } from "./setup-core.ts";
 
-const liveTestDir = dirname(fileURLToPath(import.meta.url));
+const liveTestDir = import.meta.dirname;
 const fixtureAppDir = join(liveTestDir, "app");
 const fixtureStateDir = join(fixtureAppDir, ".taizn");
 const fixtureEnvPath = join(fixtureStateDir, ".env");
