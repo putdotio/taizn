@@ -623,7 +623,7 @@ const readXmlAttribute = (tag: SaxesTagNS, local: string, uri = "") =>
     (attribute) => attribute.local === local && attribute.uri === uri,
   )?.value;
 
-const normalizeXmlName = (value: string) => value.replace(/\p{White_Space}+/gu, " ").trim();
+const normalizeXmlName = (value: string) => value.replaceAll(/\p{White_Space}+/gu, " ").trim();
 
 const widgetNamespace = "http://www.w3.org/ns/widgets";
 const tizenNamespace = "http://tizen.org/ns/widgets";
