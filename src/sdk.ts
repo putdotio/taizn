@@ -131,6 +131,7 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
   if (installed) {
     yield* Console.log(`Tizen Studio already installed at ${studioDir}`);
   } else {
+    // SAFETY: the default download dir is a private mkdtemp, so nobody can swap the installer before it runs.
     yield* Effect.scoped(
       Effect.gen(function* () {
         const directory =
@@ -357,6 +358,7 @@ export const restoreSdk = Effect.fn("restoreSdk")(function* (
     return yield* new MissingFile({ label: "SDK archive", path: archive });
   }
 
+  // SAFETY: extract into private staging and validate names, link targets and types on disk before renaming into home.
   const roots = yield* Effect.scoped(
     Effect.gen(function* () {
       const staging = yield* fs
@@ -451,6 +453,7 @@ const pathKind = Effect.fn("pathKind")(function* (path: string) {
 
 const invalidArchive = (details: string) => new InvalidInput({ details, label: "SDK archive" });
 
+// SAFETY: never follows links; only files, directories and relative symlinks inside the backup roots pass.
 const validateTree = Effect.fn("validateTree")(function* (
   base: string,
   roots: ReadonlyArray<string>,
