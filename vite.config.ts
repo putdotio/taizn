@@ -13,27 +13,34 @@ export default defineConfig({
       "anti-slop-effect/prefer-effect-match": "off",
       "anti-slop/no-runtime-typeof": "off",
       "anti-slop/no-unknown-parameters": "off",
-      "anti-slop/require-safety-comment-for-type-assertion": "off",
       "array-callback-return": "off",
-      "no-console": "off",
-      "no-promise-executor-return": "off",
       "quality/no-conditional-empty-object-spread": "off",
       "quality/no-known-value-widening": "off",
       "quality/no-reflect-get": "off",
       "quality/no-unknown-returns": "off",
       "quality/no-unsafe-dictionary-type": "off",
-      "react-hooks/rules-of-hooks": "off",
-      "typescript/no-non-null-assertion": "off",
       "typescript/no-unsafe-argument": "off",
       "typescript/no-unsafe-assignment": "off",
       "typescript/no-unsafe-call": "off",
       "typescript/no-unsafe-return": "off",
       "typescript/no-unsafe-type-assertion": "off",
       "uinaf/no-comments": "off",
-      "unicorn/consistent-function-scoping": "off",
-      "unicorn/prefer-structured-clone": "off",
       "unicorn/prefer-top-level-await": "off",
     },
+    overrides: [
+      {
+        files: ["live-test/**"],
+        rules: {
+          "no-console": "off",
+        },
+      },
+      {
+        files: ["test/seller.test.ts"],
+        rules: {
+          "unicorn/prefer-structured-clone": "off",
+        },
+      },
+    ],
   },
   test: {
     coverage: {
