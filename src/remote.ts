@@ -691,7 +691,7 @@ const connectRemotePromise = (
             }
           });
         } catch (error) {
-          fail(new TvRemoteConnectionFailed({ error, target: remoteTarget(options) }), true);
+          fail(new TvRemoteConnectionFailed({ cause: error, target: remoteTarget(options) }), true);
 
           return;
         }

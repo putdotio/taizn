@@ -65,7 +65,9 @@ export const resolveOutputPath = Effect.fn("resolveOutputPath")(function* (reque
         Effect.catch((error) =>
           error.reason._tag === "NotFound"
             ? Effect.succeed(undefined)
-            : Effect.fail(new FileSystemFailure({ error, operation: "realpath", path: candidate })),
+            : Effect.fail(
+                new FileSystemFailure({ cause: error, operation: "realpath", path: candidate }),
+              ),
         ),
       );
 
@@ -78,7 +80,7 @@ export const resolveOutputPath = Effect.fn("resolveOutputPath")(function* (reque
             error.reason._tag === "NotFound"
               ? Effect.succeed(undefined)
               : Effect.fail(
-                  new FileSystemFailure({ error, operation: "readlink", path: candidate }),
+                  new FileSystemFailure({ cause: error, operation: "readlink", path: candidate }),
                 ),
           ),
         );
