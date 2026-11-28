@@ -72,7 +72,6 @@ export const resolveOutputPath = Effect.fn("resolveOutputPath")(function* (reque
       );
 
     if (canonical === undefined) {
-      // realpath also reports NotFound for dangling links. Never write through one.
       const link = yield* fs
         .readLink(candidate)
         .pipe(

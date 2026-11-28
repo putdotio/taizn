@@ -34,8 +34,6 @@ export type SdkRestoreOptions = {
   readonly json?: boolean;
 };
 
-// Tizen Studio's default home-relative layout. Certificate mode keeps signing
-// state only; full mode adds the SDK, its data, extensions, and workspace.
 const certificateRoots = [
   "SamsungCertificate",
   ".tizen",
@@ -107,7 +105,6 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
     return yield* new TizenStudioIncomplete({ path: studioDir });
   }
 
-  // Samsung's installer rejects these destinations but still exits 0.
   if (!installed && (!isInside(home, studioDir) || /[^\u0021-\u007e]/.test(studioDir))) {
     return yield* new InvalidInput({
       details: `Samsung's installer needs a path inside ${home} without spaces or non-ASCII characters. Received: ${studioDir}`,
@@ -134,8 +131,6 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
   if (installed) {
     yield* Console.log(`Tizen Studio already installed at ${studioDir}`);
   } else {
-    // Without --download-dir the installer lands in a private mkdtemp directory
-    // so nobody else can swap it between download and execution.
     yield* Effect.scoped(
       Effect.gen(function* () {
         const directory =
@@ -185,7 +180,6 @@ export const installSdk = Effect.fn("installSdk")(function* (options: SdkInstall
     }
   }
 
-  // The package manager reuses a JDK cached here; a stale one breaks package installs.
   const jdkCache = join(home, ".package-manager/jdk");
   yield* fs
     .remove(jdkCache, { force: true, recursive: true })
@@ -229,7 +223,6 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
   const home = yield* system.homeDir;
   const platform = yield* system.platform;
 
-  // Windows ignores POSIX modes, so the archive could not be made owner-only.
   if (platform === "win32") {
     return yield* new UnsupportedPlatform({
       operation: "taizn sdk backup",
@@ -260,7 +253,6 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
       continue;
     }
 
-    // tar stores a symlinked root as the link itself, not the signing state behind it.
     if (kind === "SymbolicLink") {
       return yield* new InvalidInput({
         details: `${path} is a symlink; the archive would hold only the link`,
@@ -299,8 +291,6 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
     }
   }
 
-  // Restore rejects links that leave the backup roots, so refuse to write an
-  // archive it could not restore.
   yield* validateTree(home, included);
 
   const result = {
@@ -316,8 +306,6 @@ export const backupSdk = Effect.fn("backupSdk")(function* (
       .makeDirectory(outputDir, { recursive: true })
       .pipe(Effect.mapError(fsFailure("mkdir", outputDir)));
 
-    // Stage in a private directory beside the output, then rename into place so
-    // a failed tar never leaves a partial archive.
     if ((yield* pathKind(output)) !== "missing") {
       return yield* new ArchiveExists({ path: output });
     }
@@ -369,10 +357,6 @@ export const restoreSdk = Effect.fn("restoreSdk")(function* (
     return yield* new MissingFile({ label: "SDK archive", path: archive });
   }
 
-  // Extract into a fresh private directory, validate what tar actually wrote,
-  // then rename it into home. Names, link targets, and entry types are checked
-  // on disk, so nothing tar does on extraction can reach outside the staging tree.
-  // Real restores stage inside home so the final renames stay on one filesystem.
   const roots = yield* Effect.scoped(
     Effect.gen(function* () {
       const staging = yield* fs
@@ -442,7 +426,6 @@ const isInside = (parent: string, path: string) => {
 
 type PathKind = "missing" | FileSystem.File.Type;
 
-// FileSystem has no lstat: readLink tells links apart, stat types everything else.
 const pathKind = Effect.fn("pathKind")(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
 
@@ -468,8 +451,6 @@ const pathKind = Effect.fn("pathKind")(function* (path: string) {
 
 const invalidArchive = (details: string) => new InvalidInput({ details, label: "SDK archive" });
 
-// Walks `roots` under `base` without following links. Only regular files,
-// directories, and relative symlinks that stay inside the backup roots pass.
 const validateTree = Effect.fn("validateTree")(function* (
   base: string,
   roots: ReadonlyArray<string>,
@@ -525,11 +506,6 @@ const resolveExisting = Effect.fn("resolveExisting")(function* (
   return parent === path ? path : join(yield* resolveExisting(parent), relative(parent, path));
 });
 
-// Plans the renames that publish the staged tree into home. Missing destinations
-// take the whole staged subtree; existing directories are merged. rename()
-// replaces an existing file or symlink without following it, but a staged
-// directory over an existing symlink or a file/directory clash stops the
-// restore before anything moves.
 const planMoves = Effect.fn("planMoves")(function* (
   staging: string,
   home: string,

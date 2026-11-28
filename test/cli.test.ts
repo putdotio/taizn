@@ -46,9 +46,6 @@ const tempDir = (prefix: string) => {
   return dir;
 };
 
-// Kept for the boundary tests below that prove the packaged binary itself:
-// boot, stream separation, and exit codes. Everything else runs the same CLI
-// entry in-process through runTaiznInProcess so V8 coverage attributes it.
 const spawnTaizn = (args: Array<string>, cwd = process.cwd(), env: NodeJS.ProcessEnv = {}) =>
   spawnSync(process.execPath, [cliPath, ...args], {
     cwd,
@@ -560,8 +557,6 @@ describe("taizn cli", () => {
     assert.strictEqual(inventory.target, "127.0.0.1:26101");
   });
 
-  // Spawned: asserts the launched tool's inherited stdio reaches the CLI's own
-  // stdout, which only exists at the real process boundary.
   it("launches an installed Tizen application without requiring a project config", () => {
     const dir = createToolingFixture();
 
@@ -1113,9 +1108,7 @@ describe("taizn cli", () => {
   });
 
   it("times out stalled Samsung TV info requests", async () => {
-    const server = createServer((_request, _response) => {
-      // Keep the request open to exercise the AbortSignal timeout path.
-    });
+    const server = createServer((_request, _response) => {});
 
     try {
       await waitForHttpServer(server);
@@ -1579,9 +1572,7 @@ describe("taizn cli", () => {
         if (pid !== undefined) {
           try {
             process.kill(pid, "SIGKILL");
-          } catch {
-            /* Already reaped. */
-          }
+          } catch {}
         }
 
         await resultPromise;
@@ -2593,8 +2584,6 @@ type TarEntry = {
   readonly type: "fifo" | "file" | "hardlink" | "symlink";
 };
 
-// Hand-rolled ustar records, because system tar refuses to create the unsafe
-// members these tests need.
 const makeTarGz = (entries: ReadonlyArray<TarEntry>) => {
   const typeFlags = { fifo: "6", file: "0", hardlink: "1", symlink: "2" } as const;
   const blocks: Array<Buffer> = [];

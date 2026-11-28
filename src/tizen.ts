@@ -317,7 +317,6 @@ export const runWidget = Effect.fn("runWidget")(function* (
   const tizenPath = yield* resolveTizenCli(env);
   const target = yield* resolveRunTarget(env, sdbPath, { quiet: options.dryRun });
 
-  // Real Samsung TVs launch web widgets here by application id; package id fails.
   const runArgs = target
     ? ["run", "-p", variant.applicationId, target.flag, target.value]
     : ["run", "-p", variant.applicationId];
@@ -637,8 +636,6 @@ export const requireNativeOrRosetta = Effect.fn("requireNativeOrRosetta")(functi
     return;
   }
 
-  // The Tizen Studio `tizen` wrapper is a shell script that runs the bundled
-  // JDK at <tizen-studio>/jdk/Contents/Home on macOS, relative to tools/ide/bin.
   const realPath = yield* fs
     .realPath(path)
     .pipe(
@@ -1126,8 +1123,6 @@ export const run = Effect.fn("run")(function* (
     cwd: options.cwd ?? paths.appDir,
     forceKillAfter: options.finite ? "1 second" : undefined,
     env,
-    // Quiet runs keep the child's output off the terminal so structured output
-    // stays parseable; stderr is kept for the failure's cause.
     stderr: options.quiet ? "pipe" : "inherit",
     stdin: "inherit",
     stdout: options.quiet ? "ignore" : "inherit",
